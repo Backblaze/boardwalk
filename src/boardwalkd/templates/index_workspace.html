@@ -1,0 +1,130 @@
+<div class="div row">
+    <div class="col">
+        <h2>Workspaces</h2>
+    </div>
+    <div class="col text-end">
+        {% if edit %}
+        <a href="/" class="btn btn-sm btn-light border-danger" aria-current="Exit workspace edit mode"
+            title="Exit workspace edit mode">Edit</a>
+        {% else %}
+        <a href="/?edit=1" class="btn btn-sm btn-light" aria-current="Enter workspace edit mode"
+            title="Enter workspace edit mode">Edit</a>
+        {% end %}
+    </div>
+</div>
+{% for workspace_name, workspace in sorted(workspaces.items()) %}
+<div class="row pb-2">
+    <div class="container bg-light border border-dark rounded">
+        <div class="row pt-2 pb-2 border-bottom border-dark">
+            <div class="col-xxl-4 col-xl-5 col-l-12">
+                <span class="h3" id="{{ workspace_name }}">{{ workspace_name }}</span>
+            </div>
+            <div class="col col-xxl-7 col-xl-6 col-l-6 col-sm-6 col-10">
+                <span class="h4 ms-1">
+                    {% if secondsdelta(workspace.last_seen) > 10 %}
+                    <span
+                        title="No worker connected to this workspace. Last seen {{ workspace.last_seen }} (UTC)">⚪️</span>
+                    {% else %}
+                    <span title="Worker is connected to this workspace">🟢</span>
+                    {% end %}
+                    {% if workspace.semaphores.has_mutex %}
+                    <span title="Worker has mutex on this workspace">🔒</span>
+                    {% else %}
+                    <span title="No worker has a mutex on this workspace">🔓</span>
+                    {% end %}
+                </span>
+            </div>
+            <div class="col-xxl-1 col-xl-1 col-l-6 col-sm-6 col-2 text-end">
+                {% if workspace.semaphores.caught %}
+                {% include "index_workspace_release.html" %}
+                {% else %}
+                {% include "index_workspace_catch.html" %}
+                {% end %}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-xxl-4 col-xl-5">
+                <table class="table workspace-details-table">
+                    <tbody>
+                        <tr>
+                            <th scope="row">Workflow</th>
+                            <td>{{ workspace.details.workflow }}</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Worker</th>
+                            <td>{{ workspace.details.worker_username }}@{{ workspace.details.worker_hostname }}</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Host Pattern</th>
+                            <td>{{ workspace.details.host_pattern }}</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Command</th>
+                            <td>{{ workspace.details.worker_command }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="col-xxl-8 col-xl-7 workspace-events-preview-col">
+                <div class="workspace-events-container">
+                    <table class="table table-borderless">
+                        <tbody>
+                            {% for event in sort_events_by_date(workspace.events)[:6] %}
+                            {% if event.severity == "info" %}
+                            <tr title="{{ event.create_time }}">
+                                <td>{{ event.severity }}</td>
+                                <td>{{ squeeze(event.message) }}</td>
+                            </tr>
+                            {% end %}
+                            {% if event.severity == "success" %}
+                            <tr title="{{ event.create_time }}" class="border-end border-2 border-success">
+                                <td>{{ event.severity }}</td>
+                                <td>{{ squeeze(event.message) }}</td>
+                            </tr>
+                            {% end %}
+                            {% if event.severity == "error" %}
+                            <tr title="{{ event.create_time }}" class="border-end border-2 border-danger">
+                                <td>{{ event.severity }}</td>
+                                <td>{{ squeeze(event.message) }}</td>
+                            </tr>
+                            {% end %}
+                            {% end %}
+                        </tbody>
+                    </table>
+                </div>
+                <a href="/workspace/{{ workspace_name }}/events" class="more-events btn btn-sm btn-secondary"
+                    aria-current="More events" title="More events"
+                    style="--bs-btn-padding-y: .25rem; --bs-btn-padding-x: .5rem; --bs-btn-font-size: .75rem;">More</a>
+            </div>
+        </div>
+        {% if edit %}
+        <div class="row pt-2 pb-2 border-top border-dark">
+            <div class="btn-group btn-group-sm" role="edit group" aria-label="edit button group">
+                {% if secondsdelta(workspace.last_seen) < 10 %} <button type="button" class="btn btn-danger"
+                    title="Clears the worker mutex" disabled>Clear
+                    mutex</button>
+                    {% elif workspace.semaphores.has_mutex %}
+                    <button type="button" class="btn btn-danger" title="Clears the worker mutex"
+                        hx-delete="/workspace/{{ workspace_name }}/semaphores/has_mutex" hx-trigger="click"
+                        hx-confirm="Are you sure you want to clear the mutex on workspace &quot;{{ workspace_name }}&quot;?">Clear
+                        mutex</button>
+                    {% else %}
+                    <button type="button" class="btn btn-danger" title="Clears the worker mutex" disabled>Clear
+                        mutex</button>
+                    {% end %}
+                    {% if workspace.semaphores.has_mutex or secondsdelta(workspace.last_seen) < 10 %} <button
+                        type="button" class="btn btn-danger" title="Deletes the workspace data from the server"
+                        disabled>Delete
+                        workspace</button>
+                        {% else %}
+                        <button type="button" class="btn btn-danger" title="Deletes the workspace data from the server"
+                            hx-post="/workspace/{{ workspace_name }}/delete" hx-trigger="click"
+                            hx-confirm="Are you sure you want to delete the workspace &quot;{{ workspace_name }}&quot; from the server?">Delete
+                            workspace</button>
+                        {% end %}
+            </div>
+        </div>
+        {% end %}
+    </div>
+</div>
+{% end %}

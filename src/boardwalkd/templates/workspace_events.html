@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block main %}
+<section id="Events">
+    <div class="div container-lg">
+        <div class="row">
+            <div class="col">
+                <h2>{{ workspace_name}} Events</h2>
+            </div>
+        </div>
+        <div class="row pb-2">
+            <div class="container bg-light border border-dark rounded">
+                <div class="col workspace-events-table">
+                    <table class="table table-borderless">
+                        <tbody hx-get="/workspace/{{ workspace_name }}/events/table" hx-trigger="load, every 8s"
+                            hx-swap="innerHTML">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% end %}

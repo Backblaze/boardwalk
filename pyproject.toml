@@ -1,0 +1,13 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools>=62"]
+
+[tool.pyright]
+exclude = [
+    "build/",
+    "typings/",
+]
+pythonPlatform = "All"
+reportImportCycles = false
+reportMissingTypeStubs = false
+typeCheckingMode = "strict"

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap CSS -->
+    <link href="{{ static_url('bootstrap.min.css') }}" rel="stylesheet">
+    <!-- BoardwalkD CSS -->
+    <link href="{{ static_url('boardwalkd.css') }}" rel="stylesheet">
+
+    <title>Boardwalk · {{ title }}</title>
+
+    {% block head %}{% end %}
+
+</head>
+{# The line below causes the _xsrf cookie to always be set #}
+<!-- {% module xsrf_form_html() %} -->
+<script>
+    function getCookie(name) {
+        var r = document.cookie.match("\\b" + name + "=([^;]*)\\b");
+        return r ? r[1] : undefined;
+    }
+</script>
+
+<body hx-headers='js:{"X-XSRFToken": getCookie("_xsrf")}'>
+    <nav class="navbar">
+        <div class="container-xxl border-bottom">
+            <a href="/" class="navbar-brand text-dark">
+                Boardwalk
+                <font size="1" class="text-muted">{{ server_version() }}</font>
+            </a>
+        </div>
+    </nav>
+
+    <main>
+        {% block main %}{% end %}
+    </main>
+
+    <!-- Bootstrap JS -->
+    <script src="{{ static_url('bootstrap.bundle.min.js') }}" defer></script>
+    <!-- htmx JS -->
+    <script src="{{ static_url('htmx.min.js') }}" defer></script>
+    {% block bottom %}{% end %}
+</body>
+
+</html>

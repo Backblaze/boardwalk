@@ -1,0 +1,32 @@
+.workspace-details-table td {
+    font-family: monospace;
+    text-align: end;
+    max-width: 290px;
+    word-wrap: break-word;
+}
+
+.workspace-events-preview-col {
+    position: relative;
+}
+
+.workspace-events-preview-col table {
+    font-family: monospace;
+}
+
+.workspace-events-container {
+    height: 200px;
+    overflow-y: hidden;
+    overflow-x: hidden;
+}
+
+.workspace-events-table {
+    font-family: monospace;
+    overflow-y: hidden;
+    overflow-x: none;
+}
+
+.more-events {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+}

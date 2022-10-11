@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block main %}
+<section id="workspaces">
+    {% if edit %}
+    <div class="container-lg" hx-get="/workspaces?edit=1" hx-trigger="load, every 8s" hx-swap="innerHTML">
+    </div>
+    {% else %}
+    <div class="container-lg" hx-get="/workspaces" hx-trigger="load, every 8s" hx-swap="innerHTML">
+    </div>
+    {% end %}
+</section>
+{% end %}
