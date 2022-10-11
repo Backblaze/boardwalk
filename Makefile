@@ -68,7 +68,7 @@ test-black:
 	black . --check
 
 .PHONY: test-pyright
-test-pyright:
+test-pyright: develop
 	pyright
 
 .PHONY: test-usort
