@@ -8,6 +8,9 @@ plenty of detail and context.
 ## Development Guidelines
 
 ### Development Dependencies
+In addition to the python version specified in the `setup.cfg` and `pip`, you
+will need:
+
 - `black` (`pip3 install black`)
 - `build` (`pip3 install build`)
 - `make`
