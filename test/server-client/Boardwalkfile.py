@@ -1,4 +1,11 @@
-from boardwalk import AnsibleTasksType, Job, Workflow, Workspace, WorkspaceConfig
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from boardwalk import Job, Workflow, Workspace, WorkspaceConfig
+
+if TYPE_CHECKING:
+    from boardwalk import AnsibleTasksType
 
 boardwalkd_url = "http://localhost:8888/"
 
