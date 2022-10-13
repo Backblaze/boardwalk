@@ -14,7 +14,7 @@ class LocalState(StateBaseModel):
     """Model for local workspace state"""
 
     host_pattern: str
-    hosts: dict[str, Host] = {}
+    hosts: dict[str, Foobar] = {}
 
 
 class RemoteStateWorkflow(StateBaseModel):
