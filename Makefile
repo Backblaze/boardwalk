@@ -58,11 +58,11 @@ install:
 	python3 -m pip install --upgrade .
 
 
-# Installs/updates JS dependencies in boardwalkd
+# Installs/updates JS/CSS dependencies in boardwalkd
 BOOTSTRAP_VERSION := 5.2.2
 HTMX_VERSION := 1.8.2
-.PHONY: install-js-deps
-install-js-deps:
+.PHONY: install-web-deps
+install-web-deps:
 	curl "https://unpkg.com/htmx.org@$(HTMX_VERSION)/dist/htmx.min.js" -o src/boardwalkd/static/htmx.min.js
 	curl "https://cdn.jsdelivr.net/npm/bootstrap@$(BOOTSTRAP_VERSION)/dist/css/bootstrap.min.css" -o src/boardwalkd/static/bootstrap.min.css
 	curl "https://cdn.jsdelivr.net/npm/bootstrap@$(BOOTSTRAP_VERSION)/dist/js/bootstrap.bundle.min.js" -o src/boardwalkd/static/bootstrap.bundle.min.js
