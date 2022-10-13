@@ -67,10 +67,12 @@ test: test-black test-pyright test-usort
 test-black:
 	black . --check
 
+# Perform type analysis
 .PHONY: test-pyright
 test-pyright: develop
 	pyright
 
+# Ensure imports are formatted in a uniform way
 .PHONY: test-usort
 test-usort:
 	usort check .
