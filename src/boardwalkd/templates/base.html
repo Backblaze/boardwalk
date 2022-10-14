@@ -28,9 +28,12 @@
 <body hx-headers='js:{"X-XSRFToken": getCookie("_xsrf")}'>
     <nav class="navbar">
         <div class="container-xxl border-bottom">
-            <a href="/" class="navbar-brand text-dark">
+            <a href="/" class="navbar-brand text-dark text-left">
                 Boardwalk
                 <font size="1" class="text-muted">{{ server_version() }}</font>
+            </a>
+            <a href="/admin" class="navbar-brand text-secondary text-right">
+                <font size="3">Administration</font>
             </a>
         </div>
     </nav>
