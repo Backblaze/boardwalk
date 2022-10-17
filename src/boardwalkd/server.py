@@ -52,7 +52,9 @@ class UIBaseHandler(tornado.web.RequestHandler):
 
     def get_current_user(self):
         """Required method for @tornado.web.authenticated to work"""
-        return self.get_secure_cookie("boardwalk_user")
+        return self.get_secure_cookie(
+            "boardwalk_user", max_age_days=self.settings["auth_expire_days"]
+        )
 
 
 """
@@ -93,7 +95,11 @@ class AnonymousLoginHandler(UIBaseHandler):
     """Handles "logging in" the UI when no auth is actually configured"""
 
     async def get(self):  # pyright: reportIncompatibleMethodOverride=false
-        self.set_secure_cookie("boardwalk_user", "anonymous@example.com")
+        self.set_secure_cookie(
+            "boardwalk_user",
+            "anonymous@example.com",
+            expires_days=self.settings["auth_expire_days"],
+        )
         return self.redirect(
             self.get_query_argument("next", "/")
         )  # pyright: reportGeneralTypeIssues=false
@@ -113,7 +119,11 @@ class GoogleOAuth2LoginHandler(UIBaseHandler, tornado.auth.GoogleOAuth2Mixin):
                 "https://www.googleapis.com/oauth2/v1/userinfo",
                 access_token=access["access_token"],
             )
-            self.set_secure_cookie("boardwalk_user", user["email"])
+            self.set_secure_cookie(
+                "boardwalk_user",
+                user["email"],
+                expires_days=self.settings["auth_expire_days"],
+            )
             return self.redirect("/")
         except tornado.web.MissingArgumentError:
             return self.authorize_redirect(
@@ -388,6 +398,7 @@ Server functions
 
 
 def make_server(
+    auth_expire_days: float,
     auth_method: str,
     develop: bool,
     host_header_pattern: re.Pattern[str],
@@ -398,6 +409,7 @@ def make_server(
     """Builds the tornado application server object"""
     handlers: list[tornado.web.OutputTransform] = []
     settings = {
+        "auth_expire_days": auth_expire_days,
         "login_url": url + "/auth/login",
         "slack_webhook_url": slack_webhook_url,
         "slack_error_webhook_url": slack_error_webhook_url,
@@ -500,6 +512,7 @@ def make_server(
 
 
 async def run(
+    auth_expire_days: float,
     auth_method: str,
     develop: bool,
     host_header_pattern: re.Pattern[str],
@@ -510,6 +523,7 @@ async def run(
 ):
     """Starts the tornado server and IO loop"""
     server = make_server(
+        auth_expire_days=auth_expire_days,
         auth_method=auth_method,
         develop=develop,
         host_header_pattern=host_header_pattern,

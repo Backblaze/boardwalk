@@ -24,6 +24,13 @@ def cli():
 
 @cli.command()
 @click.option(
+    "--auth-expire-days",
+    help="The number of days login tokens and user API keys are valid before they expire",
+    type=float,
+    default=30,
+    show_default=True,
+)
+@click.option(
     "--auth-method",
     help=(
         "Enables an authentication method for the web UI, and causes the API to require auth."
@@ -85,6 +92,7 @@ def cli():
     required=True,
 )
 def serve(
+    auth_expire_days: float,
     auth_method: str,
     develop: bool,
     host_header_pattern: str,
@@ -101,6 +109,7 @@ def serve(
 
     asyncio.run(
         run(
+            auth_expire_days=auth_expire_days,
             auth_method=auth_method,
             develop=develop,
             host_header_pattern=host_header_regex,
