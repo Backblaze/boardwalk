@@ -388,8 +388,8 @@ Server functions
 
 
 def make_server(
+    auth_method: str,
     develop: bool,
-    enable_google_oauth: bool,
     host_header_pattern: re.Pattern[str],
     slack_error_webhook_url: str,
     slack_webhook_url: str,
@@ -401,7 +401,6 @@ def make_server(
         "login_url": url + "/auth/login",
         "slack_webhook_url": slack_webhook_url,
         "slack_error_webhook_url": slack_error_webhook_url,
-        "enable_google_oauth": enable_google_oauth,
         "static_path": module_dir.joinpath("static"),
         "template_path": module_dir.joinpath("templates"),
         "ui_methods": {
@@ -416,15 +415,7 @@ def make_server(
         settings["debug"] = True
 
     # Set-up authentication
-    if enable_google_oauth:
-        any_auth_enabled = True
-    else:
-        any_auth_enabled = False
-
-    if not any_auth_enabled:
-        handlers.append((r"/auth/login", AnonymousLoginHandler))
-        settings["cookie_secret"] = "ANONYMOUS"
-    elif any_auth_enabled:
+    if auth_method != "anonymous":
         try:
             settings["cookie_secret"] = os.environ["BOARDWALK_SECRET"]
         except KeyError:
@@ -434,7 +425,13 @@ def make_server(
                     " authentication method is enabled in order to generate secure cookies"
                 )
             )
-        if enable_google_oauth:
+
+    # Bootstrap the chosen auth_method
+    match auth_method:
+        case "anonymous":
+            handlers.append((r"/auth/login", AnonymousLoginHandler))
+            settings["cookie_secret"] = "ANONYMOUS"
+        case "google_oauth":
             try:
                 settings["google_oauth"] = {
                     "key": os.environ["BOARDWALK_GOOGLE_OAUTH_CLIENT_ID"],
@@ -444,10 +441,14 @@ def make_server(
                 raise ClickException(
                     (
                         "BOARDWALK_GOOGLE_OAUTH_CLIENT_ID and BOARDWALK_GOOGLE_OAUTH_SECRET env vars"
-                        " are required when --enable-google-oauth is set"
+                        " are required when auth_method is google_oauth"
                     )
                 )
             handlers.append((r"/auth/login", GoogleOAuth2LoginHandler))
+        case _:
+            raise ClickException(f"auth_method {auth_method} is not supported")
+
+    # Set-up all the main handlers
     handlers.extend(
         [
             # UI handlers
@@ -486,13 +487,21 @@ def make_server(
             ),
         ]
     )
-    rules = [(HostMatches(host_header_pattern), handlers)]
+
+    # Configure rules
+    rules = [
+        (  # Used to prevent DNS rebinding attacks
+            HostMatches(host_header_pattern),
+            handlers,
+        )
+    ]
+
     return tornado.web.Application(rules, **settings)
 
 
 async def run(
+    auth_method: str,
     develop: bool,
-    enable_google_oauth: bool,
     host_header_pattern: re.Pattern[str],
     port_number: int,
     slack_error_webhook_url: str,
@@ -501,8 +510,8 @@ async def run(
 ):
     """Starts the tornado server and IO loop"""
     server = make_server(
+        auth_method=auth_method,
         develop=develop,
-        enable_google_oauth=enable_google_oauth,
         host_header_pattern=host_header_pattern,
         slack_error_webhook_url=slack_error_webhook_url,
         slack_webhook_url=slack_webhook_url,
