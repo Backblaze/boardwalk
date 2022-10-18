@@ -20,6 +20,7 @@ import tornado.web
 import tornado.websocket
 from click import ClickException
 from pydantic import ValidationError
+from tornado.log import access_log, app_log
 from tornado.routing import HostMatches
 
 from boardwalkd.broadcast import handle_slack_broadcast
@@ -285,7 +286,7 @@ class WorkspaceDetailsApiHandler(APIBaseHandler):
         try:
             new_details = WorkspaceDetails().parse_obj(payload)
         except ValidationError as e:
-            logging.error(e)
+            app_log.error(e)
             return self.send_error(422)
 
         try:
@@ -331,7 +332,7 @@ class WorkspaceEventApiHandler(APIBaseHandler):
         try:
             event = WorkspaceEvent.parse_obj(payload)
         except ValidationError as e:
-            logging.error(e)
+            app_log.error(e)
             return self.send_error(422)
 
         event.received_time = datetime.utcnow()
@@ -341,7 +342,7 @@ class WorkspaceEventApiHandler(APIBaseHandler):
         except KeyError:
             return self.send_error(404)
 
-        logging.info(
+        app_log.info(
             f"worker_event: {self.request.remote_ip} {workspace} {event.severity} {event.message}"
         )
 
@@ -532,5 +533,5 @@ async def run(
         url=url,
     )
     server.listen(port_number)
-    logging.info(f"Server listening on port: {port_number}")
+    app_log.info(f"Server listening on port: {port_number}")
     await asyncio.Event().wait()
