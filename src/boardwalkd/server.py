@@ -51,7 +51,7 @@ class BaseHandler(tornado.web.RequestHandler):
 class UIBaseHandler(tornado.web.RequestHandler):
     """Base request handler for UI paths"""
 
-    def get_current_user(self):
+    def get_current_user(self) -> bytes | None:
         """Required method for @tornado.web.authenticated to work"""
         return self.get_secure_cookie(
             "boardwalk_user", max_age_days=self.settings["auth_expire_days"]
@@ -398,6 +398,33 @@ Server functions
 """
 
 
+def log_request(handler: tornado.web.RequestHandler):
+    """Overrides the default request logging function"""
+    if handler.get_status() < 400:
+        log_method = access_log.info
+    elif handler.get_status() < 500:
+        log_method = access_log.warning
+    else:
+        log_method = access_log.error
+
+    # If there is a current user, then include the username
+    username = ""
+    if u := handler.get_current_user():
+        username: str = u.decode("utf8") + " "
+
+    request_time = 1000.0 * handler.request.request_time()
+
+    log_method(
+        "%d %s %s (%s) %s%.2fms",
+        handler.get_status(),
+        handler.request.method,
+        handler.request.uri,
+        handler.request.remote_ip,
+        username,
+        request_time,
+    )
+
+
 def make_server(
     auth_expire_days: float,
     auth_method: str,
@@ -412,6 +439,7 @@ def make_server(
     settings = {
         "auth_expire_days": auth_expire_days,
         "login_url": url + "/auth/login",
+        "log_function": log_request,
         "slack_webhook_url": slack_webhook_url,
         "slack_error_webhook_url": slack_error_webhook_url,
         "static_path": module_dir.joinpath("static"),
