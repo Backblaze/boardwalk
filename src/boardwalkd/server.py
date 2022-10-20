@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import tornado.auth
+import tornado.httpclient
 import tornado.web
 import tornado.websocket
 from click import ClickException
@@ -116,28 +117,40 @@ class GoogleOAuth2LoginHandler(UIBaseHandler, tornado.auth.GoogleOAuth2Mixin):
 
     async def get(self, *args: Any, **kwargs: Any):
         try:
-            self.get_argument("code")
-            access = await self.get_authenticated_user(
-                redirect_uri=self.settings["login_url"],
-                code=self.get_argument("code"),
-            )
-            user = await self.oauth2_request(
-                "https://www.googleapis.com/oauth2/v1/userinfo",
-                access_token=access["access_token"],
-            )
+            # If the request is sent along with a code, then we assume the code
+            # was sent to us by google and validate it
+            try:
+                access = await self.get_authenticated_user(
+                    redirect_uri=self.settings["login_url"],
+                    code=self.get_argument("code"),
+                )
+                user = await self.oauth2_request(
+                    "https://www.googleapis.com/oauth2/v1/userinfo",
+                    access_token=access["access_token"],
+                )
+            except tornado.httpclient.HTTPClientError:
+                return self.send_error(400)
+            # If we get this far we know we have a valid user
             self.set_secure_cookie(
                 "boardwalk_user",
                 user["email"],
                 expires_days=self.settings["auth_expire_days"],
             )
-            return self.redirect("/")
+            # We attempt to redirect back to the original page the user was browsing
+            return self.redirect(self.get_argument("state", default="/"))
         except tornado.web.MissingArgumentError:
+            # If there was no code arg we need to authorize with google first
             return self.authorize_redirect(
                 redirect_uri=self.settings["login_url"],
                 client_id=self.settings["google_oauth"]["key"],
                 scope=["email"],
                 response_type="code",
-                extra_params={"approval_prompt": "auto"},
+                extra_params={
+                    "approval_prompt": "auto",
+                    # The state param gets returned along with the code and is used
+                    # to redirect the user back to their original page
+                    "state": self.get_argument("next", default="/"),
+                },
             )
 
 
