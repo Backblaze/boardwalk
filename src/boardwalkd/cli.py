@@ -43,7 +43,8 @@ def cli():
         "google_oauth\n\n"
         "Uses Google Oauth2 to identify users by their Google account email address."
         " BOARDWALK_GOOGLE_OAUTH_CLIENT_ID and BOARDWALK_GOOGLE_OAUTH_SECRET"
-        " environment variables must be set"
+        " environment variables must be set. The authorized redirect URI should be"
+        " https://<hostname>/auth/login"
     ),
     type=click.Choice(
         ["anonymous", "google_oauth"],

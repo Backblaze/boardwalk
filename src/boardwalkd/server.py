@@ -8,6 +8,8 @@ import json
 import logging
 import os
 import re
+import secrets
+import string
 from collections import deque
 from datetime import datetime, timedelta
 from distutils.util import strtobool
@@ -54,7 +56,9 @@ class UIBaseHandler(tornado.web.RequestHandler):
     def get_current_user(self) -> bytes | None:
         """Required method for @tornado.web.authenticated to work"""
         return self.get_secure_cookie(
-            "boardwalk_user", max_age_days=self.settings["auth_expire_days"]
+            "boardwalk_user",
+            max_age_days=self.settings["auth_expire_days"],
+            min_version=2,
         )
 
 
@@ -107,7 +111,8 @@ class AnonymousLoginHandler(UIBaseHandler):
 
 
 class GoogleOAuth2LoginHandler(UIBaseHandler, tornado.auth.GoogleOAuth2Mixin):
-    """Handles logging into the UI with Google Oauth2"""
+    """Handles logging into the UI with Google Oauth2. The username will be
+    the Google account email address"""
 
     async def get(self, *args: Any, **kwargs: Any):
         try:
@@ -255,9 +260,70 @@ API handlers
 """
 
 
+class AuthLoginApiWebsocketIDNotFound(Exception):
+    """The auth login client socket was not found"""
+
+
+class AuthLoginApiHandler(UIBaseHandler):
+    """Handles authenticating a user to the API and sending back a token to the
+    a client with an open login socket. This handler uses the UIBaseHandler
+    intentionally because the user must visit the UI to authenticate here"""
+
+    @tornado.web.authenticated
+    def get(self):
+        try:
+            id: str = self.get_argument("id")
+        except tornado.web.MissingArgumentError:
+            return self.send_error(422)
+
+        current_user = self.get_current_user()
+        token = self.create_signed_value("boardwalk_api_token", current_user)
+
+        try:
+            AuthLoginApiWebsocketHandler.write_to_client_by_id(id, {"token": token})
+        except AuthLoginApiWebsocketIDNotFound:
+            return self.send_error(404)
+
+
+class AuthLoginApiWebsocketHandler(tornado.websocket.WebSocketHandler):
+    """Socket used by CLI clients to login to the API and get an auth token"""
+
+    clients: dict[AuthLoginApiWebsocketHandler, str] = {}
+
+    def open(self):
+        def id_client():
+            """Gives clients a unique random id and adds it to the dict of clients.
+            This is used to identify this socket so that an auth token can be sent
+            back to the correct client after they authenticate themselves at AuthLoginApiHandler"""
+            length = 15
+            chars = string.ascii_letters + string.digits
+            id = "".join(secrets.choice(chars) for _ in range(length))
+            if id not in self.clients.values():
+                self.clients[self] = id
+            else:
+                id_client()
+            return
+
+        id_client()
+        self.write_message("Hello World")
+
+    def on_close(self):
+        del self.clients[self]
+
+    @classmethod
+    def write_to_client_by_id(cls, id: str, msg: bytes | str | dict[str, Any]):
+        """Allows writing a message to a client using a connection ID"""
+        for _, v in cls.clients.items():
+            if v == id:
+                cls.write_message(msg)
+                return
+        raise AuthLoginApiWebsocketIDNotFound
+
+
 class WorkspaceCatchApiHandler(APIBaseHandler):
     """Handles setting a catch on a workspace"""
 
+    @tornado.web.authenticated
     def post(self, workspace: str):
         try:
             state.workspaces[workspace].semaphores.caught = True
@@ -269,6 +335,7 @@ class WorkspaceCatchApiHandler(APIBaseHandler):
 class WorkspaceDetailsApiHandler(APIBaseHandler):
     """Handles getting and updating WorkspaceDetails for workspaces"""
 
+    @tornado.web.authenticated
     def get(self, workspace: str):
         try:
             return self.write(
@@ -277,6 +344,7 @@ class WorkspaceDetailsApiHandler(APIBaseHandler):
         except KeyError:
             return self.send_error(404)
 
+    @tornado.web.authenticated
     def post(self, workspace: str):
         try:
             payload = json.loads(self.request.body)
@@ -301,6 +369,7 @@ class WorkspaceDetailsApiHandler(APIBaseHandler):
 class WorkspaceHeartbeatApiHandler(APIBaseHandler):
     """Handles receiving heartbeats from workers"""
 
+    @tornado.web.authenticated
     def post(self, workspace: str):
         try:
             state.workspaces[workspace].last_seen = datetime.utcnow()
@@ -317,6 +386,7 @@ class WorkspaceEventApiHandler(APIBaseHandler):
     slack webhook is configured
     """
 
+    @tornado.web.authenticated
     async def post(self, workspace: str):
         try:
             broadcast: str | int | bool = self.get_argument("broadcast", default=0)
@@ -365,6 +435,7 @@ class WorkspaceEventApiHandler(APIBaseHandler):
 class WorkspaceMutexApiHandler(APIBaseHandler):
     """Handles workspace mutex api requests"""
 
+    @tornado.web.authenticated
     def post(self, workspace: str):
         try:
             if state.workspaces[workspace].semaphores.has_mutex:
@@ -374,6 +445,7 @@ class WorkspaceMutexApiHandler(APIBaseHandler):
         except KeyError:
             return self.send_error(404)
 
+    @tornado.web.authenticated
     def delete(self, workspace: str):
         try:
             state.workspaces[workspace].semaphores.has_mutex = False
@@ -386,6 +458,7 @@ class WorkspaceMutexApiHandler(APIBaseHandler):
 class WorkspaceSemaphoresApiHandler(APIBaseHandler):
     """Handles getting server-side WorkspaceSemaphores"""
 
+    @tornado.web.authenticated
     def get(self, workspace: str):
         try:
             return self.write(state.workspaces[workspace].semaphores.dict())
@@ -502,6 +575,14 @@ def make_server(
             (r"/workspace/(\w+)/semaphores/has_mutex", WorkspaceMutexHandler),
             (r"/workspace/(\w+)/delete", WorkspaceDeleteHandler),
             # API handlers
+            (
+                r"/api/auth/login",
+                AuthLoginApiHandler,
+            ),
+            (
+                r"/api/auth/login/socket",
+                AuthLoginApiWebsocketHandler,
+            ),
             (
                 r"/api/workspace/(\w+)/details",
                 WorkspaceDetailsApiHandler,
