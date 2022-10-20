@@ -27,7 +27,7 @@ from tornado.log import access_log, app_log
 from tornado.routing import HostMatches
 
 from boardwalkd.broadcast import handle_slack_broadcast
-from boardwalkd.protocol import WorkspaceDetails, WorkspaceEvent
+from boardwalkd.protocol import ApiLoginMessage, WorkspaceDetails, WorkspaceEvent
 from boardwalkd.state import load_state, WorkspaceState
 
 logging.basicConfig(level=logging.INFO)
@@ -292,8 +292,9 @@ class AuthLoginApiHandler(UIBaseHandler):
         current_user = self.get_current_user()
         token = self.create_signed_value("boardwalk_api_token", current_user)
 
+        message = ApiLoginMessage(token=token).dict()
         try:
-            AuthLoginApiWebsocketHandler.write_to_client_by_id(id, {"token": token})
+            AuthLoginApiWebsocketHandler.write_to_client_by_id(id, message)
         except AuthLoginApiWebsocketIDNotFound:
             return self.send_error(404)
 
@@ -304,10 +305,12 @@ class AuthLoginApiWebsocketHandler(tornado.websocket.WebSocketHandler):
     clients: dict[AuthLoginApiWebsocketHandler, str] = {}
 
     def open(self):
-        def id_client():
+        def id_client() -> str:
             """Gives clients a unique random id and adds it to the dict of clients.
             This is used to identify this socket so that an auth token can be sent
-            back to the correct client after they authenticate themselves at AuthLoginApiHandler"""
+            back to the correct client after they authenticate themselves at
+            AuthLoginApiHandler. The ID is returned and used to message the
+            client with a unique login URI"""
             length = 15
             chars = string.ascii_letters + string.digits
             id = "".join(secrets.choice(chars) for _ in range(length))
@@ -315,10 +318,10 @@ class AuthLoginApiWebsocketHandler(tornado.websocket.WebSocketHandler):
                 self.clients[self] = id
             else:
                 id_client()
-            return
+            return id
 
-        id_client()
-        self.write_message("Hello World")
+        login_url = f"{self.settings['url']}/api/auth/login?id={id_client()}"
+        return self.write_message(ApiLoginMessage(login_url=login_url).dict())
 
     def on_close(self):
         del self.clients[self]

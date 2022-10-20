@@ -25,6 +25,14 @@ class ProtocolBaseModel(BaseModel, extra=Extra.forbid):
     """BaseModel for protocol usage"""
 
 
+class ApiLoginMessage(ProtocolBaseModel):
+    """Model for websocket messages passed during authentication of CLI
+    users to the API"""
+
+    login_url: str = ""
+    token: str = ""
+
+
 class WorkspaceDetails(ProtocolBaseModel):
     """Model for basic workspace details from workers"""
 
