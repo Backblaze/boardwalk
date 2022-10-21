@@ -18,10 +18,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import tornado.auth
+import tornado.escape
 import tornado.httpclient
 import tornado.web
 import tornado.websocket
 from click import ClickException
+from cryptography.fernet import Fernet
 from pydantic import ValidationError
 from tornado.log import access_log, app_log
 from tornado.routing import HostMatches
@@ -38,17 +40,9 @@ state = load_state()
 if TYPE_CHECKING:
     from typing import Any, Callable
 
-
-class APIBaseHandler(tornado.web.RequestHandler):
-    """Base request handler for API paths"""
-
-    def check_xsrf_cookie(self):
-        """We ignore this method on API requests"""
-        pass
-
-
-class BaseHandler(tornado.web.RequestHandler):
-    """Base request handler for all paths"""
+"""
+UI handlers
+"""
 
 
 class UIBaseHandler(tornado.web.RequestHandler):
@@ -63,25 +57,20 @@ class UIBaseHandler(tornado.web.RequestHandler):
         )
 
 
-"""
-UI handlers
-"""
-
-
-def ui_method_secondsdelta(handler: BaseHandler, time: datetime) -> float:
+def ui_method_secondsdelta(handler: UIBaseHandler, time: datetime) -> float:
     """Custom UI templating method. Accepts a datetime and returns the delta
     between time given and now in number of seconds"""
     delta = datetime.utcnow() - time
     return delta.total_seconds()
 
 
-def ui_method_server_version(handler: BaseHandler) -> str:
+def ui_method_server_version(handler: UIBaseHandler) -> str:
     """Returns the version number of the server"""
     return lib_version("boardwalk")
 
 
 def ui_method_sort_events_by_date(
-    handler: BaseHandler, events: deque[WorkspaceEvent]
+    handler: UIBaseHandler, events: deque[WorkspaceEvent]
 ) -> list[WorkspaceEvent]:
     """Custom UI templating method. Accepts a deque of Workspace events and
     sorts them by datetime in ascending order"""
@@ -115,6 +104,8 @@ class GoogleOAuth2LoginHandler(UIBaseHandler, tornado.auth.GoogleOAuth2Mixin):
     """Handles logging into the UI with Google Oauth2. The username will be
     the Google account email address"""
 
+    url_encryption_key = Fernet.generate_key()
+
     async def get(self, *args: Any, **kwargs: Any):
         try:
             # If the request is sent along with a code, then we assume the code
@@ -136,10 +127,22 @@ class GoogleOAuth2LoginHandler(UIBaseHandler, tornado.auth.GoogleOAuth2Mixin):
                 user["email"],
                 expires_days=self.settings["auth_expire_days"],
             )
-            # We attempt to redirect back to the original page the user was browsing
-            return self.redirect(self.get_argument("state", default="/"))
+            # We attempt to redirect back to the original URL the user was browsing
+            # This requires decrypting the value we sent to Google in the state arg
+
+            try:
+                state_arg = self.get_argument("state")
+                orig_url = self.decrypt_url(state_arg)
+            except tornado.web.MissingArgumentError:
+                orig_url = "/"
+            return self.redirect(orig_url)
         except tornado.web.MissingArgumentError:
             # If there was no code arg we need to authorize with google first
+
+            # Tornado will redirect with the next arg containing the URL the user
+            # was originally browsing
+            orig_url = self.get_argument("next", default="/")
+
             return self.authorize_redirect(
                 redirect_uri=self.settings["login_url"],
                 client_id=self.settings["google_oauth"]["key"],
@@ -148,10 +151,25 @@ class GoogleOAuth2LoginHandler(UIBaseHandler, tornado.auth.GoogleOAuth2Mixin):
                 extra_params={
                     "approval_prompt": "auto",
                     # The state param gets returned along with the code and is used
-                    # to redirect the user back to their original page
-                    "state": self.get_argument("next", default="/"),
+                    # to redirect the user back to their original url
+                    "state": self.encode_url(orig_url),
                 },
             )
+
+    def encode_url(self, url: str) -> str:
+        """For encrypting and encoding a URL to maintain confidentiality. We use
+        this because the URL will pass through Google"""
+        cipher_text = Fernet(self.url_encryption_key).encrypt(url.encode())
+        return tornado.escape.url_escape(cipher_text)
+
+    def decrypt_url(self, encoded_url: str) -> str:
+        """Reverses self.encode_url()"""
+        unescaped_cipher_text = tornado.escape.url_unescape(encoded_url)
+        return (
+            Fernet(self.url_encryption_key)
+            .decrypt(unescaped_cipher_text.encode())
+            .decode()
+        )
 
 
 class IndexHandler(UIBaseHandler):
@@ -271,6 +289,14 @@ class WorkspacesHandler(UIBaseHandler):
 """
 API handlers
 """
+
+
+class APIBaseHandler(tornado.web.RequestHandler):
+    """Base request handler for API paths"""
+
+    def check_xsrf_cookie(self):
+        """We ignore this method on API requests"""
+        pass
 
 
 class AuthLoginApiWebsocketIDNotFound(Exception):
