@@ -19,6 +19,7 @@ from tornado.httpclient import (
     HTTPRequest,
 )
 from tornado.simple_httpclient import HTTPTimeoutError
+from tornado.websocket import websocket_connect
 
 
 class ProtocolBaseModel(BaseModel, extra=Extra.forbid):
@@ -85,6 +86,20 @@ class Client:
         self.async_client = AsyncHTTPClient()
         self.event_queue = deque([])
         self.url = urlparse(url)
+
+    async def api_login(self):
+        """Performs an interactive login to the API"""
+        url = urljoin(self.url.geturl(), f"/api/auth/login")
+        conn = await websocket_connect(url)
+        while True:
+            msg = await conn.read_message()
+            msg = ApiLoginMessage.parse_obj(msg)
+            if msg.login_url:
+                print(f"Log in at {msg.login_url}")
+            elif msg.token:
+                print(msg.token)
+                break
+        conn.close()
 
     def workspace_delete_mutex(self, workspace_name: str):
         """Deletes a workspace mutex"""

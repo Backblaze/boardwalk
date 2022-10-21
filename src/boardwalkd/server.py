@@ -121,15 +121,16 @@ class GoogleOAuth2LoginHandler(UIBaseHandler, tornado.auth.GoogleOAuth2Mixin):
                 )
             except tornado.httpclient.HTTPClientError:
                 return self.send_error(400)
+
             # If we get this far we know we have a valid user
             self.set_secure_cookie(
                 "boardwalk_user",
                 user["email"],
                 expires_days=self.settings["auth_expire_days"],
             )
+
             # We attempt to redirect back to the original URL the user was browsing
             # This requires decrypting the value we sent to Google in the state arg
-
             try:
                 state_arg = self.get_argument("state")
                 orig_url = self.decrypt_url(state_arg)
