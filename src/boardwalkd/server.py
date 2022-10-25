@@ -299,6 +299,9 @@ class APIBaseHandler(tornado.web.RequestHandler):
         """We ignore this method on API requests"""
         pass
 
+    def get_current_user(self) -> bytes | None:
+        return self.request.headers["boardwalk-api-token"]
+
 
 class AuthLoginApiWebsocketIDNotFound(Exception):
     """The auth login client socket was not found"""

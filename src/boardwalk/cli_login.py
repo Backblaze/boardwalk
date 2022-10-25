@@ -23,6 +23,5 @@ def login():
         token = asyncio.run(client.api_login())
     except ConnectionRefusedError:
         raise ClickException(f"Unable to reach {url}")
-    token_file = Path.cwd().joinpath(".boardwalk/api_token.txt")
-    token_file.write_text(token)
+    client.api_token_file.write_text(token)
     click.echo("Authentication successful")

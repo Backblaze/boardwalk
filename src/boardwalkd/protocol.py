@@ -2,13 +2,13 @@
 This file defines objects that are passed between worker clients and the server,
 and contains functions to support clients using the server
 """
-
 import concurrent.futures
 import json
 import socket
 import time
 from collections import deque
 from datetime import datetime
+from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
 from pydantic import BaseModel, Extra, validator
@@ -85,8 +85,12 @@ class Client:
 
     def __init__(self, url: str):
         self.async_client = AsyncHTTPClient()
+        self.api_token_file = Path.cwd().joinpath(".boardwalk/api_token.txt")
         self.event_queue = deque([])
         self.url = urlparse(url)
+
+    def get_api_token(self) -> str:
+        return self.api_token_file.read_text().rstrip()
 
     async def api_login(self) -> str:
         """Performs an interactive login to the API and returns a session token"""
@@ -118,6 +122,7 @@ class Client:
         request = HTTPRequest(
             method="DELETE",
             body=None,
+            headers={"boardwalk-api-token": self.get_api_token()},
             url=url,
         )
         client = HTTPClient()
@@ -136,7 +141,9 @@ class Client:
         client = HTTPClient()
 
         try:
-            request = client.fetch(url)
+            request = client.fetch(
+                url, headers={"boardwalk-api-token": self.get_api_token()}
+            )
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
@@ -154,6 +161,7 @@ class Client:
         request = HTTPRequest(
             method="POST",
             body="catch",
+            headers={"boardwalk-api-token": self.get_api_token()},
             url=url,
         )
         client = HTTPClient()
@@ -173,7 +181,10 @@ class Client:
         url = urljoin(self.url.geturl(), f"/api/workspace/{workspace_name}/details")
         request = HTTPRequest(
             method="POST",
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "boardwalk-api-token": self.get_api_token(),
+            },
             body=workspace_details.json(),
             url=url,
         )
@@ -193,6 +204,7 @@ class Client:
         request = HTTPRequest(
             method="POST",
             body="ping",
+            headers={"boardwalk-api-token": self.get_api_token()},
             url=url,
         )
         client = HTTPClient()
@@ -240,7 +252,10 @@ class Client:
             url = url + "?broadcast=1"
         request = HTTPRequest(
             method="POST",
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "boardwalk-api-token": self.get_api_token(),
+            },
             body=workspace_event.json(),
             url=url,
         )
@@ -288,6 +303,7 @@ class Client:
         request = HTTPRequest(
             method="POST",
             body="mutex",
+            headers={"boardwalk-api-token": self.get_api_token()},
             url=url,
         )
         client = HTTPClient()
@@ -308,7 +324,10 @@ class Client:
         client = HTTPClient()
 
         try:
-            request = client.fetch(url)
+            request = client.fetch(
+                url,
+                headers={"boardwalk-api-token": self.get_api_token()},
+            )
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
