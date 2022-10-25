@@ -6,6 +6,7 @@ and contains functions to support clients using the server
 import concurrent.futures
 import socket
 import time
+import json
 from collections import deque
 from datetime import datetime
 from urllib.parse import urljoin, urlparse
@@ -89,10 +90,19 @@ class Client:
 
     async def api_login(self):
         """Performs an interactive login to the API"""
-        url = urljoin(self.url.geturl(), f"/api/auth/login")
-        conn = await websocket_connect(url)
+        match self.url.scheme:
+            case "http":
+                websocket_url = self.url._replace(scheme="ws")
+            case "https":
+                websocket_url = self.url._replace(scheme="wss")
+            case _:
+                raise ValueError(f"{self.url.scheme} is not a valid url scheme")
+
+        websocket_url = urljoin(websocket_url.geturl(), f"/api/auth/login/socket")
+        conn = await websocket_connect(websocket_url)
         while True:
             msg = await conn.read_message()
+            msg = json.loads(str(msg))
             msg = ApiLoginMessage.parse_obj(msg)
             if msg.login_url:
                 print(f"Log in at {msg.login_url}")

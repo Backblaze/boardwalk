@@ -338,8 +338,8 @@ class AuthLoginApiWebsocketHandler(tornado.websocket.WebSocketHandler):
             back to the correct client after they authenticate themselves at
             AuthLoginApiHandler. The ID is returned and used to message the
             client with a unique login URI"""
-            length = 15
-            chars = string.ascii_letters + string.digits
+            length = 16
+            chars = string.ascii_lowercase + string.digits
             id = "".join(secrets.choice(chars) for _ in range(length))
             if id not in self.clients.values():
                 self.clients[self] = id
@@ -356,9 +356,9 @@ class AuthLoginApiWebsocketHandler(tornado.websocket.WebSocketHandler):
     @classmethod
     def write_to_client_by_id(cls, id: str, msg: bytes | str | dict[str, Any]):
         """Allows writing a message to a client using a connection ID"""
-        for _, v in cls.clients.items():
+        for k, v in cls.clients.items():
             if v == id:
-                cls.write_message(msg)
+                k.write_message(msg)
                 return
         raise AuthLoginApiWebsocketIDNotFound
 
