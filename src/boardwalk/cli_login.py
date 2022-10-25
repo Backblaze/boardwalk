@@ -2,17 +2,27 @@
 login CLI subcommand
 """
 import asyncio
+from pathlib import Path
+
 import click
+from boardwalkd.protocol import Client
+
+from click import ClickException
 
 from boardwalk.manifest import get_boardwalkd_url
-from boardwalkd.protocol import Client
 
 
 @click.command(
     "login",
-    short_help="Logs into the API",
+    short_help="Login to the API",
 )
 def login():
     url = get_boardwalkd_url()
     client = Client(url)
-    asyncio.run(client.api_login())
+    try:
+        token = asyncio.run(client.api_login())
+    except ConnectionRefusedError:
+        raise ClickException(f"Unable to reach {url}")
+    token_file = Path.cwd().joinpath(".boardwalk/api_token.txt")
+    token_file.write_text(token)
+    click.echo("Authentication successful")

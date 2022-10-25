@@ -325,6 +325,8 @@ class AuthLoginApiHandler(UIBaseHandler):
         except AuthLoginApiWebsocketIDNotFound:
             return self.send_error(404)
 
+        return self.write("Authentication successful. You may close this window")
+
 
 class AuthLoginApiWebsocketHandler(tornado.websocket.WebSocketHandler):
     """Socket used by CLI clients to login to the API and get an auth token"""

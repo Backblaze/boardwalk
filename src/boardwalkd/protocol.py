@@ -4,9 +4,9 @@ and contains functions to support clients using the server
 """
 
 import concurrent.futures
+import json
 import socket
 import time
-import json
 from collections import deque
 from datetime import datetime
 from urllib.parse import urljoin, urlparse
@@ -88,8 +88,8 @@ class Client:
         self.event_queue = deque([])
         self.url = urlparse(url)
 
-    async def api_login(self):
-        """Performs an interactive login to the API"""
+    async def api_login(self) -> str:
+        """Performs an interactive login to the API and returns a session token"""
         match self.url.scheme:
             case "http":
                 websocket_url = self.url._replace(scheme="ws")
@@ -105,11 +105,10 @@ class Client:
             msg = json.loads(str(msg))
             msg = ApiLoginMessage.parse_obj(msg)
             if msg.login_url:
-                print(f"Log in at {msg.login_url}")
+                print(f"\nPlease visit to login:\n{msg.login_url}\n")
             elif msg.token:
-                print(msg.token)
-                break
-        conn.close()
+                conn.close()
+                return msg.token
 
     def workspace_delete_mutex(self, workspace_name: str):
         """Deletes a workspace mutex"""
