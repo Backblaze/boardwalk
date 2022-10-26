@@ -11,16 +11,13 @@ from click import ClickException
 from boardwalk.manifest import get_boardwalkd_url
 
 
-@click.command(
-    "login",
-    short_help="Login to the API",
-)
+@click.command("login")
 def login():
+    """Login to the API"""
     url = get_boardwalkd_url()
     client = Client(url)
     try:
-        token = asyncio.run(client.api_login())
+        asyncio.run(client.api_login())
     except ConnectionRefusedError:
         raise ClickException(f"Unable to reach {url}")
-    client.api_token_file.write_text(token)
     click.echo("Authentication successful")

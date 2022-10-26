@@ -2,6 +2,7 @@
 This file defines objects that are passed between worker clients and the server,
 and contains functions to support clients using the server
 """
+import asyncio
 import concurrent.futures
 import json
 import socket
@@ -18,6 +19,7 @@ from tornado.httpclient import (
     HTTPClientError,
     HTTPError,
     HTTPRequest,
+    HTTPResponse,
 )
 from tornado.simple_httpclient import HTTPTimeoutError
 from tornado.websocket import websocket_connect
@@ -92,7 +94,7 @@ class Client:
     def get_api_token(self) -> str:
         return self.api_token_file.read_text().rstrip()
 
-    async def api_login(self) -> str:
+    async def api_login(self):
         """Performs an interactive login to the API and returns a session token"""
         match self.url.scheme:
             case "http":
@@ -112,23 +114,51 @@ class Client:
                 print(f"\nPlease visit to login:\n{msg.login_url}\n")
             elif msg.token:
                 conn.close()
-                return msg.token
+                self.api_token_file.write_text(msg.token)
+                return
 
-    def workspace_delete_mutex(self, workspace_name: str):
-        """Deletes a workspace mutex"""
-        url = urljoin(
-            self.url.geturl(), f"/api/workspace/{workspace_name}/semaphores/has_mutex"
-        )
+    def authenticated_request(
+        self,
+        path: str,
+        method: str = "GET",
+        body: bytes | str | None = None,
+        auto_login_prompt: bool = True,
+    ) -> HTTPResponse:
+        """Performs an API request with authentication. By default, auto-prompts
+        for authentication if auth fails"""
+        url = urljoin(self.url.geturl(), path)
         request = HTTPRequest(
-            method="DELETE",
-            body=None,
-            headers={"boardwalk-api-token": self.get_api_token()},
+            method=method,
+            body=body,
+            headers={
+                "Content-Type": "application/json",
+                "boardwalk-api-token": self.get_api_token(),
+            },
             url=url,
         )
         client = HTTPClient()
 
         try:
-            request = client.fetch(request)
+            return client.fetch(request)
+        except HTTPError as e:
+            if e.code == 403 and auto_login_prompt:
+                asyncio.run(self.api_login())
+                return self.authenticated_request(
+                    path=path,
+                    method=method,
+                    body=body,
+                    auto_login_prompt=auto_login_prompt,
+                )
+            else:
+                raise e
+
+    def workspace_delete_mutex(self, workspace_name: str):
+        """Deletes a workspace mutex"""
+        try:
+            self.authenticated_request(
+                path=f"/api/workspace/{workspace_name}/semaphores/has_mutex",
+                method="DELETE",
+            )
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
@@ -137,12 +167,9 @@ class Client:
 
     def workspace_get_details(self, workspace_name: str) -> WorkspaceDetails:
         """Queries the server for workspace details"""
-        url = urljoin(self.url.geturl(), f"/api/workspace/{workspace_name}/details")
-        client = HTTPClient()
-
         try:
-            request = client.fetch(
-                url, headers={"boardwalk-api-token": self.get_api_token()}
+            request = self.authenticated_request(
+                path=f"/api/workspace/{workspace_name}/details",
             )
         except HTTPError as e:
             if e.code == 404:
@@ -155,19 +182,12 @@ class Client:
 
     def workspace_post_catch(self, workspace_name: str):
         """Posts a catch to the server"""
-        url = urljoin(
-            self.url.geturl(), f"/api/workspace/{workspace_name}/semaphores/caught"
-        )
-        request = HTTPRequest(
-            method="POST",
-            body="catch",
-            headers={"boardwalk-api-token": self.get_api_token()},
-            url=url,
-        )
-        client = HTTPClient()
-
         try:
-            client.fetch(request)
+            self.authenticated_request(
+                path="/api/workspace/{workspace_name}/semaphores/caught",
+                method="POST",
+                body="catch",
+            )
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
@@ -178,20 +198,12 @@ class Client:
         self, workspace_name: str, workspace_details: WorkspaceDetails
     ):
         """Updates the workspace details at the server"""
-        url = urljoin(self.url.geturl(), f"/api/workspace/{workspace_name}/details")
-        request = HTTPRequest(
-            method="POST",
-            headers={
-                "Content-Type": "application/json",
-                "boardwalk-api-token": self.get_api_token(),
-            },
-            body=workspace_details.json(),
-            url=url,
-        )
-        client = HTTPClient()
-
         try:
-            client.fetch(request)
+            self.authenticated_request(
+                path=f"/api/workspace/{workspace_name}/details",
+                method="POST",
+                body=workspace_details.json(),
+            )
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
@@ -199,18 +211,15 @@ class Client:
                 raise e
 
     def workspace_post_heartbeat(self, workspace_name: str):
-        """Posts a heartbeat to the server"""
-        url = urljoin(self.url.geturl(), f"/api/workspace/{workspace_name}/heartbeat")
-        request = HTTPRequest(
-            method="POST",
-            body="ping",
-            headers={"boardwalk-api-token": self.get_api_token()},
-            url=url,
-        )
-        client = HTTPClient()
-
+        """Posts a heartbeat to the server. This method will not automatically
+        prompt to re-login if there is an auth failure"""
         try:
-            client.fetch(request)
+            self.authenticated_request(
+                path=f"/api/workspace/{workspace_name}/heartbeat",
+                method="POST",
+                body="ping",
+                auto_login_prompt=False,
+            )
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
@@ -225,6 +234,7 @@ class Client:
             except (
                 ConnectionRefusedError,
                 HTTPClientError,
+                HTTPError,
                 HTTPTimeoutError,
                 socket.gaierror,
             ):
@@ -247,22 +257,17 @@ class Client:
         broadcast: bool = False,
     ):
         """Sends a event to the server to be logged or broadcast"""
-        url = urljoin(self.url.geturl(), f"/api/workspace/{workspace_name}/event")
+        path = f"/api/workspace/{workspace_name}/event"
         if broadcast:
-            url = url + "?broadcast=1"
-        request = HTTPRequest(
-            method="POST",
-            headers={
-                "Content-Type": "application/json",
-                "boardwalk-api-token": self.get_api_token(),
-            },
-            body=workspace_event.json(),
-            url=url,
-        )
-        client = HTTPClient()
+            path += "?broadcast=1"
 
         try:
-            client.fetch(request)
+            self.authenticated_request(
+                path=path,
+                method="POST",
+                body=workspace_event.json(),
+                auto_login_prompt=False,
+            )
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
@@ -292,24 +297,17 @@ class Client:
             for event in self.event_queue.copy():
                 self.workspace_post_event(**event)
                 self.event_queue.popleft()
-        except ConnectionRefusedError:
+        except (ConnectionRefusedError, HTTPError):
             pass
 
     def workspace_post_mutex(self, workspace_name: str):
         """Posts a mutex to the server"""
-        url = urljoin(
-            self.url.geturl(), f"/api/workspace/{workspace_name}/semaphores/has_mutex"
-        )
-        request = HTTPRequest(
-            method="POST",
-            body="mutex",
-            headers={"boardwalk-api-token": self.get_api_token()},
-            url=url,
-        )
-        client = HTTPClient()
-
         try:
-            client.fetch(request)
+            self.authenticated_request(
+                path=f"/api/workspace/{workspace_name}/semaphores/has_mutex",
+                method="POST",
+                body="mutex",
+            )
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
@@ -320,13 +318,9 @@ class Client:
 
     def workspace_get_semaphores(self, workspace_name: str) -> WorkspaceSemaphores:
         """Queries the server for workspace semaphores"""
-        url = urljoin(self.url.geturl(), f"/api/workspace/{workspace_name}/semaphores")
-        client = HTTPClient()
-
         try:
-            request = client.fetch(
-                url,
-                headers={"boardwalk-api-token": self.get_api_token()},
+            request = self.authenticated_request(
+                path=f"/api/workspace/{workspace_name}/semaphores"
             )
         except HTTPError as e:
             if e.code == 404:
