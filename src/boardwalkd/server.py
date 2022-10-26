@@ -15,7 +15,8 @@ from datetime import datetime, timedelta
 from distutils.util import strtobool
 from importlib.metadata import version as lib_version
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Any, Callable
+from urllib.parse import urljoin
 
 import tornado.auth
 import tornado.escape
@@ -37,8 +38,6 @@ logging.basicConfig(level=logging.INFO)
 module_dir = Path(__file__).resolve().parent
 state = load_state()
 
-if TYPE_CHECKING:
-    from typing import Any, Callable
 
 """
 UI handlers
@@ -300,7 +299,19 @@ class APIBaseHandler(tornado.web.RequestHandler):
         pass
 
     def get_current_user(self) -> bytes | None:
-        return self.request.headers["boardwalk-api-token"]
+        """Decodes the API token to return the current logged in user"""
+        return self.get_secure_cookie(
+            "boardwalk_api_token",
+            value=self.request.headers["boardwalk-api-token"],
+            max_age_days=self.settings["auth_expire_days"],
+            min_version=2,
+        )
+
+    def get_login_url(self) -> str:
+        """Overrides the app's configured login url. Normally tornado will
+        redirect to the UI's login method, but we don't want that with headless
+        API operations. This redirects to a handler that simply outputs a 403"""
+        return self.settings["api_access_denied_url"]
 
 
 class AuthLoginApiWebsocketIDNotFound(Exception):
@@ -366,6 +377,14 @@ class AuthLoginApiWebsocketHandler(tornado.websocket.WebSocketHandler):
                 k.write_message(msg)
                 return
         raise AuthLoginApiWebsocketIDNotFound
+
+
+class AuthApiDenied(APIBaseHandler):
+    """Dedicated handler for redirecting an unauthenticated user to an 'access
+    denied' endpoint"""
+
+    def get(self):
+        return self.send_error(403)
 
 
 class WorkspaceCatchApiHandler(APIBaseHandler):
@@ -558,8 +577,9 @@ def make_server(
     """Builds the tornado application server object"""
     handlers: list[tornado.web.OutputTransform] = []
     settings = {
+        "api_access_denied_url": urljoin(url, "/api/auth/denied"),
         "auth_expire_days": auth_expire_days,
-        "login_url": url + "/auth/login",
+        "login_url": urljoin(url, "/auth/login"),
         "log_function": log_request,
         "slack_webhook_url": slack_webhook_url,
         "slack_error_webhook_url": slack_error_webhook_url,
@@ -623,6 +643,10 @@ def make_server(
             (r"/workspace/(\w+)/semaphores/has_mutex", WorkspaceMutexHandler),
             (r"/workspace/(\w+)/delete", WorkspaceDeleteHandler),
             # API handlers
+            (
+                r"/api/auth/denied",
+                AuthApiDenied,
+            ),
             (
                 r"/api/auth/login",
                 AuthLoginApiHandler,

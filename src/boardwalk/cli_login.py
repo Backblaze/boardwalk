@@ -2,7 +2,6 @@
 login CLI subcommand
 """
 import asyncio
-from pathlib import Path
 
 import click
 from boardwalkd.protocol import Client
