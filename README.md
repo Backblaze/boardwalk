@@ -67,9 +67,7 @@ interface used by [AWX](https://github.com/ansible/awx).
 - [x] Have CSRF protection on the server UI.
 - [x] Support server UI authentication.
 - [x] Have a way to explore saved state.
-- [ ] Support server API authentication.
-- [ ] Have a way for Boardwalkfile.py's to specify Boardwalk version
-  constraints.
+- [x] Support server API authentication.
 - [ ] Support TLS on the server.
 
 ### Non-Goals
@@ -450,6 +448,40 @@ Boardwalk will use the server for several purposes: It enables Boardwalk to:
 
 See `boardwalkd serve --help` for options to run the server.
 
+#### Architecture
+In the diagram and descriptions below, the word "server" refers to `boardwalkd`.
+The word "worker" refers to the `boardwalk` CLI when it is connected to the
+server.
+
+```txt
++------------+
+| boardwalkd |----------------------+
++------------+                      |
+     ^ (1)                          |
+     |                              |
+     +-----------+-----------+      |
+     |           |           |      |
++---------+ +---------+ +---------+ |
+| Worker1 | | Worker2 | | WorkerN | |
++---------+ +---------+ +---------+ |
+|    ^ (2)  |    ^ (2)  |    ^ (2)  |
+|    |      |    |      |    |      |
+\    +------\----+------\----+------+
+ \           \           \
+  \           \           \
+   \           \           \
+    v (3)       v (3)       v (3)
++-------+   +-------+   +-------+
+| Hosts |   | Hosts |   | Hosts |
++-------+   +-------+   +-------+
+```
+
+1. Worker details, workspace data, workflow events, heartbeats sent from workers
+   to server over HTTP(S).
+2. Workers poll server over HTTP(S) for semaphores including workspace mutexes
+   and workspace catches.
+3. Workers connect directly to hosts over SSH; server has no access to hosts.
+
 #### Catch & Release Behavior With Boardwalkd
 
 When Boardwalk encounters an error on a host, it will automatically catch the
@@ -459,3 +491,12 @@ possible to perform a local catch/release even when connected to `boardwalkd`,
 and local catches cannot be released from the server UI. If Boardwalk encounters
 an error and for any reason it cannot catch the Workspace on the server, it will
 fall back to catching locally.
+
+#### Security
+
+__Authentication__: By default, `boardwalkd` uses anonymous authentication. It's
+important that an authentication method be configured. See
+`boardwalkd serve --help` for available options.
+
+__TLS__: `boardwalkd` doesn't yet support TLS directly. TLS should be terminated
+using a reverse proxy, or other means.
