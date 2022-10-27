@@ -323,7 +323,7 @@ def run_workflow(
             )
             continue
         except HostPreConditionsUnmet:
-            continue
+            pass
 
         i += 1
 
