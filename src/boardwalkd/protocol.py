@@ -142,7 +142,13 @@ class Client:
             return client.fetch(request)
         except HTTPError as e:
             if e.code == 403 and auto_login_prompt:
+                # If auth is denied, automatically try to login
                 asyncio.run(self.api_login())
+
+                # Always flush the event queue in case any messages were pending on auth
+                self.flush_event_queue()
+
+                # Attempt the request again
                 return self.authenticated_request(
                     path=path,
                     method=method,
@@ -281,9 +287,8 @@ class Client:
         broadcast: bool = False,
     ):
         """
-        Implements self.workspace_post_event(), maintaining a local queue of
-        events to send. If an event cannot be sent, it will be sent along with
-        the next successful attempt
+        Appends an event to the event queue and attempts to flush messages to
+        the server
         """
         self.event_queue.append(
             {
@@ -293,6 +298,12 @@ class Client:
             }
         )
 
+        self.flush_event_queue()
+
+    def flush_event_queue(self):
+        """
+        Attempts to flush events to the server
+        """
         try:
             for event in self.event_queue.copy():
                 self.workspace_post_event(**event)
