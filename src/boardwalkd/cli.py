@@ -25,18 +25,23 @@ def cli():
 @cli.command()
 @click.option(
     "--auth-expire-days",
-    help="The number of days login tokens and user API keys are valid before they expire",
+    help=(
+        "The number of days login tokens and user API keys are valid before"
+        " they expire"
+    ),
     type=float,
-    default=30,
+    default=14,
     show_default=True,
 )
 @click.option(
     "--auth-method",
     help=(
-        "Enables an authentication method for the web UI, and causes the API to require auth."
-        " The method is supplied as a string argument. The BOARDWALK_SECRET environment"
-        " variable must be set for any method to work except for 'anonymous';"
-        " it is the key used to sign secure strings, such as auth cookies and API keys\n\n"
+        "Enables an authentication method for the web UI. The API always requires"
+        " authentication, however without this option configured a predictable"
+        " anonymous user will be used. The method is supplied as a string"
+        " argument. The BOARDWALK_SECRET environment variable must be set for any"
+        " method to work except for 'anonymous'; it is the key used to sign"
+        " secure strings, such as auth cookies and API keys\n\n"
         "Available auth methods:\n\n"
         "anonymous\n\n"
         "All requests are performed as an 'anonymous' default user\n\n"

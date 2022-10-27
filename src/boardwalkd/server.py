@@ -77,14 +77,6 @@ def ui_method_sort_events_by_date(
     return sorted(events, key=key, reverse=True)
 
 
-class AdminHandler(UIBaseHandler):
-    """Handles serving the Admin UI"""
-
-    @tornado.web.authenticated
-    def get(self):
-        return self.render("admin.html", title="Admin")
-
-
 class AnonymousLoginHandler(UIBaseHandler):
     """Handles "logging in" the UI when no auth is actually configured"""
 
@@ -634,7 +626,6 @@ def make_server(
     handlers.extend(
         [
             # UI handlers
-            (r"/admin", AdminHandler),
             (r"/", IndexHandler),
             (r"/workspaces", WorkspacesHandler),
             (r"/workspace/(\w+)/events", WorkspaceEventsHandler),
