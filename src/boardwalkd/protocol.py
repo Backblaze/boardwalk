@@ -7,6 +7,7 @@ import concurrent.futures
 import json
 import socket
 import time
+import webbrowser
 from collections import deque
 from datetime import datetime
 from pathlib import Path
@@ -112,6 +113,8 @@ class Client:
             msg = ApiLoginMessage.parse_obj(msg)
             if msg.login_url:
                 print(f"\nPlease visit to login:\n{msg.login_url}\n")
+                if webbrowser.open_new_tab(msg.login_url):
+                    print("Opened browser to login URL\n")
             elif msg.token:
                 conn.close()
                 self.api_token_file.write_text(msg.token)
