@@ -90,7 +90,7 @@ See [here](./CONTRIBUTING.md).
 
 Conceptual overview diagram:
 
-```txt
+```text
 +----------------------------------------+
 | Workspace                              |
 | +------------------------------------+ |
@@ -449,16 +449,16 @@ Boardwalk will use the server for several purposes: It enables Boardwalk to:
 See `boardwalkd serve --help` for options to run the server.
 
 #### Architecture
-In the diagram and descriptions below, the word "server" refers to `boardwalkd`.
-The word "worker" refers to the `boardwalk` CLI when it is connected to the
-server.
 
-```txt
-+------------+
-| boardwalkd |----------------------+
-+------------+                      |
-     ^ (1)                          |
-     |                              |
+In the diagram and descriptions below, the word "worker" refers to the
+`boardwalk` CLI when it is connected to `boardwalkd`.
+
+```text
+           +------------+
+           | boardwalkd |-----------+
+           +------------+           |
+                 ^ (1)              |
+                 |                  |
      +-----------+-----------+      |
      |           |           |      |
 +---------+ +---------+ +---------+ |
@@ -467,20 +467,20 @@ server.
 |    ^ (2)  |    ^ (2)  |    ^ (2)  |
 |    |      |    |      |    |      |
 \    +------\----+------\----+------+
- \           \           \
-  \           \           \
-   \           \           \
-    v (3)       v (3)       v (3)
+ |           |           |
+ v (3)       v (3)       v (3)
 +-------+   +-------+   +-------+
 | Hosts |   | Hosts |   | Hosts |
 +-------+   +-------+   +-------+
-```
 
-1. Worker details, workspace data, workflow events, heartbeats sent from workers
-   to server over HTTP(S).
-2. Workers poll server over HTTP(S) for semaphores including workspace mutexes
-   and workspace catches.
-3. Workers connect directly to hosts over SSH; server has no access to hosts.
+(1) Worker details, Workspace data, Workflow events, heartbeats sent from
+    workers to boardwalkd over HTTP(S).
+
+(2) Workers poll boardwalkd over HTTP(S) for semaphores including Workspace
+    mutexes and Workspace catches.
+
+(3) Workers connect directly to hosts over SSH.
+```
 
 #### Catch & Release Behavior With Boardwalkd
 
@@ -500,3 +500,13 @@ important that an authentication method be configured. See
 
 __TLS__: `boardwalkd` doesn't yet support TLS directly. TLS should be terminated
 using a reverse proxy, or other means.
+
+__No access to hosts__: `boardwalkd` is not involved in managing hosts; only
+CLI workers require direct access to hosts.
+
+__Limited control of workers__: CLI workers poll `boardwalkd` for Workspace
+mutexes and catches to determine if operations may proceed or should halt. This
+is the full extent of control `boardwalkd` has over worker behavior.
+
+__Limited information disclosure from workers__: CLI workers emit limited
+details about the worker and workflow events to `boardwalkd`.
