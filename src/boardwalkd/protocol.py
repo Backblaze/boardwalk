@@ -93,10 +93,12 @@ class Client:
         self.url = urlparse(url)
 
     def get_api_token(self) -> str:
+        """Retrieves the API token from disk"""
         return self.api_token_file.read_text().rstrip()
 
     async def api_login(self):
-        """Performs an interactive login to the API and returns a session token"""
+        """Performs an interactive login to the API and writes the session token
+        to disk"""
         match self.url.scheme:
             case "http":
                 websocket_url = self.url._replace(scheme="ws")
@@ -130,12 +132,23 @@ class Client:
         """Performs an API request with authentication. By default, auto-prompts
         for authentication if auth fails"""
         url = urljoin(self.url.geturl(), path)
+
+        try:
+            api_token = self.get_api_token()
+        except FileNotFoundError:
+            # If there is no token, automatically try to log in
+            asyncio.run(self.api_login())
+            # Always flush the event queue in case any messages were pending on auth
+            self.flush_event_queue()
+
+            api_token = self.get_api_token()
+
         request = HTTPRequest(
             method=method,
             body=body,
             headers={
                 "Content-Type": "application/json",
-                "boardwalk-api-token": self.get_api_token(),
+                "boardwalk-api-token": api_token,
             },
             url=url,
         )
@@ -147,10 +160,8 @@ class Client:
             if e.code == 403 and auto_login_prompt:
                 # If auth is denied, automatically try to login
                 asyncio.run(self.api_login())
-
                 # Always flush the event queue in case any messages were pending on auth
                 self.flush_event_queue()
-
                 # Attempt the request again
                 return self.authenticated_request(
                     path=path,
