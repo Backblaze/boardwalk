@@ -37,39 +37,6 @@ Ansible workflows. It interfaces with Ansible via
 [ansible-runner](https://github.com/ansible/ansible-runner), which is the same
 interface used by [AWX](https://github.com/ansible/awx).
 
-### V1 Goals
-
-- [x] Be able to walk through sets of hosts one-at-a-time using Ansible.
-- [x] Collect Ansible facts from hosts to a local state.
-- [x] Provide interfaces for defining and using isolated Workspaces.
-- [x] Provide an interface for defining Jobs.
-- [x] Provide an interface for defining and running series' of Jobs as
-  Workflows.
-- [x] Provide an interface to pre-process facts in state to determine Job
-  applicability.
-- [x] Provide an interface to control Job failure behavior.
-- [x] Provide interfaces to catch and release Workflows.
-- [x] Lock hosts when operations are being performed to prevent conflicting
-  operations.
-- [x] Warn logged-in users when Boardwalk performs operations on hosts.
-- [x] Provide a central network daemon for Boardwalk executors to report status
-  into and a way to view Workspace status via a web UI.
-- [x] Have a way to "lock" Workspaces network-wide, using the network daemon, to
-  prevent multiple operations on the same Workspace anywhere in the network.
-- [x] Provide a way to remotely catch a Workspace using a web UI.
-- [x] Provide a way to push Slack updates from Workflows.
-- [x] Have a way to capture and report on execution history. (Can be done by
-  using the Slack webhook on the server.)
-- [x] Provide a way for multiple Workspaces to be run in parallel in the same
-  directory.
-- [x] Have a release process and version tagging based on semantic versioning.
-- [x] Add a command-line option to print the tool version
-- [x] Have CSRF protection on the server UI.
-- [x] Support server UI authentication.
-- [x] Have a way to explore saved state.
-- [x] Support server API authentication.
-- [ ] Support TLS on the server.
-
 ### Non-Goals
 
 - ⛔️ Be a scheduler. Boardwalk doesn't need to solve the problems that cron,
