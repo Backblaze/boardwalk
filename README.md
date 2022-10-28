@@ -37,41 +37,6 @@ Ansible workflows. It interfaces with Ansible via
 [ansible-runner](https://github.com/ansible/ansible-runner), which is the same
 interface used by [AWX](https://github.com/ansible/awx).
 
-### V1 Goals
-
-- [x] Be able to walk through sets of hosts one-at-a-time using Ansible.
-- [x] Collect Ansible facts from hosts to a local state.
-- [x] Provide interfaces for defining and using isolated Workspaces.
-- [x] Provide an interface for defining Jobs.
-- [x] Provide an interface for defining and running series' of Jobs as
-  Workflows.
-- [x] Provide an interface to pre-process facts in state to determine Job
-  applicability.
-- [x] Provide an interface to control Job failure behavior.
-- [x] Provide interfaces to catch and release Workflows.
-- [x] Lock hosts when operations are being performed to prevent conflicting
-  operations.
-- [x] Warn logged-in users when Boardwalk performs operations on hosts.
-- [x] Provide a central network daemon for Boardwalk executors to report status
-  into and a way to view Workspace status via a web UI.
-- [x] Have a way to "lock" Workspaces network-wide, using the network daemon, to
-  prevent multiple operations on the same Workspace anywhere in the network.
-- [x] Provide a way to remotely catch a Workspace using a web UI.
-- [x] Provide a way to push Slack updates from Workflows.
-- [x] Have a way to capture and report on execution history. (Can be done by
-  using the Slack webhook on the server.)
-- [x] Provide a way for multiple Workspaces to be run in parallel in the same
-  directory.
-- [x] Have a release process and version tagging based on semantic versioning.
-- [x] Add a command-line option to print the tool version
-- [x] Have CSRF protection on the server UI.
-- [x] Support server UI authentication.
-- [x] Have a way to explore saved state.
-- [ ] Support server API authentication.
-- [ ] Have a way for Boardwalkfile.py's to specify Boardwalk version
-  constraints.
-- [ ] Support TLS on the server.
-
 ### Non-Goals
 
 - ⛔️ Be a scheduler. Boardwalk doesn't need to solve the problems that cron,
@@ -92,7 +57,7 @@ See [here](./CONTRIBUTING.md).
 
 Conceptual overview diagram:
 
-```txt
+```text
 +----------------------------------------+
 | Workspace                              |
 | +------------------------------------+ |
@@ -450,6 +415,40 @@ Boardwalk will use the server for several purposes: It enables Boardwalk to:
 
 See `boardwalkd serve --help` for options to run the server.
 
+#### Architecture
+
+In the diagram and descriptions below, the word "worker" refers to the
+`boardwalk` CLI when it is connected to `boardwalkd`.
+
+```text
+           +------------+
+           | boardwalkd |-----------+
+           +------------+           |
+                 ^ (1)              |
+                 |                  |
+     +-----------+-----------+      |
+     |           |           |      |
++---------+ +---------+ +---------+ |
+| Worker1 | | Worker2 | | WorkerN | |
++---------+ +---------+ +---------+ |
+|    ^ (2)  |    ^ (2)  |    ^ (2)  |
+|    |      |    |      |    |      |
+\    +------\----+------\----+------+
+ |           |           |
+ v (3)       v (3)       v (3)
++-------+   +-------+   +-------+
+| Hosts |   | Hosts |   | Hosts |
++-------+   +-------+   +-------+
+
+(1) Worker details, Workspace data, Workflow events, heartbeats sent from
+    workers to boardwalkd over HTTP(S).
+
+(2) Workers poll boardwalkd over HTTP(S) for semaphores including Workspace
+    mutexes and Workspace catches.
+
+(3) Workers connect directly to hosts over SSH.
+```
+
 #### Catch & Release Behavior With Boardwalkd
 
 When Boardwalk encounters an error on a host, it will automatically catch the
@@ -459,3 +458,24 @@ possible to perform a local catch/release even when connected to `boardwalkd`,
 and local catches cannot be released from the server UI. If Boardwalk encounters
 an error and for any reason it cannot catch the Workspace on the server, it will
 fall back to catching locally.
+
+#### Security
+
+__Authentication__: By default, `boardwalkd` uses anonymous authentication. It's
+important that an authentication method be configured. See
+`boardwalkd serve --help` for available options.
+
+__TLS__: `boardwalkd` doesn't yet support TLS directly. TLS should be terminated
+using a reverse proxy, or other means.
+
+__No access to hosts__: `boardwalkd` is not involved in managing hosts; only
+CLI workers require direct access to hosts.
+
+__Limited control of workers__: CLI workers poll `boardwalkd` for Workspace
+mutexes and catches to determine if operations may proceed or should halt. This
+is the full extent of control `boardwalkd` has over worker behavior.
+
+__Limited information disclosure from workers__: CLI workers emit limited
+details about the worker and workflow events to `boardwalkd`. When workers
+encounter an Ansible task error, the failed task's name and module name are sent
+to `boardwalkd` as part of an event, but do not contain the full error output.

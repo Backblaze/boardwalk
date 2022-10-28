@@ -24,24 +24,52 @@ def cli():
 
 @cli.command()
 @click.option(
+    "--auth-expire-days",
+    help=(
+        "The number of days login tokens and user API keys are valid before"
+        " they expire"
+    ),
+    type=float,
+    default=14,
+    show_default=True,
+)
+@click.option(
+    "--auth-method",
+    help=(
+        "Enables an authentication method for the web UI. The API always requires"
+        " authentication, however without this option configured a predictable"
+        " anonymous user will be used. The method is supplied as a string"
+        " argument. The BOARDWALK_SECRET environment variable must be set for any"
+        " method to work except for 'anonymous'; it is the key used to sign"
+        " secure strings, such as auth cookies and API keys\n\n"
+        "Available auth methods:\n\n"
+        "anonymous\n\n"
+        "All requests are performed as an 'anonymous' default user\n\n"
+        "google_oauth\n\n"
+        "Uses Google Oauth2 to identify users by their Google account email address."
+        " BOARDWALK_GOOGLE_OAUTH_CLIENT_ID and BOARDWALK_GOOGLE_OAUTH_SECRET"
+        " environment variables must be set. The authorized redirect URI should be"
+        " https://<hostname>/auth/login"
+    ),
+    type=click.Choice(
+        ["anonymous", "google_oauth"],
+        case_sensitive=False,
+    ),
+    default="anonymous",
+    show_default=True,
+)
+@click.option(
     "--develop/--no-develop",
     default=False,
     help="Runs the server in development mode with auto-reloading and tracebacks",
     show_default=True,
 )
 @click.option(
-    "--enable-google-oauth/--no-enable-google-oauth",
-    help=(
-        "Enables Google Oauth2 for the web UI."
-        " BOARDWALK_GOOGLE_OAUTH_CLIENT_ID and BOARDWALK_GOOGLE_OAUTH_SECRET"
-        " environment variables must be set along with BOARDWALK_SECRET"
-    ),
-    default=False,
-    show_default=True,
-)
-@click.option(
     "--host-header-pattern",
-    help="A valid python regex pattern to match accepted Host header values",
+    help=(
+        "A valid python regex pattern to match accepted Host header values."
+        " This prevents DNS rebinding attacks when the pattern is appropriately scoped"
+    ),
     type=str,
     required=True,
 )
@@ -70,12 +98,13 @@ def cli():
     required=True,
 )
 def serve(
+    auth_expire_days: float,
+    auth_method: str,
     develop: bool,
-    enable_google_oauth: bool,
     host_header_pattern: str,
     port: int,
-    slack_webhook_url: str,
     slack_error_webhook_url: str,
+    slack_webhook_url: str,
     url: str,
 ):
     """Runs the server"""
@@ -86,12 +115,13 @@ def serve(
 
     asyncio.run(
         run(
+            auth_expire_days=auth_expire_days,
+            auth_method=auth_method,
             develop=develop,
-            enable_google_oauth=enable_google_oauth,
             host_header_pattern=host_header_regex,
             port_number=port,
-            slack_webhook_url=slack_webhook_url,
             slack_error_webhook_url=slack_error_webhook_url,
+            slack_webhook_url=slack_webhook_url,
             url=url,
         )
     )

@@ -50,7 +50,8 @@ dist: clean
 .PHONY: format
 format:
 	black .
-	usort format .
+	@# This is a workaround for https://github.com/facebook/usort/issues/216
+	LIBCST_PARSER_TYPE=native usort format .
 
 # Installs modules to the local system
 .PHONY: install
@@ -79,9 +80,10 @@ test-black:
 # Perform type analysis
 .PHONY: test-pyright
 test-pyright: develop
-	pyright
+	PYRIGHT_PYTHON_FORCE_VERSION=latest pyright
 
 # Ensure imports are formatted in a uniform way
 .PHONY: test-usort
 test-usort:
-	usort check .
+	@# This is a workaround for https://github.com/facebook/usort/issues/216
+	LIBCST_PARSER_TYPE=native usort check .

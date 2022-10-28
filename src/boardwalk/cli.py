@@ -12,6 +12,7 @@ from click import ClickException
 
 from boardwalk.cli_catch import catch, release
 from boardwalk.cli_init import init
+from boardwalk.cli_login import login
 from boardwalk.cli_run import check, run
 from boardwalk.cli_workspace import workspace
 from boardwalk.manifest import (
@@ -82,6 +83,7 @@ def version():
 cli.add_command(catch)
 cli.add_command(check)
 cli.add_command(init)
+cli.add_command(login)
 cli.add_command(release)
 cli.add_command(run)
 cli.add_command(workspace)
