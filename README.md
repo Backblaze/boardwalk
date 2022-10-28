@@ -509,4 +509,6 @@ mutexes and catches to determine if operations may proceed or should halt. This
 is the full extent of control `boardwalkd` has over worker behavior.
 
 __Limited information disclosure from workers__: CLI workers emit limited
-details about the worker and workflow events to `boardwalkd`.
+details about the worker and workflow events to `boardwalkd`. When workers
+encounter an Ansible task error, the failed task's name and module name are sent
+to `boardwalkd` as part of an event, but do not contain the full error output.
