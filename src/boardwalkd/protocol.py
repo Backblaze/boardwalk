@@ -111,15 +111,21 @@ class Client:
         conn = await websocket_connect(websocket_url)
         while True:
             msg = await conn.read_message()
+            if not msg:
+                # The msg is None if the connection closes
+                raise ConnectionAbortedError("Server closed login websocket")
+
             msg = json.loads(str(msg))
             msg = ApiLoginMessage.parse_obj(msg)
+
             if msg.login_url:
-                print(f"\nPlease visit to login:\n{msg.login_url}\n")
+                print(f"---\nPlease visit to login:\n{msg.login_url}")
                 if webbrowser.open_new_tab(msg.login_url):
-                    print("Opened browser to login URL\n")
+                    print("---\nOpened browser to login URL")
             elif msg.token:
                 conn.close()
                 self.api_token_file.write_text(msg.token)
+                print("---\nAuthentication Successful")
                 return
 
     def authenticated_request(
