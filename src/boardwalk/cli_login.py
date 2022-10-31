@@ -20,4 +20,3 @@ def login():
         asyncio.run(client.api_login())
     except ConnectionRefusedError:
         raise ClickException(f"Unable to reach {url}")
-    click.echo("Authentication successful")

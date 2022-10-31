@@ -355,11 +355,17 @@ class AuthLoginApiWebsocketHandler(tornado.websocket.WebSocketHandler):
                 id_client()
             return id
 
-        login_url = f"{self.settings['url']}/api/auth/login?id={id_client()}"
+        this_client_id = id_client()
+        app_log.info(f"Login client ID {this_client_id} opened")
+        login_url = f"{self.settings['url']}/api/auth/login?id={this_client_id}"
         return self.write_message(ApiLoginMessage(login_url=login_url).dict())
 
     def on_close(self):
+        app_log.info(f"Login client ID {self.clients[self]} closed")
         del self.clients[self]
+
+    def on_pong(self, data: bytes):
+        app_log.info(f"Login client ID {self.clients[self]} pong received")
 
     @classmethod
     def write_to_client_by_id(cls, id: str, msg: bytes | str | dict[str, Any]):
@@ -583,6 +589,7 @@ def make_server(
             "sort_events_by_date": ui_method_sort_events_by_date,
         },
         "url": url,
+        "websocket_ping_interval": 10,
         "xsrf_cookies": True,
     }
     if develop:
