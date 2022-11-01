@@ -15,7 +15,6 @@ from urllib.parse import urljoin, urlparse
 
 from pydantic import BaseModel, Extra, validator
 from tornado.httpclient import (
-    AsyncHTTPClient,
     HTTPClient,
     HTTPClientError,
     HTTPError,
@@ -87,7 +86,6 @@ class Client:
     """Boardwalkd protocol client"""
 
     def __init__(self, url: str):
-        self.async_client = AsyncHTTPClient()
         self.api_token_file = Path.cwd().joinpath(".boardwalk/api_token.txt")
         self.event_queue = deque([])
         self.url = urlparse(url)
@@ -125,7 +123,7 @@ class Client:
             elif msg.token:
                 conn.close()
                 self.api_token_file.write_text(msg.token)
-                print("---\nAuthentication Successful")
+                print("---\nAuthentication successful")
                 return
 
     def authenticated_request(
@@ -210,7 +208,7 @@ class Client:
         """Posts a catch to the server"""
         try:
             self.authenticated_request(
-                path="/api/workspace/{workspace_name}/semaphores/caught",
+                path=f"/api/workspace/{workspace_name}/semaphores/caught",
                 method="POST",
                 body="catch",
             )
