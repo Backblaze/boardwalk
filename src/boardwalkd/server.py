@@ -85,6 +85,8 @@ class AnonymousLoginHandler(UIBaseHandler):
             "boardwalk_user",
             "anonymous@example.com",
             expires_days=self.settings["auth_expire_days"],
+            samesite="Strict",
+            secure=True,
         )
         return self.redirect(
             self.get_query_argument("next", "/")
@@ -118,6 +120,8 @@ class GoogleOAuth2LoginHandler(UIBaseHandler, tornado.auth.GoogleOAuth2Mixin):
                 "boardwalk_user",
                 user["email"],
                 expires_days=self.settings["auth_expire_days"],
+                samesite="Strict",
+                secure=True,
             )
 
             # We attempt to redirect back to the original URL the user was browsing
@@ -591,6 +595,7 @@ def make_server(
         "url": url,
         "websocket_ping_interval": 10,
         "xsrf_cookies": True,
+        "xsrf_cookie_kwargs": {"samesite": "Strict", "secure": True},
     }
     if develop:
         settings["debug"] = True
