@@ -263,7 +263,7 @@ class Client:
                 socket.gaierror,
             ):
                 pass
-            time.sleep(5)
+            time.sleep(5)  # nosemgrep: python.lang.best-practice.sleep.arbitrary-sleep
 
     def workspace_heartbeat_keepalive_connect(
         self, workspace_name: str

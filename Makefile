@@ -70,7 +70,7 @@ install-web-deps:
 
 # Runs all available tests
 .PHONY: test
-test: test-black test-pyright test-usort
+test: test-black test-pyright test-semgrep test-usort
 
 # Test that code is formatted with black
 .PHONY: test-black
@@ -81,6 +81,15 @@ test-black:
 .PHONY: test-pyright
 test-pyright: develop
 	PYRIGHT_PYTHON_FORCE_VERSION=latest pyright
+
+# Perform security static analysis
+.PHONY: test-semgrep
+test-semgrep:
+	semgrep \
+		--config "p/r2c-security-audit" \
+		--config "p/r2c-bug-scan" \
+		--config "p/secrets" \
+		--config "p/dockerfile"
 
 # Ensure imports are formatted in a uniform way
 .PHONY: test-usort

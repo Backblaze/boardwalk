@@ -487,7 +487,7 @@ def handle_workflow_catch(workspace: Workspace, hostname: str):
                 ),
             )
         while workspace.caught():
-            time.sleep(5)
+            time.sleep(5)  # nosemgrep: python.lang.best-practice.sleep.arbitrary-sleep
 
     # Now check if there is a remote catch
     def check_boardwalkd_catch(client: WorkspaceClient) -> bool:
@@ -521,7 +521,7 @@ def handle_workflow_catch(workspace: Workspace, hostname: str):
             )
         )
         while check_boardwalkd_catch(boardwalkd_client):
-            time.sleep(5)
+            time.sleep(5)  # nosemgrep: python.lang.best-practice.sleep.arbitrary-sleep
 
 
 def lock_remote_host(host: Host):
