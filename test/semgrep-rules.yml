@@ -6,7 +6,7 @@ rules:
   - python
   message: |
     UIBaseHandler.set_secure_cookie() should have additional arguments passed to
-    further enhance the security of cookies.
+    further enhance the security of cookies
 
     Example:
     self.set_secure_cookie("boardwalk_user",
@@ -30,4 +30,67 @@ rules:
             expires_days=...,
             ...
           )
+          ...
+
+- id: boardwalk.python.security.handler-method-missing-authentication
+  severity: ERROR
+  languages:
+  - python
+  message: |
+    UIBaseHandler or APIBaseHandler HTTP methods must require authentication
+    by using the @tornado.web.authenticated decorator, unless they have been
+    intentionally excluded
+  patterns:
+  - pattern-inside: |
+      class $C(UIBaseHandler):
+          ...
+  - pattern-either:
+    - pattern: |
+        def head(...):
+            ...
+    - pattern: |
+        def get(...):
+            ...
+    - pattern: |
+        def post(...):
+            ...
+    - pattern: |
+        def delete(...):
+            ...
+    - pattern: |
+        def patch(...):
+            ...
+    - pattern: |
+        def put(...):
+            ...
+    - pattern: |
+        def options(...):
+            ...
+  - pattern-not: |
+      @tornado.web.authenticated
+      def head(...):
+          ...
+  - pattern-not: |
+      @tornado.web.authenticated
+      def get(...):
+          ...
+  - pattern-not: |
+      @tornado.web.authenticated
+      def post(...):
+          ...
+  - pattern-not: |
+      @tornado.web.authenticated
+      def delete(...):
+          ...
+  - pattern-not: |
+      @tornado.web.authenticated
+      def patch(...):
+          ...
+  - pattern-not: |
+      @tornado.web.authenticated
+      def put(...):
+          ...
+  - pattern-not: |
+      @tornado.web.authenticated
+      def options(...):
           ...

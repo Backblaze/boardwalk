@@ -80,6 +80,7 @@ def ui_method_sort_events_by_date(
 class AnonymousLoginHandler(UIBaseHandler):
     """Handles "logging in" the UI when no auth is actually configured"""
 
+    # nosemgrep: test.boardwalk.python.security.handler-method-missing-authentication
     async def get(self):  # pyright: reportIncompatibleMethodOverride=false
         self.set_secure_cookie(
             "boardwalk_user",
@@ -99,6 +100,7 @@ class GoogleOAuth2LoginHandler(UIBaseHandler, tornado.auth.GoogleOAuth2Mixin):
 
     url_encryption_key = Fernet.generate_key()
 
+    # nosemgrep: test.boardwalk.python.security.handler-method-missing-authentication
     async def get(self, *args: Any, **kwargs: Any):
         try:
             # If the request is sent along with a code, then we assume the code
