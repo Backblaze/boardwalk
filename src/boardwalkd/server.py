@@ -387,6 +387,7 @@ class AuthApiDenied(APIBaseHandler):
     """Dedicated handler for redirecting an unauthenticated user to an 'access
     denied' endpoint"""
 
+    # nosemgrep: test.boardwalk.python.security.handler-method-missing-authentication
     def get(self):
         return self.send_error(403)
 

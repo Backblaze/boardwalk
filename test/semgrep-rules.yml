@@ -41,56 +41,30 @@ rules:
     by using the @tornado.web.authenticated decorator, unless they have been
     intentionally excluded
   patterns:
+  - metavariable-pattern:
+      metavariable: $HANDLER
+      patterns:
+      - pattern-either:
+        - pattern: UIBaseHandler
+        - pattern: APIBaseHandler
+  - metavariable-pattern:
+      metavariable: $METHOD
+      patterns:
+      - pattern-either:
+        - pattern: head
+        - pattern: get
+        - pattern: post
+        - pattern: delete
+        - pattern: patch
+        - pattern: put
+        - pattern: options
   - pattern-inside: |
-      class $C(UIBaseHandler):
+      class $C($HANDLER):
           ...
-  - pattern-either:
-    - pattern: |
-        def head(...):
-            ...
-    - pattern: |
-        def get(...):
-            ...
-    - pattern: |
-        def post(...):
-            ...
-    - pattern: |
-        def delete(...):
-            ...
-    - pattern: |
-        def patch(...):
-            ...
-    - pattern: |
-        def put(...):
-            ...
-    - pattern: |
-        def options(...):
-            ...
-  - pattern-not: |
-      @tornado.web.authenticated
-      def head(...):
+  - pattern: |
+      def $METHOD(...):
           ...
   - pattern-not: |
       @tornado.web.authenticated
-      def get(...):
-          ...
-  - pattern-not: |
-      @tornado.web.authenticated
-      def post(...):
-          ...
-  - pattern-not: |
-      @tornado.web.authenticated
-      def delete(...):
-          ...
-  - pattern-not: |
-      @tornado.web.authenticated
-      def patch(...):
-          ...
-  - pattern-not: |
-      @tornado.web.authenticated
-      def put(...):
-          ...
-  - pattern-not: |
-      @tornado.web.authenticated
-      def options(...):
+      def $METHOD(...):
           ...
