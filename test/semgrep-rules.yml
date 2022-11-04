@@ -1,0 +1,33 @@
+---
+rules:
+- id: boardwalk.python.security.insecure-set-secure-cookie
+  severity: ERROR
+  languages:
+  - python
+  message: |
+    UIBaseHandler.set_secure_cookie() should have additional arguments passed to
+    further enhance the security of cookies.
+
+    Example:
+    self.set_secure_cookie("boardwalk_user",
+    "anonymous@example.com",
+    expires_days=self.settings["auth_expire_days"],
+    samesite="Strict", secure=True)
+  patterns:
+  - pattern: |
+      class $C(UIBaseHandler):
+          def $F(...):
+            ...
+            self.set_secure_cookie(...)
+            ...
+  - pattern-not: |
+      class $C(UIBaseHandler):
+        def $F(...):
+          ...
+          self.set_secure_cookie(
+             samesite="Strict",
+             secure=True,
+            expires_days=...,
+            ...
+          )
+          ...

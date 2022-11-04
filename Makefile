@@ -86,6 +86,7 @@ test-pyright: develop
 .PHONY: test-semgrep
 test-semgrep:
 	semgrep \
+		--config test/semgrep-rules.yml \
 		--config "p/r2c-security-audit" \
 		--config "p/r2c-bug-scan" \
 		--config "p/secrets" \
