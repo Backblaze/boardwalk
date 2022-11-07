@@ -71,7 +71,7 @@ _stomp_locks: bool = False
     "--limit",
     "-l",
     help="An Ansible pattern to limit hosts by. Defaults to no limit",
-    default="all",
+    default="",
 )
 @click.option(
     "--server-connect/--no-server-connect",
@@ -127,6 +127,16 @@ def run(
     if len(ws.state.hosts) == 0:
         raise ClickException("No hosts found in state. Have you run `boardwalk init`?")
 
+    # Check if a --limit is required for this Workspace
+    if ws.cfg.require_limit and not limit:
+        raise ClickException("Workspace requires the --limit option be supplied")
+
+    # If no limit is supplied, then the limit is effectively "all"
+    if limit:
+        effective_limit = limit
+    else:
+        effective_limit = "all"
+
     ws.assert_host_pattern_unchanged()
 
     # Setup boardwalkd client if configured
@@ -150,7 +160,7 @@ def run(
     with concurrent.futures.ThreadPoolExecutor() as executor:
         # Process --limit
         filter_hosts_by_limit_future = executor.submit(
-            filter_hosts_by_limit, ws, ws.state.hosts.items(), limit
+            filter_hosts_by_limit, ws, ws.state.hosts.items(), effective_limit
         )
         # Get data for inventory_vars used in Jobs
         inventory_data_future = executor.submit(ansible_inventory)
@@ -159,8 +169,9 @@ def run(
         except NoHostsMatched:
             raise ClickException(
                 (
-                    "No host matched the given limit pattern. Ensure the host exists"
-                    " in the Ansible inventory and was reachable during `boardwalk init`"
+                    "No host matched the given limit pattern. Ensure the expected"
+                    " hosts exist in the Ansible inventory and confirm they were"
+                    " reachable during `boardwalk init`"
                 )
             )
         inventory_vars = inventory_data_future.result()["_meta"]["hostvars"]
@@ -208,7 +219,7 @@ def run(
     "--limit",
     "-l",
     help="An Ansible pattern to limit hosts by. Defaults to no limit",
-    default="all",
+    default="",
 )
 @click.option(
     "--server-connect/--no-server-connect",
