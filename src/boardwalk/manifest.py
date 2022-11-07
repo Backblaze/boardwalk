@@ -181,7 +181,20 @@ class Workflow(ABC):
 
 
 class WorkspaceConfig:
-    """Configuration block for workspaces with defaults validation"""
+    """
+    Configuration block for workspaces
+
+    :param default_sort_order: The default order hosts will be walked through
+    (by hostname). Valid sort orders are specified in the valid_sort_orders
+    attribute
+    :param host_pattern: The Ansible host pattern the workspace targets. If this
+    changes after initialization, the workspace needs to be re-initialized
+    :param require_limit: `check` and `run` subcommands will require the --limit
+    option to be passed. This is useful for workspaces configured with a broad
+    host pattern but workflows should be intentionally down-scoped to a specific
+    pattern
+    :param workflow: The workflow the workspace uses
+    """
 
     valid_sort_orders = ["ascending", "descending", "shuffle"]
 
@@ -190,14 +203,12 @@ class WorkspaceConfig:
         host_pattern: str,
         workflow: Workflow,
         default_sort_order: str = "shuffle",
+        require_limit: bool = False,
     ):
         self.default_sort_order = default_sort_order
-        """The default order hosts will be walked through (by hostname)"""
         self.host_pattern = host_pattern
-        """The Ansible host pattern the workspace targets. If this changes after
-        initialization, the workspace needs to be re-initialized"""
+        self.require_limit = require_limit
         self.workflow = workflow
-        """The workflow the workspace uses"""
 
     @property
     def default_sort_order(self) -> str:

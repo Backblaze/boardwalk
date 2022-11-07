@@ -11,6 +11,7 @@ from click import ClickException
 
 from boardwalk.ansible import (
     ansible_runner_run_tasks,
+    AnsibleRunError,
     AnsibleRunnerFailedHost,
     AnsibleRunnerGeneralError,
     AnsibleRunnerUnreachableHost,
@@ -35,6 +36,12 @@ if TYPE_CHECKING:
 
 @click.command(short_help="Inits local workspace state by getting host facts")
 @click.option(
+    "--limit",
+    "-l",
+    help="An Ansible pattern to limit hosts by. Defaults to no limit",
+    default="all",
+)
+@click.option(
     "--retry/--no-retry",
     "-r/-nr",
     default=False,
@@ -42,13 +49,17 @@ if TYPE_CHECKING:
     show_default=True,
 )
 @click.pass_context
-def init(ctx: click.Context, retry: bool):
+def init(ctx: click.Context, limit: str, retry: bool):
     """
     Inits the workspace state with host data. Gathers Ansible facts for hosts
     matching the workspaces host pattern. OK to run multiple times; hosts are
     only added or updated, never removed by this operation. Use
     `boardwalk workspace reset` to clear existing state if needed
     """
+    if retry and limit != "all":
+        # We don't allow limit and retry to be specified together at the moment
+        raise ClickException("--limit and --retry cannot be supplied together")
+
     try:
         ws = get_ws()
     except NoActiveWorkspace as e:
@@ -67,19 +78,20 @@ def init(ctx: click.Context, retry: bool):
         "gather_facts": False,
         "hosts": ws.cfg.host_pattern,
         "invocation_msg": "Gathering facts",
+        "limit": limit,
         "tasks": [{"name": "setup", "ansible.builtin.setup": {"gather_timeout": 30}}],
         "timeout": 300,
     }
     if retry:
         if not retry_file_path.exists():
             raise ClickException("No retry file exists")
-        runner_kwargs["limit"] = "@" + str(retry_file_path)
+        runner_kwargs["limit"] = f"@{str(retry_file_path)}"
 
     # Save the host pattern we are initializing with. If the pattern changes after
     # this point, other operations will need the state reset and init to be re-done
     ws.state.host_pattern = ws.cfg.host_pattern
 
-    # Run Ansible.
+    # Run Ansible
     hosts_were_unreachable = False
     try:
         runner = ansible_runner_run_tasks(**runner_kwargs)
@@ -92,6 +104,15 @@ def init(ctx: click.Context, retry: bool):
         # We note to the user later on if hosts were unreachable
         hosts_were_unreachable = True
         runner = e.runner
+    except AnsibleRunError as e:
+        # If we encounter this error type, there is likely some local error, so
+        # we try to print out some debug info and bail
+        for event in e.runner.events:
+            try:
+                click.echo(event["stdout"])
+            except KeyError:
+                pass
+        raise ClickException("Failed to start fact gathering")
 
     # Clear the retry file after we use it to start fresh before we build a new one
     retry_file_path.unlink(missing_ok=True)
