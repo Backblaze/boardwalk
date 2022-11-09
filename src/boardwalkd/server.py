@@ -723,7 +723,7 @@ async def run(
     auth_method: str,
     develop: bool,
     host_header_pattern: re.Pattern[str],
-    port_number: int,
+    port_number: int | None,
     tls_crt_path: str | None,
     tls_key_path: str | None,
     tls_port_number: int | None,
@@ -742,10 +742,11 @@ async def run(
         url=url,
     )
 
-    app.listen(port_number)
-    # If port_number=0 a random open port will be selected and the log message
-    # will not be accurate
-    app_log.info(f"Server listening on non-TLS port: {port_number}")
+    if port_number is not None:
+        app.listen(port_number)
+        # If port_number=0 a random open port will be selected and the log message
+        # will not be accurate
+        app_log.info(f"Server listening on non-TLS port: {port_number}")
 
     if tls_port_number is not None:
         if urlparse(url).scheme != "https":

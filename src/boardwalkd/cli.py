@@ -77,12 +77,11 @@ def cli():
 @click.option(
     "--port",
     help=(
-        "The non-TLS port number the server binds to. If --tls-port is"
-        " specified the server will redirect UI requests to the TLS port and"
-        " API requests to this port will be rejected"
+        "The non-TLS port number the server binds to. --port and/or"
+        " --tls-port must be configured"
     ),
     type=int,
-    required=True,
+    default=None,
 )
 @click.option(
     "--slack-webhook-url",
@@ -135,7 +134,7 @@ def serve(
     auth_method: str,
     develop: bool,
     host_header_pattern: str,
-    port: int,
+    port: int | None,
     slack_error_webhook_url: str,
     slack_webhook_url: str,
     tls_crt: str | None,
@@ -149,6 +148,19 @@ def serve(
         host_header_regex = re.compile(host_header_pattern)
     except re.error:
         raise ClickException("Host pattern regex invalid")
+
+    # Validate any port is configured
+    if not (port or tls_port):
+        raise ClickException("One or both of --port or --tls-port must be configured")
+
+    # If there is no TLS port then reject setting a TLS key and cert
+    if (not tls_port) and (tls_crt or tls_key):
+        raise ClickException(
+            (
+                "--tls-crt and --tls-key should not be configured"
+                " unless --tls-port is also set"
+            )
+        )
 
     # Validate TLS configuration (key and cert paths are already validated by click)
     if tls_port is not None:
