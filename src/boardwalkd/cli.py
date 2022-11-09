@@ -4,6 +4,7 @@ This file contains the boardwalkd CLI code
 import asyncio
 import re
 from importlib.metadata import version as lib_version
+from pathlib import Path
 
 import click
 from click import ClickException
@@ -74,7 +75,14 @@ def cli():
     required=True,
 )
 @click.option(
-    "--port", help="The port number the server binds to", type=int, required=True
+    "--port",
+    help=(
+        "The non-TLS port number the server binds to. If --tls-port is"
+        " specified the server will redirect UI requests to the TLS port and"
+        " API requests to this port will be rejected"
+    ),
+    type=int,
+    required=True,
 )
 @click.option(
     "--slack-webhook-url",
@@ -92,6 +100,29 @@ def cli():
     default=None,
 )
 @click.option(
+    "--tls-crt",
+    help=("Path to TLS certificate chain file for use along with --tls-port"),
+    type=click.Path(exists=True, readable=True),
+    default=None,
+)
+@click.option(
+    "--tls-key",
+    help=("Path to TLS key file for use along with --tls-port"),
+    type=click.Path(exists=True, readable=True),
+    default=None,
+)
+@click.option(
+    "--tls-port",
+    help=(
+        "The TLS port number the server binds to. When configured, UI requests"
+        " to the non-TLS port (--port) will be redirected to this TLS port and"
+        " API requests to the non-TLS port will be rejected. When --tls-port is"
+        " configured, --tls-crt and --tls-key must also be supplied"
+    ),
+    type=int,
+    default=None,
+)
+@click.option(
     "--url",
     help="The base URL where the server can be reached",
     type=str,
@@ -105,13 +136,30 @@ def serve(
     port: int,
     slack_error_webhook_url: str,
     slack_webhook_url: str,
+    tls_crt: str | None,
+    tls_key: str | None,
+    tls_port: int | None,
     url: str,
 ):
     """Runs the server"""
+    # Validate host_header_pattern
     try:
         host_header_regex = re.compile(host_header_pattern)
     except re.error:
         raise ClickException("Host pattern regex invalid")
+
+    # Validate TLS configuration (key and cert paths are already validated by click)
+    if tls_port is not None:
+        try:
+            assert tls_crt
+            assert tls_key
+        except AssertionError:
+            raise ClickException(
+                (
+                    "--tls-crt and --tls-key paths must be supplied when a"
+                    " --tls-port is configured"
+                )
+            )
 
     asyncio.run(
         run(
@@ -122,6 +170,9 @@ def serve(
             port_number=port,
             slack_error_webhook_url=slack_error_webhook_url,
             slack_webhook_url=slack_webhook_url,
+            tls_crt_path=tls_crt,
+            tls_key_path=tls_key,
+            tls_port_number=tls_port,
             url=url,
         )
     )

@@ -9,6 +9,7 @@ import logging
 import os
 import re
 import secrets
+import ssl
 import string
 from collections import deque
 from datetime import datetime, timedelta
@@ -570,7 +571,7 @@ def log_request(handler: tornado.web.RequestHandler):
     )
 
 
-def make_server(
+def make_app(
     auth_expire_days: float,
     auth_method: str,
     develop: bool,
@@ -578,8 +579,8 @@ def make_server(
     slack_error_webhook_url: str,
     slack_webhook_url: str,
     url: str,
-):
-    """Builds the tornado application server object"""
+) -> tornado.web.Application:
+    """Builds the tornado application object"""
     handlers: list[tornado.web.OutputTransform] = []
     settings = {
         "api_access_denied_url": urljoin(url, "/api/auth/denied"),
@@ -705,12 +706,15 @@ async def run(
     develop: bool,
     host_header_pattern: re.Pattern[str],
     port_number: int,
+    tls_crt_path: str | None,
+    tls_key_path: str | None,
+    tls_port_number: int | None,
     slack_error_webhook_url: str,
     slack_webhook_url: str,
     url: str,
 ):
     """Starts the tornado server and IO loop"""
-    server = make_server(
+    app = make_app(
         auth_expire_days=auth_expire_days,
         auth_method=auth_method,
         develop=develop,
@@ -719,6 +723,15 @@ async def run(
         slack_webhook_url=slack_webhook_url,
         url=url,
     )
-    server.listen(port_number)
-    app_log.info(f"Server listening on port: {port_number}")
+    app.listen(port_number)
+    # If port_number=0 a random open port will be selected and the log message
+    # will not be accurate
+    app_log.info(f"Server listening on non-TLS port: {port_number}")
+    if tls_port_number is not None:
+        ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_ctx.load_cert_chain(certfile=tls_crt_path, keyfile=tls_key_path)
+        app.listen(tls_port_number, ssl_options=ssl_ctx)
+        # If tls_port_number=0 a random open port will be selected and the log
+        # message will not be accurate
+        app_log.info(f"Server listening on TLS port: {tls_port_number}")
     await asyncio.Event().wait()
