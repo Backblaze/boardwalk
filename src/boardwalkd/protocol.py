@@ -173,6 +173,9 @@ class Client:
                     body=body,
                     auto_login_prompt=auto_login_prompt,
                 )
+            if e.code == 421:
+                # The server URL is probably incorrect
+                raise ConnectionRefusedError
             else:
                 raise e
 

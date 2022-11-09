@@ -48,14 +48,6 @@ UI handlers
 class UIBaseHandler(tornado.web.RequestHandler):
     """Base request handler for UI paths"""
 
-    def get_current_user(self) -> bytes | None:
-        """Required method for @tornado.web.authenticated to work"""
-        return self.get_secure_cookie(
-            "boardwalk_user",
-            max_age_days=self.settings["auth_expire_days"],
-            min_version=2,
-        )
-
     def prepare(self):
         # If the request's scheme or host:port differs from the server's
         # configured URL, then the request will be redirected to the configured
@@ -65,6 +57,14 @@ class UIBaseHandler(tornado.web.RequestHandler):
         if req_url.scheme != svr_url.scheme or req_url.netloc != svr_url.netloc:
             req_url = req_url._replace(scheme=svr_url.scheme, netloc=svr_url.netloc)
             return self.redirect(req_url.geturl())
+
+    def get_current_user(self) -> bytes | None:
+        """Required method for @tornado.web.authenticated to work"""
+        return self.get_secure_cookie(
+            "boardwalk_user",
+            max_age_days=self.settings["auth_expire_days"],
+            min_version=2,
+        )
 
 
 def ui_method_secondsdelta(handler: UIBaseHandler, time: datetime) -> float:
@@ -302,6 +302,14 @@ API handlers
 
 class APIBaseHandler(tornado.web.RequestHandler):
     """Base request handler for API paths"""
+
+    def prepare(self):
+        # If the request's scheme or host:port differs from the server's
+        # configured URL, then the request will rejected
+        req_url = urlparse(self.request.full_url())
+        svr_url: ParseResult = self.settings["url"]
+        if req_url.scheme != svr_url.scheme or req_url.netloc != svr_url.netloc:
+            return self.send_error(421)
 
     def check_xsrf_cookie(self):
         """We ignore this method on API requests"""
