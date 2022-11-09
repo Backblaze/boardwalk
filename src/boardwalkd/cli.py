@@ -4,7 +4,6 @@ This file contains the boardwalkd CLI code
 import asyncio
 import re
 from importlib.metadata import version as lib_version
-from pathlib import Path
 
 import click
 from click import ClickException
@@ -70,6 +69,7 @@ def cli():
     help=(
         "A valid python regex pattern to match accepted Host header values."
         " This prevents DNS rebinding attacks when the pattern is appropriately scoped"
+        " Requests reaching the server that don't match this pattern will return a 404"
     ),
     type=str,
     required=True,
@@ -114,17 +114,19 @@ def cli():
 @click.option(
     "--tls-port",
     help=(
-        "The TLS port number the server binds to. When configured, UI requests"
-        " to the non-TLS port (--port) will be redirected to this TLS port and"
-        " API requests to the non-TLS port will be rejected. When --tls-port is"
-        " configured, --tls-crt and --tls-key must also be supplied"
+        "The TLS port number the server binds to. When configured, the --url"
+        " option must have an https:// scheme. When --tls-port is configured,"
+        " --tls-crt and --tls-key must also be supplied"
     ),
     type=int,
     default=None,
 )
 @click.option(
     "--url",
-    help="The base URL where the server can be reached",
+    help=(
+        "The base URL where the server can be reached. UI Requests that do not"
+        " match the scheme or host:port of this URL will automatically be redirected"
+    ),
     type=str,
     required=True,
 )

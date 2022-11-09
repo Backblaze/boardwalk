@@ -17,7 +17,7 @@ from distutils.util import strtobool
 from importlib.metadata import version as lib_version
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import urljoin
+from urllib.parse import ParseResult, urljoin, urlparse
 
 import tornado.auth
 import tornado.escape
@@ -55,6 +55,16 @@ class UIBaseHandler(tornado.web.RequestHandler):
             max_age_days=self.settings["auth_expire_days"],
             min_version=2,
         )
+
+    def prepare(self):
+        # If the request's scheme or host:port differs from the server's
+        # configured URL, then the request will be redirected to the configured
+        # server URL
+        req_url = urlparse(self.request.full_url())
+        svr_url: ParseResult = self.settings["url"]
+        if req_url.scheme != svr_url.scheme or req_url.netloc != svr_url.netloc:
+            req_url = req_url._replace(scheme=svr_url.scheme, netloc=svr_url.netloc)
+            return self.redirect(req_url.geturl())
 
 
 def ui_method_secondsdelta(handler: UIBaseHandler, time: datetime) -> float:
@@ -499,7 +509,7 @@ class WorkspaceEventApiHandler(APIBaseHandler):
                     workspace,
                     self.settings["slack_webhook_url"],
                     self.settings["slack_error_webhook_url"],
-                    self.settings["url"],
+                    self.settings["url"].geturl(),
                 )
 
         state.flush()
@@ -596,7 +606,7 @@ def make_app(
             "server_version": ui_method_server_version,
             "sort_events_by_date": ui_method_sort_events_by_date,
         },
-        "url": url,
+        "url": urlparse(url),
         "websocket_ping_interval": 10,
         "xsrf_cookies": True,
         "xsrf_cookie_kwargs": {"samesite": "Strict", "secure": True},
@@ -723,15 +733,22 @@ async def run(
         slack_webhook_url=slack_webhook_url,
         url=url,
     )
+
     app.listen(port_number)
     # If port_number=0 a random open port will be selected and the log message
     # will not be accurate
     app_log.info(f"Server listening on non-TLS port: {port_number}")
+
     if tls_port_number is not None:
+        if urlparse(url).scheme != "https":
+            raise ClickException(f"URL scheme must be HTTPS when TLS is enabled")
+
         ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_ctx.load_cert_chain(certfile=tls_crt_path, keyfile=tls_key_path)
+
         app.listen(tls_port_number, ssl_options=ssl_ctx)
         # If tls_port_number=0 a random open port will be selected and the log
         # message will not be accurate
         app_log.info(f"Server listening on TLS port: {tls_port_number}")
+
     await asyncio.Event().wait()
