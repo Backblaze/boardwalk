@@ -305,7 +305,7 @@ class APIBaseHandler(tornado.web.RequestHandler):
 
     def prepare(self):
         # If the request's scheme or host:port differs from the server's
-        # configured URL, then the request will rejected
+        # configured URL, then the request will be rejected
         req_url = urlparse(self.request.full_url())
         svr_url: ParseResult = self.settings["url"]
         if req_url.scheme != svr_url.scheme or req_url.netloc != svr_url.netloc:
