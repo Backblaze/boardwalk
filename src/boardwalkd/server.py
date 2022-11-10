@@ -9,6 +9,7 @@ import logging
 import os
 import re
 import secrets
+import ssl
 import string
 from collections import deque
 from datetime import datetime, timedelta
@@ -16,7 +17,7 @@ from distutils.util import strtobool
 from importlib.metadata import version as lib_version
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import urljoin
+from urllib.parse import ParseResult, urljoin, urlparse
 
 import tornado.auth
 import tornado.escape
@@ -46,6 +47,16 @@ UI handlers
 
 class UIBaseHandler(tornado.web.RequestHandler):
     """Base request handler for UI paths"""
+
+    def prepare(self):
+        # If the request's scheme or host:port differs from the server's
+        # configured URL, then the request will be redirected to the configured
+        # server URL
+        req_url = urlparse(self.request.full_url())
+        svr_url: ParseResult = self.settings["url"]
+        if req_url.scheme != svr_url.scheme or req_url.netloc != svr_url.netloc:
+            req_url = req_url._replace(scheme=svr_url.scheme, netloc=svr_url.netloc)
+            return self.redirect(req_url.geturl())
 
     def get_current_user(self) -> bytes | None:
         """Required method for @tornado.web.authenticated to work"""
@@ -292,6 +303,14 @@ API handlers
 class APIBaseHandler(tornado.web.RequestHandler):
     """Base request handler for API paths"""
 
+    def prepare(self):
+        # If the request's scheme or host:port differs from the server's
+        # configured URL, then the request will be rejected
+        req_url = urlparse(self.request.full_url())
+        svr_url: ParseResult = self.settings["url"]
+        if req_url.scheme != svr_url.scheme or req_url.netloc != svr_url.netloc:
+            return self.send_error(421)
+
     def check_xsrf_cookie(self):
         """We ignore this method on API requests"""
         pass
@@ -498,7 +517,7 @@ class WorkspaceEventApiHandler(APIBaseHandler):
                     workspace,
                     self.settings["slack_webhook_url"],
                     self.settings["slack_error_webhook_url"],
-                    self.settings["url"],
+                    self.settings["url"].geturl(),
                 )
 
         state.flush()
@@ -570,7 +589,7 @@ def log_request(handler: tornado.web.RequestHandler):
     )
 
 
-def make_server(
+def make_app(
     auth_expire_days: float,
     auth_method: str,
     develop: bool,
@@ -578,8 +597,8 @@ def make_server(
     slack_error_webhook_url: str,
     slack_webhook_url: str,
     url: str,
-):
-    """Builds the tornado application server object"""
+) -> tornado.web.Application:
+    """Builds the tornado application object"""
     handlers: list[tornado.web.OutputTransform] = []
     settings = {
         "api_access_denied_url": urljoin(url, "/api/auth/denied"),
@@ -595,7 +614,7 @@ def make_server(
             "server_version": ui_method_server_version,
             "sort_events_by_date": ui_method_sort_events_by_date,
         },
-        "url": url,
+        "url": urlparse(url),
         "websocket_ping_interval": 10,
         "xsrf_cookies": True,
         "xsrf_cookie_kwargs": {"samesite": "Strict", "secure": True},
@@ -704,13 +723,16 @@ async def run(
     auth_method: str,
     develop: bool,
     host_header_pattern: re.Pattern[str],
-    port_number: int,
+    port_number: int | None,
+    tls_crt_path: str | None,
+    tls_key_path: str | None,
+    tls_port_number: int | None,
     slack_error_webhook_url: str,
     slack_webhook_url: str,
     url: str,
 ):
     """Starts the tornado server and IO loop"""
-    server = make_server(
+    app = make_app(
         auth_expire_days=auth_expire_days,
         auth_method=auth_method,
         develop=develop,
@@ -719,6 +741,23 @@ async def run(
         slack_webhook_url=slack_webhook_url,
         url=url,
     )
-    server.listen(port_number)
-    app_log.info(f"Server listening on port: {port_number}")
+
+    if port_number is not None:
+        app.listen(port_number)
+        # If port_number=0 a random open port will be selected and the log message
+        # will not be accurate
+        app_log.info(f"Server listening on non-TLS port: {port_number}")
+
+    if tls_port_number is not None:
+        if urlparse(url).scheme != "https":
+            raise ClickException(f"URL scheme must be HTTPS when TLS is enabled")
+
+        ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_ctx.load_cert_chain(certfile=tls_crt_path, keyfile=tls_key_path)
+
+        app.listen(tls_port_number, ssl_options=ssl_ctx)
+        # If tls_port_number=0 a random open port will be selected and the log
+        # message will not be accurate
+        app_log.info(f"Server listening on TLS port: {tls_port_number}")
+
     await asyncio.Event().wait()

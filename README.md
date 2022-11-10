@@ -465,8 +465,7 @@ __Authentication__: By default, `boardwalkd` uses anonymous authentication. It's
 important that an authentication method be configured. See
 `boardwalkd serve --help` for available options.
 
-__TLS__: `boardwalkd` doesn't yet support TLS directly. TLS should be terminated
-using a reverse proxy, or other means.
+__TLS__: `boardwalkd` supports TLS termination. See `boardwalkd serve --help`
 
 __No access to hosts__: `boardwalkd` is not involved in managing hosts; only
 CLI workers require direct access to hosts.

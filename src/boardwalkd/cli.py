@@ -69,12 +69,19 @@ def cli():
     help=(
         "A valid python regex pattern to match accepted Host header values."
         " This prevents DNS rebinding attacks when the pattern is appropriately scoped"
+        " Requests reaching the server that don't match this pattern will return a 404"
     ),
     type=str,
     required=True,
 )
 @click.option(
-    "--port", help="The port number the server binds to", type=int, required=True
+    "--port",
+    help=(
+        "The non-TLS port number the server binds to. --port and/or"
+        " --tls-port must be configured"
+    ),
+    type=int,
+    default=None,
 )
 @click.option(
     "--slack-webhook-url",
@@ -92,8 +99,33 @@ def cli():
     default=None,
 )
 @click.option(
+    "--tls-crt",
+    help=("Path to TLS certificate chain file for use along with --tls-port"),
+    type=click.Path(exists=True, readable=True),
+    default=None,
+)
+@click.option(
+    "--tls-key",
+    help=("Path to TLS key file for use along with --tls-port"),
+    type=click.Path(exists=True, readable=True),
+    default=None,
+)
+@click.option(
+    "--tls-port",
+    help=(
+        "The TLS port number the server binds to. When configured, the --url"
+        " option must have an https:// scheme. When --tls-port is configured,"
+        " --tls-crt and --tls-key must also be supplied"
+    ),
+    type=int,
+    default=None,
+)
+@click.option(
     "--url",
-    help="The base URL where the server can be reached",
+    help=(
+        "The base URL where the server can be reached. UI Requests that do not"
+        " match the scheme or host:port of this URL will automatically be redirected"
+    ),
     type=str,
     required=True,
 )
@@ -102,16 +134,46 @@ def serve(
     auth_method: str,
     develop: bool,
     host_header_pattern: str,
-    port: int,
+    port: int | None,
     slack_error_webhook_url: str,
     slack_webhook_url: str,
+    tls_crt: str | None,
+    tls_key: str | None,
+    tls_port: int | None,
     url: str,
 ):
     """Runs the server"""
+    # Validate host_header_pattern
     try:
         host_header_regex = re.compile(host_header_pattern)
     except re.error:
         raise ClickException("Host pattern regex invalid")
+
+    # Validate any port is configured
+    if not (port or tls_port):
+        raise ClickException("One or both of --port or --tls-port must be configured")
+
+    # If there is no TLS port then reject setting a TLS key and cert
+    if (not tls_port) and (tls_crt or tls_key):
+        raise ClickException(
+            (
+                "--tls-crt and --tls-key should not be configured"
+                " unless --tls-port is also set"
+            )
+        )
+
+    # Validate TLS configuration (key and cert paths are already validated by click)
+    if tls_port is not None:
+        try:
+            assert tls_crt
+            assert tls_key
+        except AssertionError:
+            raise ClickException(
+                (
+                    "--tls-crt and --tls-key paths must be supplied when a"
+                    " --tls-port is configured"
+                )
+            )
 
     asyncio.run(
         run(
@@ -122,6 +184,9 @@ def serve(
             port_number=port,
             slack_error_webhook_url=slack_error_webhook_url,
             slack_webhook_url=slack_webhook_url,
+            tls_crt_path=tls_crt,
+            tls_key_path=tls_key,
+            tls_port_number=tls_port,
             url=url,
         )
     )
