@@ -55,8 +55,11 @@ class UIBaseHandler(tornado.web.RequestHandler):
         req_url = urlparse(self.request.full_url())
         svr_url: ParseResult = self.settings["url"]
         if req_url.scheme != svr_url.scheme or req_url.netloc != svr_url.netloc:
-            req_url = req_url._replace(scheme=svr_url.scheme, netloc=svr_url.netloc)
-            return self.redirect(req_url.geturl())
+            redir_url = req_url._replace(scheme=svr_url.scheme, netloc=svr_url.netloc)
+            app_log.info(
+                f"Redirecting request {req_url.geturl()} to {redir_url.geturl()}"
+            )
+            return self.redirect(redir_url.geturl())
 
     def get_current_user(self) -> bytes | None:
         """Required method for @tornado.web.authenticated to work"""
@@ -382,7 +385,9 @@ class AuthLoginApiWebsocketHandler(tornado.websocket.WebSocketHandler):
 
         this_client_id = id_client()
         app_log.info(f"Login client ID {this_client_id} opened")
-        login_url = f"{self.settings['url']}/api/auth/login?id={this_client_id}"
+        login_url = urljoin(
+            self.settings["url"].geturl(), f"/api/auth/login?id={this_client_id}"
+        )
         return self.write_message(ApiLoginMessage(login_url=login_url).dict())
 
     def on_close(self):
