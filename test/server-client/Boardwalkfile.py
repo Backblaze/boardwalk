@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
 from boardwalk import Job, Workflow, Workspace, WorkspaceConfig
@@ -8,6 +9,10 @@ if TYPE_CHECKING:
     from boardwalk import AnsibleTasksType
 
 boardwalkd_url = "http://localhost:8888/"
+
+# Ansible checks the envvar first for configuration; so override the location with one
+# we control so tests work.
+os.environ["ANSIBLE_CONFIG"] = os.path.abspath("ansible.cfg")
 
 
 class ShouldSucceedTestWorkspace(Workspace):
