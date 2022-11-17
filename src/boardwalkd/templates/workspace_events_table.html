@@ -1,18 +1,21 @@
 {% for event in sort_events_by_date(workspace.events) %}
 {% if event.severity == "info" %}
-<tr title="{{ event.create_time }}">
+<tr>
+    <td style="white-space: nowrap;">{{ event.create_time.strftime("%G-%m-%d %H:%M:%S") }}</td>
     <td>{{ event.severity }}</td>
     <td>{{ squeeze(event.message) }}</td>
 </tr>
 {% end %}
 {% if event.severity == "success" %}
-<tr title="{{ event.create_time }}" class="border-end border-2 border-success">
+<tr class="border-end border-2 border-success">
+    <td style="white-space: nowrap;">{{ event.create_time.strftime("%G-%m-%d %H:%M:%S") }}</td>
     <td>{{ event.severity }}</td>
     <td>{{ squeeze(event.message) }}</td>
 </tr>
 {% end %}
 {% if event.severity == "error" %}
-<tr title="{{ event.create_time }}" class="border-end border-2 border-danger">
+<tr class="border-end border-2 border-danger">
+    <td style="white-space: nowrap;">{{ event.create_time.strftime("%G-%m-%d %H:%M:%S") }}</td>
     <td>{{ event.severity }}</td>
     <td>{{ squeeze(event.message) }}</td>
 </tr>
