@@ -845,10 +845,7 @@ def make_app(
             (r"/", IndexHandler),
             (r"/admin", AdminHandler),
             (r"/admin/user/([\w%.]+)/enable", UserEnableHandler),
-            (
-                r"/admin/user/([\w%.]+)/roles",
-                UserRoleHandler,
-            ),  ### do role handler here
+            (r"/admin/user/([\w%.]+)/roles", UserRoleHandler),
             (r"/workspace/(\w+)/delete", WorkspaceDeleteHandler),
             (r"/workspace/(\w+)/events", WorkspaceEventsHandler),
             (r"/workspace/(\w+)/events/table", WorkspaceEventsTableHandler),
