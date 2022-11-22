@@ -4,6 +4,9 @@ This file contains the main HTTP server code
 from __future__ import annotations
 
 import asyncio
+
+import atexit
+import hashlib
 import json
 import logging
 import os
@@ -20,24 +23,25 @@ from typing import Any, Callable
 from urllib.parse import ParseResult, urljoin, urlparse
 
 import tornado.auth
-import tornado.escape
 import tornado.httpclient
 import tornado.web
 import tornado.websocket
 from click import ClickException
 from cryptography.fernet import Fernet
 from pydantic import ValidationError
+from tornado.escape import url_escape, url_unescape
 from tornado.log import access_log, app_log
 from tornado.routing import HostMatches
 
 from boardwalkd.broadcast import handle_slack_broadcast
 from boardwalkd.protocol import ApiLoginMessage, WorkspaceDetails, WorkspaceEvent
-from boardwalkd.state import load_state, WorkspaceState
+from boardwalkd.state import load_state, User, valid_user_roles, WorkspaceState
 
 logging.basicConfig(level=logging.INFO)
 
 module_dir = Path(__file__).resolve().parent
 state = load_state()
+atexit.register(state.flush)
 
 
 """
@@ -61,13 +65,35 @@ class UIBaseHandler(tornado.web.RequestHandler):
             )
             return self.redirect(redir_url.geturl())
 
+        # Gets the logged in user, if any, to determine if their account is
+        # disabled. If there is no logged in user, they will automatically be
+        # redirected by tornado to the login page. Once there is a logged-in
+        # user this logic will return a 403 if either the user is disabled, or
+        # somehow they don't exist in the server state
+        cur_user = self.current_user
+        if isinstance(cur_user, bytes):
+            username = cur_user.decode()
+            try:
+                if not state.users[username].enabled:
+                    return self.send_error(403)
+            except KeyError:
+                return self.send_error(403)
+
     def get_current_user(self) -> bytes | None:
-        """Required method for @tornado.web.authenticated to work"""
+        """This method is called by @tornado.web.authenticated to get the current
+        user, if any. If there is no user, or their cookie is invalid/expired,
+        they will be redirected to the login page"""
         return self.get_secure_cookie(
             "boardwalk_user",
             max_age_days=self.settings["auth_expire_days"],
             min_version=2,
         )
+
+
+def ui_method_sha256(handler: UIBaseHandler, value: str) -> str:
+    """Custom UI templating method. Accepts a string value and returns an sha256
+    digest of the string as a string"""
+    return hashlib.sha256(value.encode()).hexdigest()
 
 
 def ui_method_secondsdelta(handler: UIBaseHandler, time: datetime) -> float:
@@ -91,14 +117,141 @@ def ui_method_sort_events_by_date(
     return sorted(events, key=key, reverse=True)
 
 
+class AdminUIBaseHandler(UIBaseHandler):
+    """Base handler for Admin UI handlers. Requires the current user be a member
+    of the 'admin' role"""
+
+    def prepare(self):
+        super().prepare()
+
+        cur_user = self.current_user
+        if isinstance(cur_user, bytes):
+            username = cur_user.decode()
+            try:
+                if "admin" not in state.users[username].roles:
+                    return self.send_error(403)
+            except KeyError:
+                return self.send_error(403)
+
+
+class AdminHandler(AdminUIBaseHandler):
+    """Handles serving the admin UI"""
+
+    @tornado.web.authenticated
+    def get(self):
+        return self.render(
+            "admin.html",
+            title="Admin",
+            users=state.users,
+            owner=self.settings["owner"],
+            valid_user_roles=valid_user_roles,
+        )
+
+
+class UserEnableHandler(AdminUIBaseHandler):
+    """Handles enabling/disabling users in the admin UI"""
+
+    @tornado.web.authenticated
+    def post(self, user: str):
+        """Enables a given user"""
+        try:
+            state.users[user].enabled = True
+            state.flush()
+            return self.render("admin_user_enable.html", user=state.users[user])
+        except KeyError:
+            return self.send_error(404)
+
+    @tornado.web.authenticated
+    def delete(self, user: str):
+        """Disables a given user"""
+        try:
+            state.users[user].enabled = False
+            state.flush()
+            return self.render("admin_user_enable.html", user=state.users[user])
+        except KeyError:
+            return self.send_error(404)
+
+
+class UserRoleHandler(AdminUIBaseHandler):
+    """Handles configuring user roles in the admin UI"""
+
+    @tornado.web.authenticated
+    def post(self, user: str):
+        """Appends a role to a user"""
+        try:
+            role: str = self.get_argument("role")
+        except tornado.web.MissingArgumentError:
+            app_log.warning("role argument missing")
+            return self.send_error(422)
+
+        # Don't allow modifying the default role
+        if role == "default":
+            app_log.warning("The default role cannot be modified")
+            return self.send_error(406)
+
+        try:
+            User.validate_roles({role})
+        except ValueError:
+            app_log.warning(f"Invalid role {role}")
+            return self.send_error(422)
+
+        try:
+            state.users[user].roles.add(role)
+            state.flush()
+            return self.render(
+                "admin_user_roles.html",
+                user=state.users[user],
+                valid_user_roles=valid_user_roles,
+            )
+        except KeyError:
+            return self.send_error(404)
+
+    @tornado.web.authenticated
+    def delete(self, user: str):
+        """Removes a role from a user"""
+        try:
+            role: str = self.get_argument("role")
+        except tornado.web.MissingArgumentError:
+            app_log.warning("role argument missing")
+            return self.send_error(422)
+
+        # Don't allow modifying the default role
+        if role == "default":
+            app_log.warning("The default role cannot be modified")
+            return self.send_error(406)
+
+        try:
+            User.validate_roles({role})
+        except ValueError:
+            app_log.warning(f"Invalid role {role}")
+            return self.send_error(422)
+
+        try:
+            state.users[user].roles.remove(role)
+            state.flush()
+            return self.render(
+                "admin_user_roles.html",
+                user=state.users[user],
+                valid_user_roles=valid_user_roles,
+            )
+        except KeyError:
+            return self.send_error(404)
+
+
 class AnonymousLoginHandler(UIBaseHandler):
     """Handles "logging in" the UI when no auth is actually configured"""
 
     # nosemgrep: test.boardwalk.python.security.handler-method-missing-authentication
     async def get(self):  # pyright: reportIncompatibleMethodOverride=false
+        # Save the user to the state if they aren't already in there
+        anon_username = "anonymous@example.com"
+        if anon_username not in state.users:
+            state.users[anon_username] = User(email=anon_username)
+            state.flush()
+
         self.set_secure_cookie(
             "boardwalk_user",
-            "anonymous@example.com",
+            anon_username,
             expires_days=self.settings["auth_expire_days"],
             samesite="Strict",
             secure=True,
@@ -131,7 +284,14 @@ class GoogleOAuth2LoginHandler(UIBaseHandler, tornado.auth.GoogleOAuth2Mixin):
             except tornado.httpclient.HTTPClientError:
                 return self.send_error(400)
 
-            # If we get this far we know we have a valid user
+            # If we get this far we know we have a valid google user
+            try:
+                state.users[user["email"]] = User(email=user["email"])
+            except ValidationError as e:
+                app_log.error(e)
+                return self.send_error(422)
+            state.flush()
+
             self.set_secure_cookie(
                 "boardwalk_user",
                 user["email"],
@@ -172,11 +332,11 @@ class GoogleOAuth2LoginHandler(UIBaseHandler, tornado.auth.GoogleOAuth2Mixin):
         """For encrypting and encoding a URL to maintain confidentiality. We use
         this because the URL will pass through Google"""
         cipher_text = Fernet(self.url_encryption_key).encrypt(url.encode())
-        return tornado.escape.url_escape(cipher_text)
+        return url_escape(cipher_text)
 
     def decrypt_url(self, encoded_url: str) -> str:
         """Reverses self.encode_url()"""
-        unescaped_cipher_text = tornado.escape.url_unescape(encoded_url)
+        unescaped_cipher_text = url_unescape(encoded_url)
         return (
             Fernet(self.url_encryption_key)
             .decrypt(unescaped_cipher_text.encode())
@@ -313,6 +473,20 @@ class APIBaseHandler(tornado.web.RequestHandler):
         svr_url: ParseResult = self.settings["url"]
         if req_url.scheme != svr_url.scheme or req_url.netloc != svr_url.netloc:
             return self.send_error(421)
+
+        # Gets the logged in user, if any, to determine if their account is
+        # disabled. If there is no logged in user, they will automatically be
+        # redirected by tornado to the login page. Once there is a logged-in
+        # user this logic will return a 403 if either the user is disabled, or
+        # somehow they don't exist in the server state
+        cur_user = self.current_user
+        if isinstance(cur_user, bytes):
+            username = cur_user.decode()
+            try:
+                if not state.users[username].enabled:
+                    return self.send_error(403)
+            except KeyError:
+                return self.send_error(403)
 
     def check_xsrf_cookie(self):
         """We ignore this method on API requests"""
@@ -599,6 +773,7 @@ def make_app(
     auth_method: str,
     develop: bool,
     host_header_pattern: re.Pattern[str],
+    owner: str,
     slack_error_webhook_url: str,
     slack_webhook_url: str,
     url: str,
@@ -610,11 +785,13 @@ def make_app(
         "auth_expire_days": auth_expire_days,
         "login_url": urljoin(url, "/auth/login"),
         "log_function": log_request,
+        "owner": owner,
         "slack_webhook_url": slack_webhook_url,
         "slack_error_webhook_url": slack_error_webhook_url,
         "static_path": module_dir.joinpath("static"),
         "template_path": module_dir.joinpath("templates"),
         "ui_methods": {
+            "sha256": ui_method_sha256,
             "secondsdelta": ui_method_secondsdelta,
             "server_version": ui_method_server_version,
             "sort_events_by_date": ui_method_sort_events_by_date,
@@ -666,12 +843,18 @@ def make_app(
         [
             # UI handlers
             (r"/", IndexHandler),
-            (r"/workspaces", WorkspacesHandler),
+            (r"/admin", AdminHandler),
+            (r"/admin/user/([\w%.]+)/enable", UserEnableHandler),
+            (
+                r"/admin/user/([\w%.]+)/roles",
+                UserRoleHandler,
+            ),  ### do role handler here
+            (r"/workspace/(\w+)/delete", WorkspaceDeleteHandler),
             (r"/workspace/(\w+)/events", WorkspaceEventsHandler),
             (r"/workspace/(\w+)/events/table", WorkspaceEventsTableHandler),
             (r"/workspace/(\w+)/semaphores/caught", WorkspaceCatchHandler),
             (r"/workspace/(\w+)/semaphores/has_mutex", WorkspaceMutexHandler),
-            (r"/workspace/(\w+)/delete", WorkspaceDeleteHandler),
+            (r"/workspaces", WorkspacesHandler),
             # API handlers
             (
                 r"/api/auth/denied",
@@ -728,6 +911,7 @@ async def run(
     auth_method: str,
     develop: bool,
     host_header_pattern: re.Pattern[str],
+    owner: str,
     port_number: int | None,
     tls_crt_path: str | None,
     tls_key_path: str | None,
@@ -742,6 +926,7 @@ async def run(
         auth_method=auth_method,
         develop=develop,
         host_header_pattern=host_header_pattern,
+        owner=owner,
         slack_error_webhook_url=slack_error_webhook_url,
         slack_webhook_url=slack_webhook_url,
         url=url,
@@ -764,5 +949,12 @@ async def run(
         # If tls_port_number=0 a random open port will be selected and the log
         # message will not be accurate
         app_log.info(f"Server listening on TLS port: {tls_port_number}")
+
+    # Initialize server owner
+    if owner not in state.users:
+        state.users[owner] = User(email=owner)
+    state.users[owner].roles.add("admin")
+    state.users[owner].enabled = True
+    state.flush()
 
     await asyncio.Event().wait()

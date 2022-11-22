@@ -75,6 +75,18 @@ def cli():
     required=True,
 )
 @click.option(
+    "--owner",
+    help=(
+        "A default admin user. Every time the server starts up, this user will"
+        " be enabled and added to the admin role. This option must be supplied"
+        " when --auth-method is anything other than 'anonymous'. The purpose of"
+        " the owner is to have an initial admin user available at first start"
+        " and to avoid lock-outs"
+    ),
+    type=str,
+    default=None,
+)
+@click.option(
     "--port",
     help=(
         "The non-TLS port number the server binds to. --port and/or"
@@ -134,6 +146,7 @@ def serve(
     auth_method: str,
     develop: bool,
     host_header_pattern: str,
+    owner: str | None,
     port: int | None,
     slack_error_webhook_url: str,
     slack_webhook_url: str,
@@ -175,12 +188,22 @@ def serve(
                 )
             )
 
+    # Validate --owner
+    if not owner:
+        if auth_method != "anonymous":
+            raise ClickException(
+                "--owner must be defined when --auth-method is not 'anonymous'"
+            )
+        else:
+            owner = "anonymous@example.com"
+
     asyncio.run(
         run(
             auth_expire_days=auth_expire_days,
             auth_method=auth_method,
             develop=develop,
             host_header_pattern=host_header_regex,
+            owner=owner,
             port_number=port,
             slack_error_webhook_url=slack_error_webhook_url,
             slack_webhook_url=slack_webhook_url,

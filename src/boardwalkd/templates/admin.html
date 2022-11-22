@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block main %}
+<div class="container-xxl">
+    <div class="row pb-2">
+        <div class="container bg-light border border-dark rounded">
+            <div class="row pt-2 pb-2 border-bottom border-dark">
+                <div class="col-12">
+                    <span class="h3" id="users}">Users</span>
+                </div>
+            </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">Email</th>
+                        <th scope="col">Roles</th>
+                        <th scope="col">Enabled?</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users.values() %}
+                    <tr>
+                        <th scope="row">{{ user.email }}{% if user.email == owner %} <button type="button"
+                                class="btn btn-sm btn-outline-secondary"
+                                title="The owner is defined by the server configuration. They will be marked as Enabled and maintain the Admin role every time the server starts"
+                                disabled>Owner</button>{% end %}
+                        </th>
+                        <td>{% include "admin_user_roles.html" %}</td>
+                        <td>{% include "admin_user_enable.html" %}</td>
+                    </tr>
+                    {% end %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% end %}
