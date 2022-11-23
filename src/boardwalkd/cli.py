@@ -7,6 +7,7 @@ from importlib.metadata import version as lib_version
 
 import click
 from click import ClickException
+from email_validator import EmailNotValidError, validate_email
 
 from boardwalkd.server import run
 
@@ -189,13 +190,17 @@ def serve(
             )
 
     # Validate --owner
-    if not owner:
-        if auth_method != "anonymous":
-            raise ClickException(
-                "--owner must be defined when --auth-method is not 'anonymous'"
-            )
-        else:
-            owner = "anonymous@example.com"
+    if owner:
+        try:
+            validate_email(owner, check_deliverability=False)
+        except EmailNotValidError:
+            raise ClickException("Email addressed passed to --owner is invalid")
+    elif auth_method != "anonymous":
+        raise ClickException(
+            "--owner must be defined when --auth-method is not 'anonymous'"
+        )
+    else:
+        owner = "anonymous@example.com"
 
     asyncio.run(
         run(
