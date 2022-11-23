@@ -4,7 +4,8 @@
     <button class="btn btn-sm btn-warning" hx-delete="/admin/user/{{ url_escape(user.email) }}/roles?role={{ role }}"
         hx-trigger="click" hx-swap="innerHTML" hx-target="#roles-btn-group-{{ sha256(user.email) }}"
         hx-confirm="Are you sure you want to remove the {{ role }} role from &quot;{{ user.email }}&quot;?"
-        title="Remove the {{ role }} role from {{ user.email }}">
+        title="Remove the {{ role }} role from {{ user.email }}" {% if role=="admin" and (current_user==user.email or
+        owner==user.email) %}disabled{% end %}>
         {{ role }}
     </button>
     {% elif role != "default" %}

@@ -143,6 +143,7 @@ class AdminHandler(AdminUIBaseHandler):
             "admin.html",
             title="Admin",
             users=state.users,
+            current_user=self.current_user.decode(),
             owner=self.settings["owner"],
             valid_user_roles=valid_user_roles,
         )
@@ -157,17 +158,31 @@ class UserEnableHandler(AdminUIBaseHandler):
         try:
             state.users[user].enabled = True
             state.flush()
-            return self.render("admin_user_enable.html", user=state.users[user])
+            return self.render(
+                "admin_user_enable.html",
+                user=state.users[user],
+                current_user=self.current_user.decode(),
+                owner=self.settings["owner"],
+            )
         except KeyError:
             return self.send_error(404)
 
     @tornado.web.authenticated
     def delete(self, user: str):
         """Disables a given user"""
+        # Don't allow users to disable themselves or the owner
+        if user == self.current_user.decode() or user == self.settings["owner"]:
+            return self.send_error(406)
+
         try:
             state.users[user].enabled = False
             state.flush()
-            return self.render("admin_user_enable.html", user=state.users[user])
+            return self.render(
+                "admin_user_enable.html",
+                user=state.users[user],
+                current_user=self.current_user.decode(),
+                owner=self.settings["owner"],
+            )
         except KeyError:
             return self.send_error(404)
 
@@ -201,6 +216,8 @@ class UserRoleHandler(AdminUIBaseHandler):
             return self.render(
                 "admin_user_roles.html",
                 user=state.users[user],
+                current_user=self.current_user.decode(),
+                owner=self.settings["owner"],
                 valid_user_roles=valid_user_roles,
             )
         except KeyError:
@@ -220,6 +237,12 @@ class UserRoleHandler(AdminUIBaseHandler):
             app_log.warning("The default role cannot be modified")
             return self.send_error(406)
 
+        # Don't allow users to remove admin from themselves or the owner
+        if (
+            user == self.current_user.decode() or user == self.settings["owner"]
+        ) and role == "admin":
+            return self.send_error(406)
+
         try:
             User.validate_roles({role})
         except ValueError:
@@ -232,6 +255,8 @@ class UserRoleHandler(AdminUIBaseHandler):
             return self.render(
                 "admin_user_roles.html",
                 user=state.users[user],
+                current_user=self.current_user.decode(),
+                owner=self.settings["owner"],
                 valid_user_roles=valid_user_roles,
             )
         except KeyError:
