@@ -459,6 +459,10 @@ and local catches cannot be released from the server UI. If Boardwalk encounters
 an error and for any reason it cannot catch the Workspace on the server, it will
 fall back to catching locally.
 
+#### Boardwalkd Database Storage and Persistence
+`boardwalkd` uses a single JSON file to save state. The JSON file is flushed to
+the working directory of the server, in `.boardwalkd/statefile.json`
+
 #### Security
 
 __Authentication__: By default, `boardwalkd` uses anonymous authentication. It's
