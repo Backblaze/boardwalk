@@ -6,16 +6,35 @@ from collections import deque
 from datetime import datetime
 from pathlib import Path
 
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel, EmailStr, Extra, validator
 
 from boardwalkd.protocol import WorkspaceDetails, WorkspaceEvent, WorkspaceSemaphores
 
 statefile_dir_path = Path.cwd().joinpath(".boardwalkd")
 statefile_path = statefile_dir_path.joinpath("statefile.json")
 
+valid_user_roles = {"default", "admin"}
+
 
 class StateBaseModel(BaseModel, extra=Extra.forbid):
     """BaseModel for state usage"""
+
+
+class User(StateBaseModel):
+    """Model for user metadata"""
+
+    enabled: bool = True
+    email: EmailStr
+    roles: set[str] = {"default"}
+
+    @validator("roles")
+    def validate_roles(cls, input_roles: set[str]):
+        for role in input_roles:
+            if role not in valid_user_roles:
+                raise ValueError(
+                    f"Roles {input_roles} are not valid. Roles may be {valid_user_roles}"
+                )
+        return input_roles
 
 
 class WorkspaceState(StateBaseModel):
@@ -31,6 +50,7 @@ class State(StateBaseModel):
     """Model for persistent server state"""
 
     workspaces: dict[str, WorkspaceState] = {}
+    users: dict[str, User] = {}
 
     def flush(self):
         """
