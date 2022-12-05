@@ -943,6 +943,8 @@ async def run(
     url: str,
 ):
     """Starts the tornado server and IO loop"""
+    global state
+
     app = make_app(
         auth_expire_days=auth_expire_days,
         auth_method=auth_method,
