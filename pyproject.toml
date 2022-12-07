@@ -1,22 +1,22 @@
 [build-system]
-build-backend = "setuptools.build_meta"
-requires = ["setuptools>=62"]
+build-backend="setuptools.build_meta"
+requires=["setuptools>=62"]
 
 [project]
-name = "boardwalk"
-description = "Boardwalk is a linear Ansible workflow engine"
-readme = "README.md"
-version = {file = "VERSION"}
-authors = [
-    {name = "Mat Hornbeek (Backblaze, Inc.)", email = "84995001+m4wh6k@users.noreply.github.com"}
+name="boardwalk"
+description="Boardwalk is a linear Ansible workflow engine"
+dynamic=["version"]
+readme="README.md"
+authors=[
+    {name="Mat Hornbeek (Backblaze, Inc.)", email="84995001+m4wh6k@users.noreply.github.com"}
 ]
-classifiers = [
+classifiers=[
     "Programming Language :: Python :: 3",
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS"
 ]
-requires-python = ">=3.10"
-dependencies = [
+requires-python=">=3.10"
+dependencies=[
     "ansible >=6.5.0",
     "ansible-runner >=2.3.0",
     "click >=8.1.3",
@@ -27,24 +27,27 @@ dependencies = [
 ]
 
 [project.urls]
-Source = "https://github.com/Backblaze/boardwalk"
-Issues = "https://github.com/Backblaze/boardwalk/issues"
+Source="https://github.com/Backblaze/boardwalk"
+Issues="https://github.com/Backblaze/boardwalk/issues"
 
 [project.scripts]
-boardwalk = "boardwalk.cli:cli"
-boardwalkd = "boardwalkd.cli:cli"
+boardwalk="boardwalk.cli:cli"
+boardwalkd="boardwalkd.cli:cli"
 
 [tool.setuptools.package-data]
-boardwalk = ["py.typed"]
-boardwalkd = ["static/*.css", "static/*.js", "templates/*.html", "py.typed"]
+boardwalk=["py.typed"]
+boardwalkd=["static/*.css", "static/*.js", "templates/*.html", "py.typed"]
+
+[tool.setuptools.dynamic]
+version={file="VERSION"}
 
 [tool.pyright]
-exclude = [
+exclude=[
     "build/",
     "dist/",
     "typings/",
 ]
-pythonPlatform = "All"
-reportImportCycles = false
-reportMissingTypeStubs = false
-typeCheckingMode = "strict"
+pythonPlatform="All"
+reportImportCycles=false
+reportMissingTypeStubs=false
+typeCheckingMode="strict"
