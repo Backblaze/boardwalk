@@ -1,9 +1,1 @@
-__pycache__/
-.boardwalk/
-.boardwalkd/
-.DS_store
-.idea
-.vscode/
-*.egg-info/
-build/
-dist/
+.gitignore
