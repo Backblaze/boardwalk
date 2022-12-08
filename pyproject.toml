@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "setuptools.build_meta"
-requires = ["setuptools>=62"]
+requires = ["setuptools >=62"]
 
 [project]
 name = "boardwalk"
@@ -26,9 +26,18 @@ dependencies = [
     "tornado >=6.2"
 ]
 
+[project.optional-dependencies]
+develop = [
+    "black",
+    "build",
+    "pyright",
+    "semgrep",
+    "usort"
+]
+
 [project.urls]
-Source = "https://github.com/Backblaze/boardwalk"
-Issues = "https://github.com/Backblaze/boardwalk/issues"
+source = "https://github.com/Backblaze/boardwalk"
+issues = "https://github.com/Backblaze/boardwalk/issues"
 
 [project.scripts]
 boardwalk = "boardwalk.cli:cli"

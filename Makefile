@@ -23,7 +23,7 @@ clean:
 # Installs modules in editable mode
 .PHONY: develop
 develop:
-	python3 -m pip install --editable .
+	python3 -m pip install --upgrade --editable .[develop]
 
 .PHONY: develop-server
 develop-server: develop
@@ -43,7 +43,7 @@ else
 endif
 
 dist: clean
-	python3 -m pip install -U build pip
+	python3 -m pip install --upgrade build pip
 	python3 -m build
 
 # Applys project's required code style
@@ -74,7 +74,7 @@ test: test-black test-pyright test-semgrep test-usort
 
 # Test that code is formatted with black
 .PHONY: test-black
-test-black:
+test-black: develop
 	black . --check
 
 # Perform type analysis
@@ -84,7 +84,7 @@ test-pyright: develop
 
 # Perform security static analysis
 .PHONY: test-semgrep
-test-semgrep:
+test-semgrep: develop
 	semgrep \
 		--config test/semgrep-rules.yml \
 		--config "p/r2c-security-audit" \
@@ -94,6 +94,6 @@ test-semgrep:
 
 # Ensure imports are formatted in a uniform way
 .PHONY: test-usort
-test-usort:
+test-usort: develop
 	@# This is a workaround for https://github.com/facebook/usort/issues/216
 	LIBCST_PARSER_TYPE=native usort check .
