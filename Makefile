@@ -23,7 +23,7 @@ clean:
 # Installs modules in editable mode
 .PHONY: develop
 develop:
-	python3 -m pip install --editable .
+	python3 -m pip install --upgrade --editable .[develop]
 
 .PHONY: develop-server
 develop-server: develop
@@ -43,7 +43,7 @@ else
 endif
 
 dist: clean
-	python3 -m pip install -U build pip
+	python3 -m pip install --upgrade build pip
 	python3 -m build
 
 # Applys project's required code style

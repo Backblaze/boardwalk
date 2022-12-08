@@ -10,25 +10,21 @@ plenty of detail and context.
 
 ### Development Dependencies
 
-In addition to the python version specified in the `setup.cfg` and `pip`, you
-will need:
+In addition to the python version specified in the `pyproject.toml`, you will
+need:
 
-- `black` (`pip3 install black`)
-- `build` (`pip3 install build`)
 - `make`
 - `pip3`
 - `podman`
 - `pyenv`
-- `pyright` (`pip3 install pyright`)
-- `semgrep`
-- `usort` (`pip3 install usort`)
 
 #### Makefile
 
 The [Makefile](./Makefile) has some useful targets for typical development
 operations, like formatting, building, and locally installing the module.
 
-To install the module in editable mode run `make develop`.
+To install the module in editable mode run `make develop`. This will also
+install extra development dependencies.
 To run the server in development mode, run `make develop-server`.
 
 See the content of the Makefile for other useful targets.
