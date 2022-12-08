@@ -391,6 +391,17 @@ class WorkspaceCatchHandler(UIBaseHandler):
     def post(self, workspace: str):
         try:
             state.workspaces[workspace].semaphores.caught = True
+
+            # Record who clicked the catch button
+            cur_user = self.current_user.decode()
+            payload = {
+                "severity": "info",
+                "message": f"Workspace caught by {cur_user}",
+            }
+            event = WorkspaceEvent.parse_obj(payload)
+            event.received_time = datetime.utcnow()
+            state.workspaces[workspace].events.append(event)
+
             state.flush()
             return self.render("index_workspace_release.html", workspace_name=workspace)
         except KeyError:
@@ -400,6 +411,17 @@ class WorkspaceCatchHandler(UIBaseHandler):
     def delete(self, workspace: str):
         try:
             state.workspaces[workspace].semaphores.caught = False
+
+            # Record who clicked the release button
+            cur_user = self.current_user.decode()
+            payload = {
+                "severity": "info",
+                "message": f"Workspace released by {cur_user}",
+            }
+            event = WorkspaceEvent.parse_obj(payload)
+            event.received_time = datetime.utcnow()
+            state.workspaces[workspace].events.append(event)
+
             state.flush()
             return self.render("index_workspace_catch.html", workspace_name=workspace)
         except KeyError:
