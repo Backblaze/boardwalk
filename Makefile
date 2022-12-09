@@ -44,7 +44,7 @@ endif
 
 dist: clean
 	python3 -m pip install --upgrade build pip
-	python3 -m build . --sdist --wheel
+	python3 -m build
 
 # Applys project's required code style
 .PHONY: format
