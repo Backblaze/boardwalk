@@ -15,6 +15,9 @@ statefile_path = statefile_dir_path.joinpath("statefile.json")
 
 valid_user_roles = {"default", "admin"}
 
+# The maximum number of events a unique workspace should hold in history
+_MAXIMUM_EVENTS: int = 64
+
 
 class StateBaseModel(BaseModel, extra=Extra.forbid):
     """BaseModel for state usage"""
@@ -42,7 +45,7 @@ class WorkspaceState(StateBaseModel):
 
     details: WorkspaceDetails = WorkspaceDetails()
     last_seen: datetime | None = None  # When the worker last updated anything
-    events: deque[WorkspaceEvent] = deque([], maxlen=64)
+    events: deque[WorkspaceEvent] = deque([], maxlen=_MAXIMUM_EVENTS)
     semaphores: WorkspaceSemaphores = WorkspaceSemaphores()
 
 
@@ -57,6 +60,12 @@ class State(StateBaseModel):
         Writes state to disk for persistence
         Some items are excluded because they should only be set during runtime
         """
+        # Constrain the maximum number of events in a workspace's event logs
+        for name in self.workspaces:
+            num_events = len(self.workspaces[name].events)
+            if (events_to_pop := num_events - _MAXIMUM_EVENTS) > 0:
+                for _ in range(events_to_pop):
+                    self.workspaces[name].events.popleft()
         # Write state to disk.
         statefile_path.write_text(self.json())
 
