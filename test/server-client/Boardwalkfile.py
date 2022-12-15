@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-from boardwalk import Job, Workflow, Workspace, WorkspaceConfig
+from boardwalk import Job, path, Workflow, Workspace, WorkspaceConfig
 
 if TYPE_CHECKING:
     from boardwalk import AnsibleTasksType
@@ -39,6 +39,14 @@ class UIAbuseTestWorkspace(Workspace):
         )
 
 
+class MalformedYAMLWorkspace(Workspace):
+    def config(self):
+        return WorkspaceConfig(
+            host_pattern="localhost",
+            workflow=MalformedYAMLWorkflow(),
+        )
+
+
 class UITestVeryLongWorkflowNameWorkflow(Workflow):
     def jobs(self):
         return TestJob()
@@ -54,6 +62,14 @@ class FailTestWorkflow(Workflow):
         return FailTestJob()
 
 
+class MalformedYAMLWorkflow(Workflow):
+    def jobs(self):
+        return MalformedYAMLJob()
+
+    def exit_jobs(self):
+        return TestJob()
+
+
 class TestJob(Job):
     def tasks(self) -> AnsibleTasksType:
         return [{"debug": {"msg": "hello test"}}]
@@ -62,3 +78,12 @@ class TestJob(Job):
 class FailTestJob(Job):
     def tasks(self) -> AnsibleTasksType:
         return [{"fail": {"msg": "failed successfully"}}]
+
+
+class MalformedYAMLJob(Job):
+    """
+    Tests a playbook that has malformed YAML
+    """
+
+    def tasks(self) -> AnsibleTasksType:
+        return [{"import_tasks": path("malformed_playbook.yml")}]
