@@ -1,0 +1,3 @@
+---
+- debug:
+    msg: "Should" fail because yaml string values should be equally quoted on both ends
