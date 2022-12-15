@@ -56,7 +56,7 @@ def init(ctx: click.Context, limit: str, retry: bool):
     only added or updated, never removed by this operation. Use
     `boardwalk workspace reset` to clear existing state if needed
     """
-    if retry and limit != "all":
+    if retry and limit not in ["all", ""]:
         # We don't allow limit and retry to be specified together at the moment
         raise ClickException("--limit and --retry cannot be supplied together")
 
