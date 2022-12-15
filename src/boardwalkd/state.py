@@ -52,7 +52,7 @@ class WorkspaceState(StateBaseModel):
     ) -> deque[WorkspaceEvent]:
         """
         Pydantic won't persist the maxlen argument for deque when cold loading
-        from the statefile. This forces event to always be returned with maxlen
+        from the statefile. This forces events to always be returned with maxlen
         """
         return deque(input_events, maxlen=cls._max_workspace_events)
 
