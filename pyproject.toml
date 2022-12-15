@@ -41,7 +41,7 @@ boardwalkd = ["static/*.css", "static/*.js", "templates/*.html", "py.typed"]
 [tool.setuptools.dynamic]
 # We still use a requirements.txt because GitHub's depependency scanner doesn't
 # currently support reading dependencies directly from a pyproject.toml, at
-# least not also using poetry
+# least not without also using poetry
 dependencies = {file = "requirements.txt"}
 version = {file = "VERSION"}
 
