@@ -42,8 +42,19 @@ class WorkspaceState(StateBaseModel):
 
     details: WorkspaceDetails = WorkspaceDetails()
     last_seen: datetime | None = None  # When the worker last updated anything
-    events: deque[WorkspaceEvent] = deque([], maxlen=64)
+    _max_workspace_events: int = 64
+    events: deque[WorkspaceEvent] = deque([], maxlen=_max_workspace_events)
     semaphores: WorkspaceSemaphores = WorkspaceSemaphores()
+
+    @validator("events")
+    def validate_events(
+        cls, input_events: deque[WorkspaceEvent]
+    ) -> deque[WorkspaceEvent]:
+        """
+        Pydantic won't persist the maxlen argument for deque when cold loading
+        from the statefile. This forces events to always be returned with maxlen
+        """
+        return deque(input_events, maxlen=cls._max_workspace_events)
 
 
 class State(StateBaseModel):
