@@ -205,8 +205,6 @@ class WorkspaceConfig:
     """
     Configuration block for workspaces
 
-    :param always_retry_failed_hosts: When True, hosts that fail a Workflow
-    will be retried until they succeed, regardless of Job preconditions
     :param default_sort_order: The default order hosts will be walked through
     (by hostname). Valid sort orders are specified in the valid_sort_orders
     attribute
@@ -225,11 +223,9 @@ class WorkspaceConfig:
         self,
         host_pattern: str,
         workflow: Workflow,
-        always_retry_failed_hosts: bool = True,
         default_sort_order: str = "shuffle",
         require_limit: bool = False,
     ):
-        self.always_retry_failed_hosts = always_retry_failed_hosts
         self.default_sort_order = default_sort_order
         self.host_pattern = host_pattern
         self.require_limit = require_limit
