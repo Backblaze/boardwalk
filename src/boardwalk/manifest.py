@@ -151,6 +151,21 @@ class Job:
             raise ValueError(f"Required options missing: {', '.join(missing_options)}")
 
 
+class WorkflowConfig:
+    """
+    Configuration block for Workflows
+
+    :param always_retry_failed_hosts: When True, hosts that fail a Workflow
+    will be retried until they succeed, regardless of Job preconditions
+    """
+
+    def __init__(
+        self,
+        always_retry_failed_hosts: bool = True,
+    ):
+        self.always_retry_failed_hosts = always_retry_failed_hosts
+
+
 class Workflow(ABC):
     """Defines a workflow of Jobs"""
 
@@ -166,6 +181,12 @@ class Workflow(ABC):
         self.i_jobs = workflow_jobs
         # self._exit_jobs is the list of initialized Jobs.
         self.i_exit_jobs = workflow_exit_jobs
+
+        self.cfg: WorkflowConfig = self.config()
+
+    def config(self) -> WorkflowConfig:
+        """Optionally-supplied WorkflowConfig options"""
+        return WorkflowConfig()
 
     @abstractmethod
     def jobs(self) -> Job | tuple[Job, ...]:
