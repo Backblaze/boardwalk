@@ -577,6 +577,8 @@ def bootstrap_with_server(workspace: Workspace, ctx: click.Context):
         raise ClickException(f"Could not connect to server {boardwalkd_url}")
     except socket.gaierror:
         raise ClickException(f"Could not resolve server {boardwalkd_url}")
+    except HTTPClientError as e:
+        raise ClickException(f"Received error {e} from {boardwalkd_url}")
 
     # Post the worker's details, which also creates the workspace
     try:
