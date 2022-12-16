@@ -446,25 +446,28 @@ def check_host_preconditions_locally(
         # See if preconditions are met based upon local state
         any_job_preconditions_unmet = False
 
-        # If the workflow was started but never finished, ignore preconditions
-        try:
-            boardwalk_state = RemoteStateModel.parse_obj(
-                host.ansible_facts["ansible_local"]["boardwalk_state"]
-            )
-            if (
-                boardwalk_state.workspaces[workspace.name].workflow.started
-                and not boardwalk_state.workspaces[workspace.name].workflow.succeeded
-            ):
-                hosts_meeting_preconditions.append(host)
-                click.echo(
-                    (
-                        f"{host.name}: Warning: Host started workflow but never completed."
-                        " Job preconditions are ignored for this host"
-                    )
+        if workspace.cfg.workflow.cfg.always_retry_failed_hosts:
+            # If the workflow was started but never finished, ignore preconditions
+            try:
+                boardwalk_state = RemoteStateModel.parse_obj(
+                    host.ansible_facts["ansible_local"]["boardwalk_state"]
                 )
-                continue
-        except KeyError:
-            pass
+                if (
+                    boardwalk_state.workspaces[workspace.name].workflow.started
+                    and not boardwalk_state.workspaces[
+                        workspace.name
+                    ].workflow.succeeded
+                ):
+                    hosts_meeting_preconditions.append(host)
+                    click.echo(
+                        (
+                            f"{host.name}: Warning: Host started workflow but never completed."
+                            " Job preconditions are ignored for this host"
+                        )
+                    )
+                    continue
+            except KeyError:
+                pass
 
         for job in chain(workflow.i_jobs, workflow.i_exit_jobs):
             if not job.preconditions(
@@ -658,24 +661,25 @@ def directly_confirm_host_preconditions(
         )
     update_host_facts_in_local_state(host, workspace)
 
-    # If the workflow was started but never finished, ignore preconditions
-    try:
-        boardwalk_state = RemoteStateModel.parse_obj(
-            host.ansible_facts["ansible_local"]["boardwalk_state"]
-        )
-        if (
-            boardwalk_state.workspaces[workspace.name].workflow.started
-            and not boardwalk_state.workspaces[workspace.name].workflow.succeeded
-        ):
-            click.echo(
-                (
-                    f"{host.name}: Warning: Host started workflow but never completed."
-                    " Job preconditions are ignored for this host"
-                )
+    if workspace.cfg.workflow.cfg.always_retry_failed_hosts:
+        # If the workflow was started but never finished, ignore preconditions
+        try:
+            boardwalk_state = RemoteStateModel.parse_obj(
+                host.ansible_facts["ansible_local"]["boardwalk_state"]
             )
-            return True
-    except KeyError:
-        pass
+            if (
+                boardwalk_state.workspaces[workspace.name].workflow.started
+                and not boardwalk_state.workspaces[workspace.name].workflow.succeeded
+            ):
+                click.echo(
+                    (
+                        f"{host.name}: Warning: Host started workflow but never completed."
+                        " Job preconditions are ignored for this host"
+                    )
+                )
+                return True
+        except KeyError:
+            pass
 
     all_job_preconditions_met = True
     workflow = workspace.cfg.workflow

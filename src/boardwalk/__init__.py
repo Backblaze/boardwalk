@@ -6,6 +6,7 @@ from .manifest import (
     Job as Job,
     path as path,
     Workflow as Workflow,
+    WorkflowConfig as WorkflowConfig,
     Workspace as Workspace,
     WorkspaceConfig as WorkspaceConfig,
 )

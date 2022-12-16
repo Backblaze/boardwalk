@@ -184,7 +184,7 @@ OS upgrades for storage pods in the staging environment
 """
 
 # Imports the boardwalk module and classes used in the Boardwalkfile.py
-from boardwalk import Job, Workflow, Workspace, WorkspaceConfig, path
+from boardwalk import Job, Workflow, WorkflowConfig, Workspace, WorkspaceConfig, path
 
 # Optionally sets the URL to a boardwalkd server
 boardwalkd_url = "http://localhost:8888"
@@ -228,6 +228,16 @@ class PodDistUpgradeWorkflow(Workflow):
             DistUpgradeJob(options={"target_version": 10}),
             PodPostTasksJob(),
         )
+
+    """
+    Optional workflow configuration options may be specified. The example below
+    changes Boardwalk's default behavior. Normally, Boardwalk will always retry
+    workflows on failed hosts until they complete the workflow successfully at
+    least once, even if they no longer meet Job preconditions. This example
+    disables this behavior
+    """
+    def config(self):
+        return WorkflowConfig(always_retry_failed_hosts=False)
 
 
 # Defines a Job with the name "PodPreTasksJob", which is called in the
@@ -277,8 +287,9 @@ class DistUpgradeJob(Job):
     Note that preconditions can exist for a Job without any tasks. This may be
     useful for cases where a Workflow should have additional preconditions
 
-    Preconditions are ignored if a workflow has started on a host but never
-    completed
+    By default, preconditions are ignored if a workflow has started on a host
+    but never completed. This behavior may be changed as described in the
+    Workflow class above
     """
     def preconditions(self, facts: dict, inventory_vars: dict):
         return (facts["ansible_distribution"] == "Debian")
