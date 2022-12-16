@@ -24,6 +24,7 @@ from boardwalkd.protocol import (
     WorkspaceHasMutex,
 )
 from click import ClickException
+from tornado.httpclient import HTTPClientError
 from tornado.simple_httpclient import HTTPTimeoutError
 
 from boardwalk.ansible import (
@@ -517,6 +518,14 @@ def handle_workflow_catch(workspace: Workspace, hostname: str):
                 )
             )
             return True
+        except HTTPClientError as e:
+            click.echo(
+                (
+                    f"Received error {e} from {client.url.geturl()} while checking for remote catch."
+                    " Boardwalk considers the remote workspace caught if it can't be reached"
+                )
+            )
+            return True
 
     if boardwalkd_client and check_boardwalkd_catch(boardwalkd_client):
         click.echo(
@@ -568,6 +577,8 @@ def bootstrap_with_server(workspace: Workspace, ctx: click.Context):
         raise ClickException(f"Could not connect to server {boardwalkd_url}")
     except socket.gaierror:
         raise ClickException(f"Could not resolve server {boardwalkd_url}")
+    except HTTPClientError as e:
+        raise ClickException(f"Received error {e} from {boardwalkd_url}")
 
     # Post the worker's details, which also creates the workspace
     try:
@@ -605,6 +616,10 @@ def bootstrap_with_server(workspace: Workspace, ctx: click.Context):
         except ConnectionRefusedError:
             click.echo(
                 f"Could not connect to {boardwalkd_url}. Cannot unmutex Workspace"
+            )
+        except HTTPClientError as e:
+            click.echo(
+                f"Received error {e} from {boardwalkd_url}. Cannot unmutex Workspace"
             )
 
     ctx.call_on_close(unmutex_boardwalkd_workspace)
