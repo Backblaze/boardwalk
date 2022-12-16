@@ -618,7 +618,9 @@ def bootstrap_with_server(workspace: Workspace, ctx: click.Context):
                 f"Could not connect to {boardwalkd_url}. Cannot unmutex Workspace"
             )
         except HTTPClientError as e:
-            click.echo(f"Received error {e}. Cannot unmutex Workspace")
+            click.echo(
+                f"Received error {e} from {boardwalkd_url}. Cannot unmutex Workspace"
+            )
 
     ctx.call_on_close(unmutex_boardwalkd_workspace)
 
