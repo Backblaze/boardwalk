@@ -31,11 +31,11 @@ class ShouldFailTestWorkspace(Workspace):
         )
 
 
-class UIAbuseTestWorkspace(Workspace):
+class UITestVeryVeryLongWorkSpaceNameWorkspace(Workspace):
     def config(self):
         return WorkspaceConfig(
             host_pattern="localhost:!foo:!bar:!baz:!fizz:!buzz:!my-very-long-host-name",
-            workflow=UITestVeryLongWorkflowNameWorkflow(),
+            workflow=UITestVerVeryLongWorkflowNameWorkflow(),
         )
 
 
@@ -47,7 +47,7 @@ class MalformedYAMLWorkspace(Workspace):
         )
 
 
-class UITestVeryLongWorkflowNameWorkflow(Workflow):
+class UITestVerVeryLongWorkflowNameWorkflow(Workflow):
     def jobs(self):
         return TestJob()
 
