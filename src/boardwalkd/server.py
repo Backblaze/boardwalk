@@ -310,16 +310,19 @@ class GoogleOAuth2LoginHandler(UIBaseHandler, tornado.auth.GoogleOAuth2Mixin):
                 return self.send_error(400)
 
             # If we get this far we know we have a valid google user
-            try:
-                state.users[user["email"]] = User(email=user["email"])
-            except ValidationError as e:
-                app_log.error(e)
-                return self.send_error(422)
-            state.flush()
+            username = user["email"]
+
+            if username not in state.users:
+                try:
+                    state.users[username] = User(email=username)
+                except ValidationError as e:
+                    app_log.error(e)
+                    return self.send_error(422)
+                state.flush()
 
             self.set_secure_cookie(
                 "boardwalk_user",
-                user["email"],
+                username,
                 expires_days=self.settings["auth_expire_days"],
                 samesite="Strict",
                 secure=True,
