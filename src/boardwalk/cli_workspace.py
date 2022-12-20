@@ -41,8 +41,10 @@ def workspace_list():
         pass
     except WorkspaceNotFound:
         pass
-    for item in Workspace.__subclasses__():
-        click.echo(item.__qualname__)
+    workspace_names: list[str] = [i.__qualname__ for i in Workspace.__subclasses__()]
+    workspace_names.sort()
+    for name in workspace_names:
+        click.echo(name)
 
 
 @workspace.command("reset", short_help="Resets active workspace")
