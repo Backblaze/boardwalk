@@ -4,8 +4,9 @@ catch and release CLI subcommands
 import click
 from click import ClickException
 
-from boardwalk.manifest import get_ws, NoActiveWorkspace
 from boardwalk.log import boardwalk_logger
+
+from boardwalk.manifest import get_ws, NoActiveWorkspace
 
 
 @click.command(

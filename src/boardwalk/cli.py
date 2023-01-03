@@ -15,13 +15,13 @@ from boardwalk.cli_init import init
 from boardwalk.cli_login import login
 from boardwalk.cli_run import check, run
 from boardwalk.cli_workspace import workspace
+from boardwalk.log import boardwalk_logger
 from boardwalk.manifest import (
     get_ws,
     ManifestNotFound,
     NoActiveWorkspace,
     WorkspaceNotFound,
 )
-from boardwalk.log import boardwalk_logger
 
 if TYPE_CHECKING:
     from typing import Any

@@ -4,6 +4,10 @@ Logger code
 import logging
 import sys
 
-logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler(sys.stdout)])
+logging.basicConfig(
+    format="%(levelname)s: %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+    level=logging.INFO,
+)
 
 boardwalk_logger = logging.getLogger("boardwalk")

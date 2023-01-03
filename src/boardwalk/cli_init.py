@@ -17,8 +17,8 @@ from boardwalk.ansible import (
     AnsibleRunnerUnreachableHost,
 )
 from boardwalk.host import Host
-from boardwalk.manifest import get_ws, NoActiveWorkspace, Workspace
 from boardwalk.log import boardwalk_logger
+from boardwalk.manifest import get_ws, NoActiveWorkspace, Workspace
 
 if TYPE_CHECKING:
     from ansible_runner import RunnerEvent

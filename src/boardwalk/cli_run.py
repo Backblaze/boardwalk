@@ -37,9 +37,9 @@ from boardwalk.ansible import (
     AnsibleRunnerUnreachableHost,
 )
 from boardwalk.host import Host, RemoteHostLocked
+from boardwalk.log import boardwalk_logger
 from boardwalk.manifest import get_boardwalkd_url, get_ws, NoActiveWorkspace, Workspace
 from boardwalk.state import RemoteStateModel, RemoteStateWorkflow, RemoteStateWorkspace
-from boardwalk.log import boardwalk_logger
 
 if TYPE_CHECKING:
     from typing import ItemsView

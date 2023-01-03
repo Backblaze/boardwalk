@@ -4,8 +4,9 @@ workspace CLI subcommand group
 import click
 from click import ClickException
 
-from boardwalk.manifest import get_ws, NoActiveWorkspace, Workspace, WorkspaceNotFound
 from boardwalk.log import boardwalk_logger
+
+from boardwalk.manifest import get_ws, NoActiveWorkspace, Workspace, WorkspaceNotFound
 
 
 @click.group(short_help="Subcommand group for working with workspaces")
