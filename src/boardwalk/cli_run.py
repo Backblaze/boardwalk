@@ -23,7 +23,6 @@ from boardwalkd.protocol import (
     WorkspaceEvent,
     WorkspaceHasMutex,
 )
-from click import ClickException
 from tornado.httpclient import HTTPClientError
 from tornado.simple_httpclient import HTTPTimeoutError
 
@@ -36,6 +35,7 @@ from boardwalk.ansible import (
     AnsibleRunnerGeneralError,
     AnsibleRunnerUnreachableHost,
 )
+from boardwalk.app_exceptions import BoardwalkException
 from boardwalk.host import Host, RemoteHostLocked
 from boardwalk.log import boardwalk_logger
 from boardwalk.manifest import get_boardwalkd_url, get_ws, NoActiveWorkspace, Workspace
@@ -122,16 +122,18 @@ def run(
     try:
         ws = get_ws()
     except NoActiveWorkspace as e:
-        raise ClickException(e.message)
+        raise BoardwalkException(e.message)
     boardwalk_logger.info(f"Using workspace: {ws.name}")
 
     # See if we have any hosts
     if len(ws.state.hosts) == 0:
-        raise ClickException("No hosts found in state. Have you run `boardwalk init`?")
+        raise BoardwalkException(
+            "No hosts found in state. Have you run `boardwalk init`?"
+        )
 
     # Check if a --limit is required for this Workspace
     if ws.cfg.require_limit and not limit:
-        raise ClickException("Workspace requires the --limit option be supplied")
+        raise BoardwalkException("Workspace requires the --limit option be supplied")
 
     # If no limit is supplied, then the limit is effectively "all"
     if limit:
@@ -169,7 +171,7 @@ def run(
         try:
             hosts_working_list = filter_hosts_by_limit_future.result()
         except NoHostsMatched:
-            raise ClickException(
+            raise BoardwalkException(
                 (
                     "No host matched the given limit pattern. Ensure the expected"
                     " hosts exist in the Ansible inventory and confirm they were"
@@ -198,7 +200,7 @@ def run(
             global become_password
             become_password = getpass.getpass("BECOME password: ")
     except ValueError:
-        raise ClickException(
+        raise BoardwalkException(
             "ANSIBLE_BECOME_ASK_PASS env variable has an invalid boolean value"
         )
     except KeyError:
@@ -325,7 +327,7 @@ def run_workflow(
                         message=f"{host.name}: {e.__class__.__qualname__}",
                     )
                 )
-            raise ClickException(e.runner_msg)
+            raise BoardwalkException(e.runner_msg)
         except (
             AnsibleRunnerFailedHost,
             AnsibleRunnerUnreachableHost,
@@ -409,7 +411,7 @@ def filter_hosts_by_limit(
         suppress_env_files=True,
     )
     if rc != 0:
-        ClickException(f"Failed to process --limit pattern. {err}")
+        BoardwalkException(f"Failed to process --limit pattern. {err}")
 
     # Format the output into a clean list
     inventory_host_list = [line.strip() for line in out.splitlines()[1:]]
@@ -571,22 +573,22 @@ def bootstrap_with_server(workspace: Workspace, ctx: click.Context):
     """Performs all of the initial set-up actions needed when boardwalk is
     configured to connect to a central boardwalkd"""
     if not boardwalkd_client:
-        raise ClickException(
+        raise BoardwalkException(
             "bootstrap_with_server called but no boardwalkd_client exists"
         )
     boardwalkd_url = boardwalkd_client.url.geturl()
     # Check if the if the Workspace is locked. We don't want to conflict with another worker
     try:
         if boardwalkd_client.has_mutex():
-            raise ClickException(
+            raise BoardwalkException(
                 f"A workspace with the name {workspace.name} has already locked on {boardwalkd_url}"
             )
     except ConnectionRefusedError:
-        raise ClickException(f"Could not connect to server {boardwalkd_url}")
+        raise BoardwalkException(f"Could not connect to server {boardwalkd_url}")
     except socket.gaierror:
-        raise ClickException(f"Could not resolve server {boardwalkd_url}")
+        raise BoardwalkException(f"Could not resolve server {boardwalkd_url}")
     except HTTPClientError as e:
-        raise ClickException(f"Received error {e} from {boardwalkd_url}")
+        raise BoardwalkException(f"Received error {e} from {boardwalkd_url}")
 
     # Post the worker's details, which also creates the workspace
     try:
@@ -600,23 +602,23 @@ def bootstrap_with_server(workspace: Workspace, ctx: click.Context):
             )
         )
     except ConnectionRefusedError:
-        raise ClickException(f"Could not connect to server {boardwalkd_url}")
+        raise BoardwalkException(f"Could not connect to server {boardwalkd_url}")
 
     # Lock the Workspace at the server
     try:
         boardwalkd_client.mutex()
     except WorkspaceHasMutex:
-        raise ClickException(
+        raise BoardwalkException(
             f"A workspace with the name {workspace.name} has already locked on {boardwalkd_url}"
         )
     except ConnectionRefusedError:
-        raise ClickException(f"Could not connect to server {boardwalkd_url}")
+        raise BoardwalkException(f"Could not connect to server {boardwalkd_url}")
 
     # Create unmutex callback
     def unmutex_boardwalkd_workspace():
         """Wraps unmutex to prevent crashing if we can't connect"""
         if not boardwalkd_client:
-            raise ClickException(
+            raise BoardwalkException(
                 "unmutex_boardwalkd_workspace called but no boardwalkd_client exists"
             )
         try:

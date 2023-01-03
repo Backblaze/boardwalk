@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import ansible_runner
-from click import ClickException
 
 import boardwalk
+from boardwalk.app_exceptions import BoardwalkException
 from boardwalk.log import boardwalk_logger
 
 if TYPE_CHECKING:
@@ -198,7 +198,7 @@ def ansible_inventory() -> InventoryData:
         suppress_env_files=True,
     )
     if rc != 0:
-        ClickException(f"Failed to render inventory. {err}")
+        BoardwalkException(f"Failed to render inventory. {err}")
 
     return json.loads(out)
 

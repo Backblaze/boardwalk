@@ -6,8 +6,7 @@ import asyncio
 import click
 from boardwalkd.protocol import Client
 
-from click import ClickException
-
+from boardwalk.app_exceptions import BoardwalkException
 from boardwalk.manifest import get_boardwalkd_url
 
 
@@ -19,4 +18,4 @@ def login():
     try:
         asyncio.run(client.api_login())
     except ConnectionRefusedError:
-        raise ClickException(f"Unable to reach {url}")
+        raise BoardwalkException(f"Unable to reach {url}")

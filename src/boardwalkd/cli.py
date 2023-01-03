@@ -6,7 +6,7 @@ import re
 from importlib.metadata import version as lib_version
 
 import click
-from click import ClickException
+from boardwalk.app_exceptions import BoardwalkException
 from email_validator import EmailNotValidError, validate_email
 
 from boardwalkd.server import run
@@ -161,15 +161,17 @@ def serve(
     try:
         host_header_regex = re.compile(host_header_pattern)
     except re.error:
-        raise ClickException("Host pattern regex invalid")
+        raise BoardwalkException("Host pattern regex invalid")
 
     # Validate any port is configured
     if not (port or tls_port):
-        raise ClickException("One or both of --port or --tls-port must be configured")
+        raise BoardwalkException(
+            "One or both of --port or --tls-port must be configured"
+        )
 
     # If there is no TLS port then reject setting a TLS key and cert
     if (not tls_port) and (tls_crt or tls_key):
-        raise ClickException(
+        raise BoardwalkException(
             (
                 "--tls-crt and --tls-key should not be configured"
                 " unless --tls-port is also set"
@@ -182,7 +184,7 @@ def serve(
             assert tls_crt
             assert tls_key
         except AssertionError:
-            raise ClickException(
+            raise BoardwalkException(
                 (
                     "--tls-crt and --tls-key paths must be supplied when a"
                     " --tls-port is configured"
@@ -194,9 +196,9 @@ def serve(
         try:
             validate_email(owner, check_deliverability=False)
         except EmailNotValidError:
-            raise ClickException("Email addressed passed to --owner is invalid")
+            raise BoardwalkException("Email addressed passed to --owner is invalid")
     elif auth_method != "anonymous":
-        raise ClickException(
+        raise BoardwalkException(
             "--owner must be defined when --auth-method is not 'anonymous'"
         )
     else:

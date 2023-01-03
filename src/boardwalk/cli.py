@@ -3,12 +3,16 @@ This is the main file for handling the CLI
 """
 from __future__ import annotations
 
+import logging
+
 import signal
+import sys
 from importlib.metadata import version as lib_version
 from typing import TYPE_CHECKING
 
 import click
-from click import ClickException
+
+from boardwalk.app_exceptions import BoardwalkException
 
 from boardwalk.cli_catch import catch, release
 from boardwalk.cli_init import init
@@ -25,6 +29,12 @@ from boardwalk.manifest import (
 
 if TYPE_CHECKING:
     from typing import Any
+
+logging.basicConfig(
+    format="%(levelname)s:%(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+    level=logging.INFO,
+)
 
 
 terminating = False
@@ -67,7 +77,7 @@ def cli(ctx: click.Context):
         if ctx.invoked_subcommand == "version":
             return
         click.echo(cli.get_help(ctx))
-        raise ClickException("No Boardwalkfile.py found")
+        raise BoardwalkException("No Boardwalkfile.py found")
     except NoActiveWorkspace:
         return
     except WorkspaceNotFound:

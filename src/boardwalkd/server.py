@@ -26,7 +26,7 @@ import tornado.auth
 import tornado.httpclient
 import tornado.web
 import tornado.websocket
-from click import ClickException
+from boardwalk.app_exceptions import BoardwalkException
 from cryptography.fernet import Fernet
 from pydantic import ValidationError
 from tornado.escape import url_escape, url_unescape
@@ -859,7 +859,7 @@ def make_app(
         try:
             settings["cookie_secret"] = os.environ["BOARDWALK_SECRET"]
         except KeyError:
-            raise ClickException(
+            raise BoardwalkException(
                 (
                     "The BOARDWALK_SECRET environment variable is required when any"
                     " authentication method is enabled in order to generate secure cookies"
@@ -878,7 +878,7 @@ def make_app(
                     "secret": os.environ["BOARDWALK_GOOGLE_OAUTH_SECRET"],
                 }
             except KeyError:
-                raise ClickException(
+                raise BoardwalkException(
                     (
                         "BOARDWALK_GOOGLE_OAUTH_CLIENT_ID and BOARDWALK_GOOGLE_OAUTH_SECRET env vars"
                         " are required when auth_method is google_oauth"
@@ -886,7 +886,7 @@ def make_app(
                 )
             handlers.append((r"/auth/login", GoogleOAuth2LoginHandler))
         case _:
-            raise ClickException(f"auth_method {auth_method} is not supported")
+            raise BoardwalkException(f"auth_method {auth_method} is not supported")
 
     # Set-up all the main handlers
     handlers.extend(
@@ -989,7 +989,7 @@ async def run(
 
     if tls_port_number is not None:
         if urlparse(url).scheme != "https":
-            raise ClickException(f"URL scheme must be HTTPS when TLS is enabled")
+            raise BoardwalkException(f"URL scheme must be HTTPS when TLS is enabled")
 
         ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_ctx.load_cert_chain(certfile=tls_crt_path, keyfile=tls_key_path)

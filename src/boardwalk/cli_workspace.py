@@ -2,10 +2,9 @@
 workspace CLI subcommand group
 """
 import click
-from click import ClickException
 
+from boardwalk.app_exceptions import BoardwalkException
 from boardwalk.log import boardwalk_logger
-
 from boardwalk.manifest import get_ws, NoActiveWorkspace, Workspace, WorkspaceNotFound
 
 
@@ -20,7 +19,7 @@ def workspace_show():
     try:
         ws = get_ws()
     except NoActiveWorkspace as e:
-        raise ClickException(e.message)
+        raise BoardwalkException(e.message)
     click.echo(ws.name)
 
 
@@ -58,7 +57,7 @@ def workspace_reset():
     try:
         ws = get_ws()
     except NoActiveWorkspace as e:
-        raise ClickException(e.message)
+        raise BoardwalkException(e.message)
     boardwalk_logger.info(f"Using workspace: {ws.name}")
     ws.reset()
 
@@ -69,7 +68,7 @@ def workspace_dump():
     try:
         ws = get_ws()
     except NoActiveWorkspace as e:
-        raise ClickException(e.message)
+        raise BoardwalkException(e.message)
     # We don't want to print the active Workspace name to stdout with a logger
     # because the output wouldn't be valid JSON. So we use click.echo() to simply
     # write to stderr

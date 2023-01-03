@@ -13,6 +13,8 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
+from boardwalk.log import boardwalk_logger
+
 from pydantic import BaseModel, Extra, validator
 from tornado.httpclient import (
     HTTPClient,
@@ -264,7 +266,10 @@ class Client:
                 HTTPError,
                 HTTPTimeoutError,
                 socket.gaierror,
-            ):
+            ) as e:
+                boardwalk_logger.debug(
+                    f"Heartbeat keepalive error {e.__class__.__qualname__}"
+                )
                 pass
             time.sleep(5)  # nosemgrep: python.lang.best-practice.sleep.arbitrary-sleep
 

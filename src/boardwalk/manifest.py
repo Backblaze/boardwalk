@@ -11,8 +11,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import TYPE_CHECKING
 
-from click import ClickException
-
+from boardwalk.app_exceptions import BoardwalkException
 from boardwalk.state import LocalState
 
 if TYPE_CHECKING:
@@ -290,7 +289,7 @@ class Workspace(ABC):
         """Asserts the host pattern has not changed improperly. If it has, it could
         cause unexpected issues such as hosts being in the state that shouldn't"""
         if self.cfg.host_pattern != self.state.host_pattern:
-            raise ClickException(
+            raise BoardwalkException(
                 (
                     "The workspace's host_pattern has changed since `boardwalk init` was first ran."
                     f' It was "{self.state.host_pattern}" but is now "{self.cfg.host_pattern}".'
@@ -331,7 +330,7 @@ class Workspace(ABC):
         try:
             self.path.joinpath("workspace.mutex").touch(exist_ok=False)
         except FileExistsError:
-            raise ClickException("Workspace is locked by another operation")
+            raise BoardwalkException("Workspace is locked by another operation")
 
     def has_mutex(self):
         """Checks if the workspace has a mutex. Returns True if so"""
@@ -363,7 +362,7 @@ class Workspace(ABC):
             ws = get_ws()
             # Check if the active Workspace is mutexed
             if ws.has_mutex():
-                raise ClickException(
+                raise BoardwalkException(
                     "Workspace is locked by another operation. `boardwalk workspace use` cannot be called while the workspace is locked"
                 )
         except NoActiveWorkspace:

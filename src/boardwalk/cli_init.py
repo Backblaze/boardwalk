@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
 import click
-from click import ClickException
 
 from boardwalk.ansible import (
     ansible_runner_run_tasks,
@@ -16,6 +15,7 @@ from boardwalk.ansible import (
     AnsibleRunnerGeneralError,
     AnsibleRunnerUnreachableHost,
 )
+from boardwalk.app_exceptions import BoardwalkException
 from boardwalk.host import Host
 from boardwalk.log import boardwalk_logger
 from boardwalk.manifest import get_ws, NoActiveWorkspace, Workspace
@@ -59,12 +59,12 @@ def init(ctx: click.Context, limit: str, retry: bool):
     """
     if retry and limit not in ["all", ""]:
         # We don't allow limit and retry to be specified together at the moment
-        raise ClickException("--limit and --retry cannot be supplied together")
+        raise BoardwalkException("--limit and --retry cannot be supplied together")
 
     try:
         ws = get_ws()
     except NoActiveWorkspace as e:
-        raise ClickException(e.message)
+        raise BoardwalkException(e.message)
     boardwalk_logger.info(f"Using workspace: {ws.name}")
 
     ws.assert_host_pattern_unchanged()
@@ -85,7 +85,7 @@ def init(ctx: click.Context, limit: str, retry: bool):
     }
     if retry:
         if not retry_file_path.exists():
-            raise ClickException("No retry file exists")
+            raise BoardwalkException("No retry file exists")
         runner_kwargs["limit"] = f"@{str(retry_file_path)}"
 
     # Save the host pattern we are initializing with. If the pattern changes after
@@ -113,7 +113,7 @@ def init(ctx: click.Context, limit: str, retry: bool):
                 boardwalk_logger.error(event["stdout"])
             except KeyError:
                 pass
-        raise ClickException("Failed to start fact gathering")
+        raise BoardwalkException("Failed to start fact gathering")
 
     # Clear the retry file after we use it to start fresh before we build a new one
     retry_file_path.unlink(missing_ok=True)
@@ -138,7 +138,7 @@ def init(ctx: click.Context, limit: str, retry: bool):
 
     # If we didn't find any hosts, raise an exception
     if len(ws.state.hosts) == 0:
-        raise ClickException("No hosts gathered")
+        raise BoardwalkException("No hosts gathered")
 
 
 def add_gathered_facts_to_state(event: RunnerEvent, ws: Workspace):
