@@ -18,6 +18,7 @@ from boardwalk.ansible import (
 )
 from boardwalk.host import Host
 from boardwalk.manifest import get_ws, NoActiveWorkspace, Workspace
+from boardwalk.log import boardwalk_logger
 
 if TYPE_CHECKING:
     from ansible_runner import RunnerEvent
@@ -64,7 +65,7 @@ def init(ctx: click.Context, limit: str, retry: bool):
         ws = get_ws()
     except NoActiveWorkspace as e:
         raise ClickException(e.message)
-    click.echo(f"Using workspace: {ws.name}")
+    boardwalk_logger.info(f"Using workspace: {ws.name}")
 
     ws.assert_host_pattern_unchanged()
 
@@ -109,7 +110,7 @@ def init(ctx: click.Context, limit: str, retry: bool):
         # we try to print out some debug info and bail
         for event in e.runner.events:
             try:
-                click.echo(event["stdout"])
+                boardwalk_logger.error(event["stdout"])
             except KeyError:
                 pass
         raise ClickException("Failed to start fact gathering")
@@ -131,7 +132,9 @@ def init(ctx: click.Context, limit: str, retry: bool):
 
     # Note if any hosts were unreachable
     if hosts_were_unreachable:
-        click.echo("Some hosts were unreachable. Consider running again with --retry")
+        boardwalk_logger.warn(
+            "Some hosts were unreachable. Consider running again with --retry"
+        )
 
     # If we didn't find any hosts, raise an exception
     if len(ws.state.hosts) == 0:
@@ -164,9 +167,9 @@ def handle_failed_init_hosts(event: RunnerEvent, retry_file_path: Path):
         event["event"] == "runner_on_unreachable"
         or event["event"] == "runner_on_failed"
     ):
-        click.echo(event["stdout"])
+        boardwalk_logger.warn(event["stdout"])
         with open(retry_file_path, "a") as file:
             file.write(f"{event['event_data']['host']}\n")
     # If no hosts matched or there are warnings, write them out
     if event["event"] == "warning" or event["event"] == "playbook_on_no_hosts_matched":
-        click.echo(event["stdout"])
+        boardwalk_logger.warn(event["stdout"])

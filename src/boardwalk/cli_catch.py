@@ -5,6 +5,7 @@ import click
 from click import ClickException
 
 from boardwalk.manifest import get_ws, NoActiveWorkspace
+from boardwalk.log import boardwalk_logger
 
 
 @click.command(
@@ -17,7 +18,7 @@ def catch():
         ws = get_ws()
     except NoActiveWorkspace as e:
         raise ClickException(e.message)
-    click.echo(f"Using workspace: {ws.name}")
+    boardwalk_logger.info(f"Using workspace: {ws.name}")
     ws.catch()
 
 
@@ -31,5 +32,5 @@ def release():
         ws = get_ws()
     except NoActiveWorkspace as e:
         raise ClickException(e.message)
-    click.echo(f"Using workspace: {ws.name}")
+    boardwalk_logger.info(f"Using workspace: {ws.name}")
     ws.release()

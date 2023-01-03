@@ -21,9 +21,11 @@ from boardwalk.manifest import (
     NoActiveWorkspace,
     WorkspaceNotFound,
 )
+from boardwalk.log import boardwalk_logger
 
 if TYPE_CHECKING:
     from typing import Any
+
 
 terminating = False
 
@@ -36,12 +38,12 @@ def handle_signal(sig: int, frame: Any):
     signals sent to child processes (ansible-playbook)
     """
     global terminating
-    click.echo(f"Received signal {sig}")
+    boardwalk_logger.warn(f"Received signal {sig}")
     if not terminating:
         terminating = True
         raise KeyboardInterrupt
     else:
-        click.echo("Boardwalk is already terminating")
+        boardwalk_logger.warn("Boardwalk is already terminating")
 
 
 @click.group()
@@ -53,15 +55,15 @@ def cli(ctx: click.Context):
 
     To see more info about any subcommand, do `boardwalk <subcommand> --help`
     """
-    # There's not much we can do without a Boardwalkfile.py. Print help and
-    # exit if it's missing
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGHUP, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
     try:
         get_ws()
     except ManifestNotFound:
-        # The version subcommand is the only one that doesn't need a Boardwalkfile.py
+        # There's not much we can do without a Boardwalkfile.py. Print help and
+        # exit if it's missing. The version subcommand is the only one that
+        # doesn't need a Boardwalkfile.py
         if ctx.invoked_subcommand == "version":
             return
         click.echo(cli.get_help(ctx))
