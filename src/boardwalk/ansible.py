@@ -4,6 +4,7 @@ This file has utilities for working with Ansible
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from functools import partial
 from pathlib import Path
@@ -13,7 +14,6 @@ import ansible_runner
 
 import boardwalk
 from boardwalk.app_exceptions import BoardwalkException
-from boardwalk.log import boardwalk_logger
 
 if TYPE_CHECKING:
     from typing import Any, Optional, TypedDict
@@ -61,6 +61,9 @@ if TYPE_CHECKING:
         vars: dict[str, str | bool]
 
 
+logger = logging.getLogger(__name__)
+
+
 def ansible_runner_cancel_callback(ws: Workspace):
     """
     ansible_runner needs a callback to tell it to stop execution. It returns
@@ -99,11 +102,11 @@ def ansible_runner_errors_to_output(runner: Runner, include_msg: bool = True) ->
                 try:
                     msg.append(event["event_data"]["res"]["msg"])
                 except KeyError:
-                    boardwalk_logger.warn("Event error did not contain msg")
+                    logger.warn("Event error did not contain msg")
                 try:
                     msg.append(event["stdout"])
                 except KeyError:
-                    boardwalk_logger.warn("Event error did not contain stdout")
+                    logger.warn("Event error did not contain stdout")
             output.append(": ".join(msg))
     return "\n".join(output)
 
@@ -161,7 +164,7 @@ def ansible_runner_run_tasks(
     if limit:
         output_msg_prefix = f"{hosts}(limit: {limit}): ansible_runner invocation"
     output_msg = f"{output_msg_prefix}: {invocation_msg}"
-    boardwalk_logger.info(output_msg)
+    logger.info(output_msg)
     runner: Runner = ansible_runner.run(**runner_kwargs)  # type: ignore
     runner_errors = ansible_runner_errors_to_output(runner)
     fail_msg = f"Error:\n{output_msg}\n{runner_errors}"
@@ -181,7 +184,7 @@ def ansible_runner_run_tasks(
 
 def ansible_inventory() -> InventoryData:
     """Uses ansible-inventory to fetch the inventory and returns it as a dict"""
-    boardwalk_logger.info("Processing ansible-inventory")
+    logger.info("Processing ansible-inventory")
     """
     Note that for the moment we have --export set here. --export won't expand Jinja
     expressions and this is done for performance reasons. It's entirely possible

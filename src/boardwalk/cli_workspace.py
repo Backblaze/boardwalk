@@ -1,11 +1,14 @@
 """
 workspace CLI subcommand group
 """
+import logging
+
 import click
 
 from boardwalk.app_exceptions import BoardwalkException
-from boardwalk.log import boardwalk_logger
 from boardwalk.manifest import get_ws, NoActiveWorkspace, Workspace, WorkspaceNotFound
+
+logger = logging.getLogger(__name__)
 
 
 @click.group(short_help="Subcommand group for working with workspaces")
@@ -31,7 +34,7 @@ def workspace_show():
 def workspace_use(workspace_name: str):
     Workspace.use(workspace_name)
     ws = get_ws()
-    boardwalk_logger.info(f"Using workspace: {ws.name}")
+    logger.info(f"Using workspace: {ws.name}")
 
 
 @workspace.command("list", help="Lists available workspaces from the Boardwalkfile.py")
@@ -58,7 +61,7 @@ def workspace_reset():
         ws = get_ws()
     except NoActiveWorkspace as e:
         raise BoardwalkException(e.message)
-    boardwalk_logger.info(f"Using workspace: {ws.name}")
+    logger.info(f"Using workspace: {ws.name}")
     ws.reset()
 
 

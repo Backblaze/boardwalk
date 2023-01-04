@@ -5,6 +5,7 @@ and contains functions to support clients using the server
 import asyncio
 import concurrent.futures
 import json
+import logging
 import socket
 import time
 import webbrowser
@@ -12,8 +13,6 @@ from collections import deque
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
-
-from boardwalk.log import boardwalk_logger
 
 from pydantic import BaseModel, Extra, validator
 from tornado.httpclient import (
@@ -25,6 +24,8 @@ from tornado.httpclient import (
 )
 from tornado.simple_httpclient import HTTPTimeoutError
 from tornado.websocket import websocket_connect
+
+logger = logging.getLogger(__name__)
 
 
 class ProtocolBaseModel(BaseModel, extra=Extra.forbid):
@@ -267,9 +268,7 @@ class Client:
                 HTTPTimeoutError,
                 socket.gaierror,
             ) as e:
-                boardwalk_logger.debug(
-                    f"Heartbeat keepalive error {e.__class__.__qualname__}"
-                )
+                logger.debug(f"Heartbeat keepalive error {e.__class__.__qualname__}")
                 pass
             time.sleep(5)  # nosemgrep: python.lang.best-practice.sleep.arbitrary-sleep
 

@@ -19,7 +19,6 @@ from boardwalk.cli_init import init
 from boardwalk.cli_login import login
 from boardwalk.cli_run import check, run
 from boardwalk.cli_workspace import workspace
-from boardwalk.log import boardwalk_logger
 from boardwalk.manifest import (
     get_ws,
     ManifestNotFound,
@@ -30,12 +29,14 @@ from boardwalk.manifest import (
 if TYPE_CHECKING:
     from typing import Any
 
+# have a way to specify log level
 logging.basicConfig(
-    format="%(levelname)s:%(message)s",
+    format="%(levelname)s:%(name)s:%(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],
     level=logging.INFO,
 )
 
+logger = logging.getLogger(__name__)
 
 terminating = False
 
@@ -48,12 +49,12 @@ def handle_signal(sig: int, frame: Any):
     signals sent to child processes (ansible-playbook)
     """
     global terminating
-    boardwalk_logger.warn(f"Received signal {sig}")
+    logger.warn(f"Received signal {sig}")
     if not terminating:
         terminating = True
         raise KeyboardInterrupt
     else:
-        boardwalk_logger.warn("Boardwalk is already terminating")
+        logger.warn("Boardwalk is already terminating")
 
 
 @click.group()

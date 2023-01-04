@@ -1,12 +1,14 @@
 """
 catch and release CLI subcommands
 """
+import logging
+
 import click
 
 from boardwalk.app_exceptions import BoardwalkException
-from boardwalk.log import boardwalk_logger
-
 from boardwalk.manifest import get_ws, NoActiveWorkspace
+
+logger = logging.getLogger(__name__)
 
 
 @click.command(
@@ -19,7 +21,7 @@ def catch():
         ws = get_ws()
     except NoActiveWorkspace as e:
         raise BoardwalkException(e.message)
-    boardwalk_logger.info(f"Using workspace: {ws.name}")
+    logger.info(f"Using workspace: {ws.name}")
     ws.catch()
 
 
@@ -33,5 +35,5 @@ def release():
         ws = get_ws()
     except NoActiveWorkspace as e:
         raise BoardwalkException(e.message)
-    boardwalk_logger.info(f"Using workspace: {ws.name}")
+    logger.info(f"Using workspace: {ws.name}")
     ws.release()

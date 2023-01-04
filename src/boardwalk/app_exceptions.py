@@ -1,11 +1,12 @@
 """
 Common application exception classes
 """
+import logging
 import typing
 
 from click import ClickException
 
-from boardwalk.log import boardwalk_logger
+logger = logging.getLogger(__name__)
 
 
 class BoardwalkException(ClickException):
@@ -16,4 +17,4 @@ class BoardwalkException(ClickException):
 
     def show(self, file: typing.IO[str] | None = None) -> None:
 
-        boardwalk_logger.error(self.format_message())
+        logger.error(self.format_message())
