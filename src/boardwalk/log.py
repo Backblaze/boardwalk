@@ -1,7 +1,6 @@
 """
-Logger code
+Common logger(s)
 """
 import logging
-import sys
 
 boardwalk_logger = logging.getLogger("boardwalk")
