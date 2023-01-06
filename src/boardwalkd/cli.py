@@ -2,6 +2,7 @@
 This file contains the boardwalkd CLI code
 """
 import asyncio
+import logging
 import re
 from importlib.metadata import version as lib_version
 
@@ -10,6 +11,8 @@ from boardwalk.app_exceptions import BoardwalkException
 from email_validator import EmailNotValidError, validate_email
 
 from boardwalkd.server import run
+
+logging.basicConfig(level=logging.INFO)
 
 
 @click.group()

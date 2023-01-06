@@ -8,7 +8,6 @@ import asyncio
 import atexit
 import hashlib
 import json
-import logging
 import os
 import re
 import secrets
@@ -36,8 +35,6 @@ from tornado.routing import HostMatches
 from boardwalkd.broadcast import handle_slack_broadcast
 from boardwalkd.protocol import ApiLoginMessage, WorkspaceDetails, WorkspaceEvent
 from boardwalkd.state import load_state, User, valid_user_roles, WorkspaceState
-
-logging.basicConfig(level=logging.INFO)
 
 module_dir = Path(__file__).resolve().parent
 state = load_state()
