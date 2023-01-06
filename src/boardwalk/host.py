@@ -10,11 +10,11 @@ from base64 import b64decode
 from datetime import datetime
 from typing import Any, TYPE_CHECKING
 
-from click import ClickException
 from pydantic import BaseModel, Extra
 
 import boardwalk
 from boardwalk.ansible import ansible_runner_run_tasks
+from boardwalk.app_exceptions import BoardwalkException
 
 if TYPE_CHECKING:
     from ansible_runner import Runner
@@ -204,7 +204,7 @@ class Host(BaseModel, extra=Extra.forbid):
         if len(facts) > 0:
             return facts
         else:
-            raise ClickException("gather_facts returned nothing")
+            raise BoardwalkException("gather_facts returned nothing")
 
     def get_remote_state(self) -> boardwalk.state.RemoteStateModel:
         """Gets boardwalk's remote state fact as an object"""
@@ -289,5 +289,5 @@ class Host(BaseModel, extra=Extra.forbid):
             workspace.flush()
 
 
-class RemoteHostLocked(ClickException):
+class RemoteHostLocked(BoardwalkException):
     """The remote host is locked by another job"""

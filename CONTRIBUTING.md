@@ -53,3 +53,12 @@ enforcement of test coverage.
 
 The boardwalk pip module uses semantic versioning. Please make sure to update
 the VERSION file along with any changes to the package.
+
+### Logging
+Most output should use a logger, with a few exceptions:
+- Raw output streamed from Ansible. Playbook runs should look familiar to
+  Ansible users. Ansible output that has been processed by Boardwalk should be
+  emitted by a logger.
+- Cases where the output of a command is intended to be consumed in a specific
+  format, and the formatting features of a logger aren't useful. Examples
+  include `boardwalk version` and `boardwalk workspace dump`.

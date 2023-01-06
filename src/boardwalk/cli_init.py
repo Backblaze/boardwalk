@@ -3,11 +3,12 @@ init CLI subcommand
 """
 from __future__ import annotations
 
+import logging
+
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
 import click
-from click import ClickException
 
 from boardwalk.ansible import (
     ansible_runner_run_tasks,
@@ -16,6 +17,7 @@ from boardwalk.ansible import (
     AnsibleRunnerGeneralError,
     AnsibleRunnerUnreachableHost,
 )
+from boardwalk.app_exceptions import BoardwalkException
 from boardwalk.host import Host
 from boardwalk.manifest import get_ws, NoActiveWorkspace, Workspace
 
@@ -32,6 +34,9 @@ if TYPE_CHECKING:
         limit: str
         tasks: AnsibleTasksType
         timeout: int
+
+
+logger = logging.getLogger(__name__)
 
 
 @click.command(short_help="Inits local workspace state by getting host facts")
@@ -58,13 +63,13 @@ def init(ctx: click.Context, limit: str, retry: bool):
     """
     if retry and limit not in ["all", ""]:
         # We don't allow limit and retry to be specified together at the moment
-        raise ClickException("--limit and --retry cannot be supplied together")
+        raise BoardwalkException("--limit and --retry cannot be supplied together")
 
     try:
         ws = get_ws()
     except NoActiveWorkspace as e:
-        raise ClickException(e.message)
-    click.echo(f"Using workspace: {ws.name}")
+        raise BoardwalkException(e.message)
+    logger.info(f"Using workspace: {ws.name}")
 
     ws.assert_host_pattern_unchanged()
 
@@ -84,7 +89,7 @@ def init(ctx: click.Context, limit: str, retry: bool):
     }
     if retry:
         if not retry_file_path.exists():
-            raise ClickException("No retry file exists")
+            raise BoardwalkException("No retry file exists")
         runner_kwargs["limit"] = f"@{str(retry_file_path)}"
 
     # Save the host pattern we are initializing with. If the pattern changes after
@@ -109,10 +114,10 @@ def init(ctx: click.Context, limit: str, retry: bool):
         # we try to print out some debug info and bail
         for event in e.runner.events:
             try:
-                click.echo(event["stdout"])
+                logger.error(event["stdout"])
             except KeyError:
                 pass
-        raise ClickException("Failed to start fact gathering")
+        raise BoardwalkException("Failed to start fact gathering")
 
     # Clear the retry file after we use it to start fresh before we build a new one
     retry_file_path.unlink(missing_ok=True)
@@ -131,11 +136,11 @@ def init(ctx: click.Context, limit: str, retry: bool):
 
     # Note if any hosts were unreachable
     if hosts_were_unreachable:
-        click.echo("Some hosts were unreachable. Consider running again with --retry")
+        logger.warn("Some hosts were unreachable. Consider running again with --retry")
 
     # If we didn't find any hosts, raise an exception
     if len(ws.state.hosts) == 0:
-        raise ClickException("No hosts gathered")
+        raise BoardwalkException("No hosts gathered")
 
 
 def add_gathered_facts_to_state(event: RunnerEvent, ws: Workspace):
@@ -164,9 +169,9 @@ def handle_failed_init_hosts(event: RunnerEvent, retry_file_path: Path):
         event["event"] == "runner_on_unreachable"
         or event["event"] == "runner_on_failed"
     ):
-        click.echo(event["stdout"])
+        logger.warn(event["stdout"])
         with open(retry_file_path, "a") as file:
             file.write(f"{event['event_data']['host']}\n")
     # If no hosts matched or there are warnings, write them out
     if event["event"] == "warning" or event["event"] == "playbook_on_no_hosts_matched":
-        click.echo(event["stdout"])
+        logger.warn(event["stdout"])

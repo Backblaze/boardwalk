@@ -3,12 +3,17 @@ This is the main file for handling the CLI
 """
 from __future__ import annotations
 
+import logging
+import os
 import signal
+import sys
+from distutils.util import strtobool
 from importlib.metadata import version as lib_version
-from typing import TYPE_CHECKING
+from typing import Literal, TYPE_CHECKING
 
 import click
-from click import ClickException
+
+from boardwalk.app_exceptions import BoardwalkException
 
 from boardwalk.cli_catch import catch, release
 from boardwalk.cli_init import init
@@ -25,6 +30,8 @@ from boardwalk.manifest import (
 if TYPE_CHECKING:
     from typing import Any
 
+logger = logging.getLogger(__name__)
+
 terminating = False
 
 
@@ -36,36 +43,68 @@ def handle_signal(sig: int, frame: Any):
     signals sent to child processes (ansible-playbook)
     """
     global terminating
-    click.echo(f"Received signal {sig}")
+    logger.warn(f"Received signal {sig}")
     if not terminating:
         terminating = True
         raise KeyboardInterrupt
     else:
-        click.echo("Boardwalk is already terminating")
+        logger.warn("Boardwalk is already terminating")
 
 
 @click.group()
+@click.option(
+    "--debug/--no-debug",
+    "-D/-nD",
+    help=(
+        "Whether or not output debug messages. Alternatively may be set with"
+        " the BOARDWALK_DEBUG=1 environment variable"
+    ),
+    default=False,
+    show_default=True,
+)
 @click.pass_context
-def cli(ctx: click.Context):
+def cli(ctx: click.Context, debug: bool | Literal[0, 1]):
     """
     Boardwalk is a linear remote execution workflow engine built on top of Ansible.
     See the README.md @ https://github.com/Backblaze/boardwalk for more info
 
     To see more info about any subcommand, do `boardwalk <subcommand> --help`
     """
-    # There's not much we can do without a Boardwalkfile.py. Print help and
-    # exit if it's missing
+    try:
+        debug = strtobool(os.environ["BOARDWALK_DEBUG"])
+    except KeyError:
+        pass
+    except ValueError:
+        raise BoardwalkException(
+            "BOARDWALK_DEBUG env variable has an invalid boolean value"
+        )
+
+    if debug:
+        loglevel = logging.DEBUG
+        logformat = "%(levelname)s:%(name)s:%(threadName)s:%(message)s"
+    else:
+        loglevel = logging.INFO
+        logformat = "%(levelname)s:%(name)s:%(message)s"
+
+    logging.basicConfig(
+        format=logformat,
+        handlers=[logging.StreamHandler(sys.stdout)],
+        level=loglevel,
+    )
+
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGHUP, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
     try:
         get_ws()
     except ManifestNotFound:
-        # The version subcommand is the only one that doesn't need a Boardwalkfile.py
+        # There's not much we can do without a Boardwalkfile.py. Print help and
+        # exit if it's missing. The version subcommand is the only one that
+        # doesn't need a Boardwalkfile.py
         if ctx.invoked_subcommand == "version":
             return
         click.echo(cli.get_help(ctx))
-        raise ClickException("No Boardwalkfile.py found")
+        raise BoardwalkException("No Boardwalkfile.py found")
     except NoActiveWorkspace:
         return
     except WorkspaceNotFound:

@@ -5,6 +5,7 @@ and contains functions to support clients using the server
 import asyncio
 import concurrent.futures
 import json
+import logging
 import socket
 import time
 import webbrowser
@@ -23,6 +24,8 @@ from tornado.httpclient import (
 )
 from tornado.simple_httpclient import HTTPTimeoutError
 from tornado.websocket import websocket_connect
+
+logger = logging.getLogger(__name__)
 
 
 class ProtocolBaseModel(BaseModel, extra=Extra.forbid):
@@ -159,6 +162,7 @@ class Client:
         client = HTTPClient()
 
         try:
+            logger.debug(f"Fetching request {request.method} {request.url}")
             return client.fetch(request)
         except HTTPError as e:
             if e.code == 403 and auto_login_prompt:
@@ -264,7 +268,8 @@ class Client:
                 HTTPError,
                 HTTPTimeoutError,
                 socket.gaierror,
-            ):
+            ) as e:
+                logger.debug(f"Heartbeat keepalive error {e.__class__.__qualname__}")
                 pass
             time.sleep(5)  # nosemgrep: python.lang.best-practice.sleep.arbitrary-sleep
 
