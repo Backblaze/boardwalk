@@ -162,6 +162,7 @@ class Client:
         client = HTTPClient()
 
         try:
+            logger.debug(f"Fetching request {request.method} {request.url}")
             return client.fetch(request)
         except HTTPError as e:
             if e.code == 403 and auto_login_prompt:
