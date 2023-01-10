@@ -634,8 +634,8 @@ def bootstrap_with_server(workspace: Workspace, ctx: click.Context):
     ctx.call_on_close(unmutex_boardwalkd_workspace)
 
     # Send heartbeats in background
-    heartbeat_coroutine = boardwalkd_client.heartbeat_keepalive_connect()
-    ctx.call_on_close(heartbeat_coroutine.cancel)
+    heartbeat_quit = boardwalkd_client.heartbeat_keepalive_connect()
+    ctx.call_on_close(heartbeat_quit.set)
 
 
 def update_host_facts_in_local_state(host: Host, workspace: Workspace):
