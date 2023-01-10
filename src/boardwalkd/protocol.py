@@ -7,6 +7,7 @@ import concurrent.futures
 import json
 import logging
 import socket
+import threading
 import time
 import webbrowser
 from collections import deque
@@ -257,9 +258,14 @@ class Client:
             else:
                 raise e
 
-    def workspace_heartbeat_keepalive(self, workspace_name: str) -> None:
+    def workspace_heartbeat_keepalive(
+        self, workspace_name: str, quit: threading.Event
+    ) -> None:
         """Tries to post a heartbeat to the server every 5 seconds"""
         while True:
+            if quit.is_set():
+                logging.debug("Heartbeat keepalive thread closing")
+                return
             try:
                 self.workspace_post_heartbeat(workspace_name)
             except (
@@ -275,12 +281,13 @@ class Client:
 
     def workspace_heartbeat_keepalive_connect(
         self, workspace_name: str
-    ) -> concurrent.futures.Future[None]:
+    ) -> threading.Event:
         """Starts a background thread to post heartbeats to the server so it
         knows when a client is alive"""
         executor = concurrent.futures.ThreadPoolExecutor()
-        future = executor.submit(self.workspace_heartbeat_keepalive, workspace_name)
-        return future
+        quit = threading.Event()
+        executor.submit(self.workspace_heartbeat_keepalive, workspace_name, quit)
+        return quit
 
     def workspace_post_event(
         self,
