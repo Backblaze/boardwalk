@@ -391,41 +391,33 @@ class WorkspaceCatchHandler(UIBaseHandler):
     def post(self, workspace: str):
         try:
             state.workspaces[workspace].semaphores.caught = True
-
-            # Record who clicked the catch button
-            cur_user = self.current_user.decode()
-            payload = {
-                "severity": "info",
-                "message": f"Workspace caught by {cur_user}",
-            }
-            event = WorkspaceEvent.parse_obj(payload)
-            event.received_time = datetime.utcnow()
-            state.workspaces[workspace].events.append(event)
-
-            state.flush()
-            return self.render("index_workspace_release.html", workspace_name=workspace)
         except KeyError:
             return self.send_error(404)
+
+        # Record who clicked the catch button
+        cur_user = self.current_user.decode()
+        event = WorkspaceEvent(
+            severity="info", message=f"Workspace caught by {cur_user}"
+        )
+        internal_workspace_event(workspace, event)
+
+        return self.render("index_workspace_release.html", workspace_name=workspace)
 
     @tornado.web.authenticated
     def delete(self, workspace: str):
         try:
             state.workspaces[workspace].semaphores.caught = False
-
-            # Record who clicked the release button
-            cur_user = self.current_user.decode()
-            payload = {
-                "severity": "info",
-                "message": f"Workspace released by {cur_user}",
-            }
-            event = WorkspaceEvent.parse_obj(payload)
-            event.received_time = datetime.utcnow()
-            state.workspaces[workspace].events.append(event)
-
-            state.flush()
-            return self.render("index_workspace_catch.html", workspace_name=workspace)
         except KeyError:
             return self.send_error(404)
+
+        # Record who clicked the release button
+        cur_user = self.current_user.decode()
+        event = WorkspaceEvent(
+            severity="info", message=f"Workspace released by {cur_user}"
+        )
+        internal_workspace_event(workspace, event)
+
+        return self.render("index_workspace_catch.html", workspace_name=workspace)
 
 
 class WorkspaceEventsHandler(UIBaseHandler):
@@ -682,6 +674,18 @@ class WorkspaceDetailsApiHandler(APIBaseHandler):
         state.workspaces[workspace].last_seen = datetime.utcnow()
         state.flush()
 
+        # Log the updated details to the events table
+        workspace_details = state.workspaces[workspace].details
+        message = (
+            "Workspace client details:"
+            f" Workflow: {workspace_details.workflow},"
+            f" Worker: {workspace_details.worker_username}@{workspace_details.worker_hostname},"
+            f" Host Pattern: {workspace_details.host_pattern},"
+            f" Command: {workspace_details.worker_command}"
+        )
+        event = WorkspaceEvent(severity="info", message=message)
+        internal_workspace_event(workspace, event)
+
 
 class WorkspaceHeartbeatApiHandler(APIBaseHandler):
     """Handles receiving heartbeats from workers"""
@@ -813,6 +817,19 @@ def log_request(handler: tornado.web.RequestHandler):
         username,
         request_time,
     )
+
+
+def internal_workspace_event(workspace: str, event: WorkspaceEvent):
+    """
+    Appends an internally-generated workspace event to the state and logs to the
+    application log
+    """
+    event.received_time = datetime.utcnow()
+    state.workspaces[workspace].events.append(event)
+    app_log.info(
+        f"internal_workspace_event: {workspace} {event.severity} {event.message}"
+    )
+    state.flush()
 
 
 def make_app(
