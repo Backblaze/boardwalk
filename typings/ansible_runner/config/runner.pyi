@@ -56,7 +56,7 @@ class RunnerConfig(BaseConfig):
         cmdline=...,
         omit_event_data=...,
         only_failed_event_data=...,
-        **kwargs
+        **kwargs,
     ) -> None: ...
     @property
     def sandboxed(self): ...

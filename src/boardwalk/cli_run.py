@@ -657,7 +657,8 @@ def directly_confirm_host_preconditions(
 ) -> bool:
     """Connects directly to the host and confirms that the workflow job preconditions
     are actually met. Raises an exception if any are unmet. If a workflow was run but
-    never completed, preconditions are ignored. Also posts events to the central server"""
+    never completed, preconditions are ignored. Also posts events to the central server
+    """
     if boardwalkd_client:
         boardwalkd_client.queue_event(
             WorkspaceEvent(
