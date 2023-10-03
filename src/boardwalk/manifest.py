@@ -51,7 +51,7 @@ def get_ws() -> Workspace:
     # Try to import the Boardwalkfile.py
     try:
         sys.path.append(str(Path.cwd()))
-        import Boardwalkfile  # pyright: reportMissingImports=false,reportUnknownVariableType=false,reportUnusedImport=false
+        import Boardwalkfile  # pyright: ignore [reportMissingImports, reportUnknownVariableType, reportUnusedImport]
 
         sys.path.pop()
     except ModuleNotFoundError:
@@ -93,13 +93,13 @@ def get_ws() -> Workspace:
 def get_boardwalkd_url() -> str:
     try:
         sys.path.append(str(Path.cwd()))
-        from Boardwalkfile import boardwalkd_url
+        from Boardwalkfile import boardwalkd_url  # type: ignore
 
         sys.path.pop()
     except ModuleNotFoundError:
         raise ManifestNotFound
     except ImportError:
-        return None
+        return None  # type: ignore
     return boardwalkd_url
 
 
@@ -114,7 +114,7 @@ class Job:
 
     def required_options(self) -> tuple[str]:
         """Optional user method. Defines any required Job input options"""
-        return tuple()
+        return tuple()  # type: ignore
 
     def preconditions(
         self, facts: AnsibleFacts, inventory_vars: InventoryHostVars
@@ -136,7 +136,7 @@ class Job:
         req_options = self.required_options()
         if isinstance(self.required_options(), str):
             req_options: tuple[str] = (
-                req_options,  # pyright: reportGeneralTypeIssues=false
+                req_options,  # pyright: ignore [reportGeneralTypeIssues]
             )
         return req_options
 

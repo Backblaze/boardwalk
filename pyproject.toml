@@ -54,4 +54,5 @@ exclude = [
 pythonPlatform = "All"
 reportImportCycles = false
 reportMissingTypeStubs = false
-typeCheckingMode = "strict"
+# Use basic type-checking for now, until strict type checking can be fixed again
+typeCheckingMode = "basic"

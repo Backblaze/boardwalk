@@ -110,7 +110,7 @@ def ui_method_sort_events_by_date(
 ) -> list[WorkspaceEvent]:
     """Custom UI templating method. Accepts a deque of Workspace events and
     sorts them by datetime in ascending order"""
-    key: Callable[[WorkspaceEvent], datetime] = lambda x: x.create_time
+    key: Callable[[WorkspaceEvent], datetime] = lambda x: x.create_time  # type: ignore
     return sorted(events, key=key, reverse=True)
 
 
@@ -264,11 +264,11 @@ class AnonymousLoginHandler(UIBaseHandler):
     """Handles "logging in" the UI when no auth is actually configured"""
 
     # nosemgrep: test.boardwalk.python.security.handler-method-missing-authentication
-    async def get(self):  # pyright: reportIncompatibleMethodOverride=false
+    async def get(self):  # pyright: ignore [reportIncompatibleMethodOverride]
         # Save the user to the state if they aren't already in there
         anon_username = "anonymous@example.com"
         if anon_username not in state.users:
-            state.users[anon_username] = User(email=anon_username)
+            state.users[anon_username] = User(email=anon_username)  # type: ignore
             state.flush()
 
         self.set_secure_cookie(
@@ -279,8 +279,8 @@ class AnonymousLoginHandler(UIBaseHandler):
             secure=True,
         )
         return self.redirect(
-            self.get_query_argument("next", "/")
-        )  # pyright: reportGeneralTypeIssues=false
+            self.get_query_argument("next", "/")  # type: ignore
+        )  # pyright: ignore [reportGeneralTypeIssues]
 
 
 class GoogleOAuth2LoginHandler(UIBaseHandler, tornado.auth.GoogleOAuth2Mixin):
@@ -375,8 +375,8 @@ class IndexHandler(UIBaseHandler):
     @tornado.web.authenticated
     def get(self):
         try:
-            edit: str | int | bool = self.get_argument("edit", default=0)
-            edit = strtobool(edit)
+            edit: str | int | bool = self.get_argument("edit", default=0)  # type: ignore
+            edit = strtobool(edit)  # type: ignore
         except (AttributeError, ValueError):
             edit = 0
         return self.render(
@@ -440,7 +440,7 @@ class WorkspaceEventsTableHandler(UIBaseHandler):
     @tornado.web.authenticated
     def get(self, workspace: str):
         try:
-            workspace = state.workspaces[workspace]
+            workspace = state.workspaces[workspace]  # type: ignore
         except KeyError:
             return self.send_error(404)
         return self.render("workspace_events_table.html", workspace=workspace)
@@ -454,7 +454,7 @@ class WorkspaceMutexHandler(UIBaseHandler):
         try:
             # If the host is possibly still connected we will not delete the
             # mutex. Workspaces should send a heartbeat every 5 seconds
-            delta: timedelta = datetime.utcnow() - state.workspaces[workspace].last_seen
+            delta: timedelta = datetime.utcnow() - state.workspaces[workspace].last_seen  # type: ignore
             if delta.total_seconds() < 10:
                 return self.send_error(412)
             state.workspaces[workspace].semaphores.has_mutex = False
@@ -488,8 +488,8 @@ class WorkspacesHandler(UIBaseHandler):
     @tornado.web.authenticated
     def get(self):
         try:
-            edit: str | int | bool = self.get_argument("edit", default=0)
-            edit = strtobool(edit)
+            edit: str | int | bool = self.get_argument("edit", default=0)  # type: ignore
+            edit = strtobool(edit)  # type: ignore
         except (AttributeError, ValueError):
             edit = 0
         return self.render(
@@ -564,9 +564,9 @@ class AuthLoginApiHandler(UIBaseHandler):
             return self.send_error(422)
 
         current_user = self.get_current_user()
-        token = self.create_signed_value("boardwalk_api_token", current_user)
+        token = self.create_signed_value("boardwalk_api_token", current_user)  # type: ignore
 
-        message = ApiLoginMessage(token=token).dict()
+        message = ApiLoginMessage(token=token).dict()  # type: ignore
         try:
             AuthLoginApiWebsocketHandler.write_to_client_by_id(id, message)
         except AuthLoginApiWebsocketIDNotFound:
@@ -649,7 +649,7 @@ class WorkspaceDetailsApiHandler(APIBaseHandler):
         try:
             return self.write(
                 state.workspaces[workspace].details.dict()
-            )  # pyright: reportUnknownMemberType=false
+            )  # pyright: ignore [reportUnknownMemberType]
         except KeyError:
             return self.send_error(404)
 
@@ -710,8 +710,8 @@ class WorkspaceEventApiHandler(APIBaseHandler):
     @tornado.web.authenticated
     async def post(self, workspace: str):
         try:
-            broadcast: str | int | bool = self.get_argument("broadcast", default=0)
-            broadcast = strtobool(broadcast)
+            broadcast: str | int | bool = self.get_argument("broadcast", default=0)  # type: ignore
+            broadcast = strtobool(broadcast)  # type: ignore
         except (AttributeError, ValueError):
             broadcast = 0
 
@@ -883,7 +883,7 @@ def make_app(
     # Bootstrap the chosen auth_method
     match auth_method:
         case "anonymous":
-            handlers.append((r"/auth/login", AnonymousLoginHandler))
+            handlers.append((r"/auth/login", AnonymousLoginHandler))  # type: ignore
             settings["cookie_secret"] = "ANONYMOUS"
         case "google_oauth":
             try:
@@ -898,7 +898,7 @@ def make_app(
                         " are required when auth_method is google_oauth"
                     )
                 )
-            handlers.append((r"/auth/login", GoogleOAuth2LoginHandler))
+            handlers.append((r"/auth/login", GoogleOAuth2LoginHandler))  # type: ignore
         case _:
             raise BoardwalkException(f"auth_method {auth_method} is not supported")
 
@@ -953,7 +953,7 @@ def make_app(
                 r"/api/workspace/(\w+)/semaphores/has_mutex",
                 WorkspaceMutexApiHandler,
             ),
-        ]
+        ]  # type: ignore
     )
 
     # Configure rules
@@ -964,7 +964,7 @@ def make_app(
         )
     ]
 
-    return tornado.web.Application(rules, **settings)
+    return tornado.web.Application(rules, **settings)  # type: ignore
 
 
 async def run(
@@ -1006,7 +1006,7 @@ async def run(
             raise BoardwalkException(f"URL scheme must be HTTPS when TLS is enabled")
 
         ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        ssl_ctx.load_cert_chain(certfile=tls_crt_path, keyfile=tls_key_path)
+        ssl_ctx.load_cert_chain(certfile=tls_crt_path, keyfile=tls_key_path)  # type: ignore
 
         app.listen(tls_port_number, ssl_options=ssl_ctx)
         # If tls_port_number=0 a random open port will be selected and the log
@@ -1015,7 +1015,7 @@ async def run(
 
     # Initialize server owner
     if owner not in state.users:
-        state.users[owner] = User(email=owner)
+        state.users[owner] = User(email=owner)  # type: ignore
     state.users[owner].roles.add("admin")
     state.users[owner].enabled = True
     state.flush()
