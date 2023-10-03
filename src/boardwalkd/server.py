@@ -202,7 +202,7 @@ class UserRoleHandler(AdminUIBaseHandler):
             return self.send_error(406)
 
         try:
-            User.validate_roles({role})
+            User.validate_roles({role})  # type: ignore
         except ValueError:
             app_log.warning(f"Invalid role {role}")
             return self.send_error(422)
@@ -241,7 +241,7 @@ class UserRoleHandler(AdminUIBaseHandler):
             return self.send_error(406)
 
         try:
-            User.validate_roles({role})
+            User.validate_roles({role})  # type: ignore
         except ValueError:
             app_log.warning(f"Invalid role {role}")
             return self.send_error(422)
