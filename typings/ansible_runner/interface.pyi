@@ -200,7 +200,7 @@ def init_plugin_docs_config(
     snippet=...,
     playbook_dir=...,
     module_path=...,
-    **kwargs
+    **kwargs,
 ):  # -> Runner:
     """
     Initialize the Runner() instance
@@ -219,7 +219,7 @@ def get_plugin_docs(
     snippet=...,
     playbook_dir=...,
     module_path=...,
-    **kwargs
+    **kwargs,
 ):  # -> tuple[Any | str, str]:
     """
     Run an ansible-doc command to get plugin docs  in the foreground and return a Runner object when complete.
@@ -322,7 +322,7 @@ def get_plugin_docs_async(
     snippet=...,
     playbook_dir=...,
     module_path=...,
-    **kwargs
+    **kwargs,
 ):  # -> tuple[Thread, Runner]:
     """
     Run an ansible-doc command in the background which will start immediately. Returns the thread object and a Runner object.
@@ -339,7 +339,7 @@ def get_plugin_list(
     plugin_type=...,
     playbook_dir=...,
     module_path=...,
-    **kwargs
+    **kwargs,
 ):  # -> tuple[Any | str, str]:
     """
     Run an ansible-doc command to get list of installed Ansible plugins.
@@ -443,7 +443,7 @@ def get_inventory(
     vault_password_file=...,
     output_file=...,
     export=...,
-    **kwargs
+    **kwargs,
 ):  # -> tuple[Any | str, str]:
     """
     Run an ansible-inventory command to get inventory related details.

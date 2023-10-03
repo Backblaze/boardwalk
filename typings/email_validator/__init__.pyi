@@ -71,7 +71,7 @@ def validate_email(
     test_environment: bool = ...,
     globally_deliverable: bool = ...,
     timeout: float = ...,
-    dns_resolver: dns.resolver.Resolver = ...
+    dns_resolver: dns.resolver.Resolver = ...,
 ) -> ValidatedEmail:
     """
     Validates an email address, raising an EmailNotValidError if the address is not valid or returning a dict of
