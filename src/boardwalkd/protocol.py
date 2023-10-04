@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
-from pydantic import BaseModel, Extra, validator
+from pydantic import BaseModel, Extra, field_validator
 from tornado.httpclient import (
     HTTPClient,
     HTTPClientError,
@@ -64,7 +64,8 @@ class WorkspaceEvent(ProtocolBaseModel):
         if not self.create_time:
             self.create_time: datetime | None = datetime.utcnow()
 
-    @validator("severity")
+    @field_validator("severity")
+    @classmethod
     def severity_level(cls, v: str):
         if v not in ["info", "success", "error"]:
             raise ValueError(f"invalid severity level")

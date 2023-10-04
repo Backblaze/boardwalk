@@ -6,7 +6,7 @@ from collections import deque
 from datetime import datetime
 from pathlib import Path
 
-from pydantic import BaseModel, EmailStr, Extra, validator
+from pydantic import BaseModel, EmailStr, Extra, field_validator
 
 from boardwalkd.protocol import WorkspaceDetails, WorkspaceEvent, WorkspaceSemaphores
 
@@ -27,7 +27,8 @@ class User(StateBaseModel):
     email: EmailStr
     roles: set[str] = {"default"}
 
-    @validator("roles")
+    @field_validator("roles")
+    @classmethod
     def validate_roles(cls, input_roles: set[str]):
         for role in input_roles:
             if role not in valid_user_roles:
@@ -46,7 +47,8 @@ class WorkspaceState(StateBaseModel):
     events: deque[WorkspaceEvent] = deque([], maxlen=_max_workspace_events)
     semaphores: WorkspaceSemaphores = WorkspaceSemaphores()
 
-    @validator("events")
+    @field_validator("events")
+    @classmethod
     def validate_events(
         cls, input_events: deque[WorkspaceEvent]
     ) -> deque[WorkspaceEvent]:
@@ -54,7 +56,10 @@ class WorkspaceState(StateBaseModel):
         Pydantic won't persist the maxlen argument for deque when cold loading
         from the statefile. This forces events to always be returned with maxlen
         """
-        return deque(input_events, maxlen=cls._max_workspace_events)
+        # TODO: Figure out how to access the value here without using `.default` and needing
+        # to ignore type errors; how do you extract an int from a ModelPrivateAttr?
+        _max_events = cls._max_workspace_events.default  # type: ignore
+        return deque(input_events, maxlen=_max_events)
 
 
 class State(StateBaseModel):
