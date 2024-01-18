@@ -1,5 +1,26 @@
 # Contributing
 
+Contributions are subject to GitHub’s Terms of Service and You accept and
+agree to the following for your present and future Contributions.
+
+1. License Grant: You hereby grant Backblaze, and any recipients or users of
+the Backblaze open source software (as may be modified by your Contribution),
+a non-exclusive, perpetual, irrevocable, worldwide, royalty-free,
+sublicensable license to use, reproduce, distribute, modify, create derivative
+works of, publicly display, publicly perform, and otherwise use your
+Contributions on any terms Backblaze or such users, deem appropriate.
+
+3. Representations and Warranties: You represent and warrant that you have the
+necessary rights to grant the rights described herein and that your
+Contribution does not violate any third-party rights or applicable laws.
+Except as stated in the previous sentence, the contribution is submitted
+“AS IS” and the Contributor disclaims all warranties with regard to the
+contribution.
+
+3. Except for the license granted herein to Backblaze and to recipients and
+users of the Backblaze open source software, You reserve all right, title, and
+interest in and to your Contributions.
+
 ## Bug Reports & Feature Requests
 
 Bug reports and feature requests are really helpful. Head over to
@@ -46,7 +67,7 @@ See the content of the Makefile for other useful targets.
 Automated tests are run with `make test`.
 
 Automated tests should be developed for cases that clearly improve Boardwalk's
-reliability, user and developer experience. Otherwise there is no specific
+reliability, user and developer experience. Otherwise, there is no specific
 enforcement of test coverage.
 
 ### Versioning

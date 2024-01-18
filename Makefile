@@ -6,7 +6,7 @@ build: dist
 container:
 	podman build . --tag boardwalk:$(shell cat VERSION | tr -d '\n')
 
-# Cleans up temporary data that might get created during normal devlopment
+# Cleans up temporary data that might get created during normal development
 .PHONY: clean
 clean:
 	rm -r \
