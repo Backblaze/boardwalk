@@ -136,7 +136,7 @@ class Job:
         req_options = self.required_options()
         if isinstance(self.required_options(), str):
             req_options: tuple[str] = (
-                req_options,  # pyright: ignore [reportGeneralTypeIssues]
+                req_options,  # pyright: ignore [reportGeneralTypeIssues, reportAssignmentType]
             )
         return req_options
 
