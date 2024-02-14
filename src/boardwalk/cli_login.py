@@ -1,6 +1,7 @@
 """
 login CLI subcommand
 """
+
 import asyncio
 
 import click

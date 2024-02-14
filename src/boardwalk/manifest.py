@@ -2,6 +2,7 @@
 This file has all of the classes and functions that are used in a
 Boardwalkfile.py
 """
+
 from __future__ import annotations
 
 import os

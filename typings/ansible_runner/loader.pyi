@@ -32,6 +32,7 @@ class ArtifactLoader:
             ConfigurationError: If the file cannot be loaded
         """
         ...
+
     def abspath(self, path):  # -> str:
         """
         Transform the path to an absolute path
@@ -43,6 +44,7 @@ class ArtifactLoader:
             string: The absolute path to the file
         """
         ...
+
     def isfile(self, path):  # -> bool:
         """
         Check if the path is a file
@@ -53,6 +55,7 @@ class ArtifactLoader:
         :returns: boolean
         """
         ...
+
     def load_file(
         self, path, objtype=..., encoding=...
     ):  # -> Any | bytes | str | None:

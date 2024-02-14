@@ -2,6 +2,7 @@
 This file defines models and helpers to support data that's persisted to a local
 state and survives service restarts
 """
+
 from collections import deque
 from datetime import datetime
 from pathlib import Path

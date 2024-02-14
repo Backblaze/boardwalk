@@ -2,6 +2,7 @@
 This file contains everything about what host data is stored and what can be
 done to hosts
 """
+
 from __future__ import annotations
 
 import getpass
@@ -29,8 +30,12 @@ class Host(BaseModel, extra=Extra.forbid):
     name: str
     meta: dict[str, str | int | bool] = {}
     remote_mutex_path: str = "/opt/boardwalk.mutex"
-    remote_alert_msg: str = "ALERT: Boardwalk is running a workflow against this host. Services may be interrupted"
-    remote_alert_string_formatted: str = f"$(tput -T xterm bold)$(tput -T xterm setaf 1)'{remote_alert_msg}'$(tput -T xterm sgr0)"
+    remote_alert_msg: str = (
+        "ALERT: Boardwalk is running a workflow against this host. Services may be interrupted"
+    )
+    remote_alert_string_formatted: str = (
+        f"$(tput -T xterm bold)$(tput -T xterm setaf 1)'{remote_alert_msg}'$(tput -T xterm sgr0)"
+    )
     remote_alert_motd: str = f"#!/bin/sh\necho {remote_alert_string_formatted}"
     remote_alert_motd_path: str = "/etc/update-motd.d/99-boardwalk-alert"
     remote_alert_wall_cmd: str = f"wall {remote_alert_string_formatted}"

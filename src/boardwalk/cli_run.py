@@ -1,6 +1,7 @@
 """
 run and check CLI subcommands
 """
+
 from __future__ import annotations
 
 import concurrent.futures

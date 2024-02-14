@@ -38,9 +38,11 @@ class Base64IO(io.IOBase):
         :raises TypeError: if ``wrapped`` does not have attributes needed to determine the stream's state
         """
         ...
+
     def __enter__(self) -> Base64IO:
         """Return self on enter."""
         ...
+
     def __exit__(
         self,
         exc_type: Optional[Type[BaseException]],
@@ -49,6 +51,7 @@ class Base64IO(io.IOBase):
     ) -> Literal[False]:
         """Properly close self on exit."""
         ...
+
     def close(self) -> None:
         """Close this stream, encoding and writing any buffered bytes is present.
 
@@ -57,6 +60,7 @@ class Base64IO(io.IOBase):
             This does **not** close the wrapped stream.
         """
         ...
+
     def writable(self) -> bool:
         """Determine if the stream can be written to.
 
@@ -66,6 +70,7 @@ class Base64IO(io.IOBase):
         :rtype: bool
         """
         ...
+
     def readable(self) -> bool:
         """Determine if the stream can be read from.
 
@@ -75,9 +80,11 @@ class Base64IO(io.IOBase):
         :rtype: bool
         """
         ...
+
     def flush(self) -> None:
         """Flush the write buffer of the wrapped stream."""
         ...
+
     def write(self, b: bytes) -> int:
         """Base64-encode the bytes and write them to the wrapped stream.
 
@@ -95,12 +102,14 @@ class Base64IO(io.IOBase):
         :raises IOError: if underlying stream is not writable
         """
         ...
+
     def writelines(self, lines: Iterable[bytes]) -> None:
         """Write a list of lines.
 
         :param list lines: Lines to write
         """
         ...
+
     def read(self, b: int = ...) -> bytes:
         """Read bytes from wrapped stream, base64-decoding before return.
 
@@ -114,9 +123,11 @@ class Base64IO(io.IOBase):
         :rtype: bytes
         """
         ...
+
     def __iter__(self):  # -> Self@Base64IO:
         """Let this class act as an iterator."""
         ...
+
     def readline(self, limit: int = ...) -> bytes:
         """Read and return one line from the stream.
 
@@ -131,6 +142,7 @@ class Base64IO(io.IOBase):
         :rtype: bytes
         """
         ...
+
     def readlines(self, hint: int = ...) -> List[bytes]:
         """Read and return a list of lines from the stream.
 
@@ -142,6 +154,7 @@ class Base64IO(io.IOBase):
         :rtype: list of bytes
         """
         ...
+
     def __next__(self) -> bytes:
         """Python 3 iterator hook."""
         ...
