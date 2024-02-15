@@ -1,6 +1,7 @@
 """
 workspace CLI subcommand group
 """
+
 import logging
 
 import click

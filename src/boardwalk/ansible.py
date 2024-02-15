@@ -1,6 +1,7 @@
 """
 This file has utilities for working with Ansible
 """
+
 from __future__ import annotations
 
 import json

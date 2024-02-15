@@ -1,6 +1,7 @@
 """
 catch and release CLI subcommands
 """
+
 import logging
 
 import click

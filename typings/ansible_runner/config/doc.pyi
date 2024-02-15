@@ -49,6 +49,7 @@ class DocConfig(BaseConfig):
         ansible-doc -t role -l -j <collection_name>
         """
         ...
+
     def prepare_role_argspec_command(
         self, role_name, collection_name, playbook_dir
     ):  # -> None:

@@ -1,6 +1,7 @@
 """
 Common application exception classes
 """
+
 import logging
 import typing
 

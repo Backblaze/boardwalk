@@ -1,6 +1,7 @@
 """
 This is the main file for handling the CLI
 """
+
 from __future__ import annotations
 
 import logging

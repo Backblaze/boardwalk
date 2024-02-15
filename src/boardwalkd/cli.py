@@ -1,6 +1,7 @@
 """
 This file contains the boardwalkd CLI code
 """
+
 import asyncio
 import logging
 import re

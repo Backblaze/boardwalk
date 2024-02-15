@@ -1,6 +1,7 @@
 """
 This file holds the state model
 """
+
 from pydantic import BaseModel, Extra
 
 from boardwalk.host import Host

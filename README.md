@@ -149,10 +149,17 @@ Boardwalk.
 
 ### Installation
 
+We recommend installing `boardwalk` in a [`pipx`](https://pipx.pypa.io/stable/)
+environment, to ensure that your system or user pip packages are not affected by
+Boardwalk's dependencies. Refer to `pipx`'s documentation for how to install it,
+and then execute the following commands:
 ```sh
-python3 -m pip install git+ssh://git@github.com/Backblaze/boardwalk.git
-# Optionally appending @<git reference> allows for installing specific commits,
+# Boardwalk depends on `ansible` in order to run.
+pipx install ansible>=6.5.0
+# Inject Boardwalk into the environment so it can use Ansible. Optionally,
+# appending an @<git reference> allows for installing specific commits,
 # branches, or tags.
+pipx inject ansible git+ssh://git@github.com/Backblaze/boardwalk.git
 ```
 
 __Note__:
