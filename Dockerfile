@@ -1,7 +1,9 @@
 FROM python:3.10 AS build
 WORKDIR /build
 COPY . .
-RUN make build
+RUN python3 -m pip install --user pipx \
+    && PATH=PATH:/root/.local/bin pipx install poetry \
+    && PATH=PATH:/root/.local/bin poetry build
 
 FROM python:3.10-slim
 COPY --from=build /build/dist ./dist
