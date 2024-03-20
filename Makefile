@@ -27,14 +27,14 @@ develop:
 .PHONY: develop-server
 develop-server: develop
 ifdef BOARDWALKD_SLACK_WEBHOOK_URL
-	boardwalkd serve \
+	poetry run boardwalkd serve \
 		--develop \
 		--host-header-pattern="(localhost|127\.0\.0\.1)" \
 		--port=8888 \
 		--slack-webhook-url="$(BOARDWALKD_SLACK_WEBHOOK_URL)" \
 		--url='http://localhost:8888'
 else
-	boardwalkd serve \
+	poetry run boardwalkd serve \
 		--develop \
 		--host-header-pattern="(localhost|127\.0\.0\.1)" \
 		--port=8888 \
@@ -47,9 +47,9 @@ dist: clean
 # Applys project's required code style
 .PHONY: format
 format:
-	black .
+	poetry run black .
 	@# This is a workaround for https://github.com/facebook/usort/issues/216
-	LIBCST_PARSER_TYPE=native usort format .
+	LIBCST_PARSER_TYPE=native poetry run usort format .
 
 # Installs modules to the local system (via pipx; will need Ansible injected)
 .PHONY: install
@@ -74,25 +74,30 @@ test: test-black test-pyright test-semgrep test-usort
 # Test that code is formatted with black
 .PHONY: test-black
 test-black: develop
-	black . --check
+	poetry run black . --check
 
 # Perform type analysis
 .PHONY: test-pyright
 test-pyright: develop
-	PYRIGHT_PYTHON_FORCE_VERSION=latest pyright
+	export PYRIGHT_PYTHON_FORCE_VERSION=latest
+	poetry run pyright
 
 # Perform security static analysis
 .PHONY: test-semgrep
 test-semgrep: develop
-	semgrep \
+ifndef GITHUB_ACTIONS
+	poetry run semgrep \
 		--config test/semgrep-rules.yml \
 		--config "p/r2c-security-audit" \
 		--config "p/r2c-bug-scan" \
 		--config "p/secrets" \
 		--config "p/dockerfile"
+else
+	echo Semgrep will run in its own GitHub Actions job.
+endif
 
 # Ensure imports are formatted in a uniform way
 .PHONY: test-usort
 test-usort: develop
 	@# This is a workaround for https://github.com/facebook/usort/issues/216
-	LIBCST_PARSER_TYPE=native usort check .
+	LIBCST_PARSER_TYPE=native poetry run usort check .

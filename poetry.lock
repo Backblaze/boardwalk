@@ -1370,13 +1370,13 @@ zstd = ["zstandard (>=0.18.0)"]
 
 [[package]]
 name = "usort"
-version = "1.0.8"
+version = "1.0.8.post1"
 description = "A small, safe import sorter"
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "usort-1.0.8-py3-none-any.whl", hash = "sha256:74be3025e15b93a0dc1caf21e764566621058f7bcdb255422021f2825cc761d9"},
-    {file = "usort-1.0.8.tar.gz", hash = "sha256:ec611778ccecdf512e13d0588cc2d5235d142b7ce40d4971d47df505b78950bd"},
+    {file = "usort-1.0.8.post1-py3-none-any.whl", hash = "sha256:6c57cdf17b458c79f8a61eb3ce8bf3f93e36d3c2edd602b9b2aa16b6875d3255"},
+    {file = "usort-1.0.8.post1.tar.gz", hash = "sha256:68def75f2b20b97390c552c503e071ee06c65ad502c5f94f3bd03f095cf4dfe6"},
 ]
 
 [package.dependencies]
@@ -1405,4 +1405,4 @@ bracex = ">=2.1.1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<4"
-content-hash = "214f5beb9fc738a7528df0e6b542aa47f4fabde1f0cafde03831500ecbb02e3a"
+content-hash = "aba1a4f5e7a2c0c305952af99f32c7fac3149c5fd18e6cb65fa66162ee85b4f6"

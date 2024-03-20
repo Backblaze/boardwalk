@@ -43,10 +43,10 @@ pydantic = ">=2.4.2"
 tornado = ">=6.2"
 
 [tool.poetry.group.dev.dependencies]
-black = "==24.3.0"
+black = ">=24.3.0"
 pyright = "==1.1.350"
 semgrep = ">=1.66.0"
-usort = "==1.0.8"
+usort = ">=1.0.8.post1"
 
 [tool.poetry.scripts]
 boardwalk = "boardwalk.cli:cli"
