@@ -76,16 +76,10 @@ jobs:
       #----------------------------------------------
       #              run test suite
       #----------------------------------------------
-      # Check code formatting
-      - run: make test-black
+      # Check code formatting and import sorting
+      - run: make test-ruff
 
       # Commented out because we're planning on switching to a different static
       # typechecker, and frankly whatever is taking pyright _minutes_ to run is
       # a little excessive, for now.
       # - run: make test-pyright
-
-      # Commented out because I have zero idea why GitHub Actions has an error,
-      # but locally it does not. Black also does import formatting, so this isn't
-      # terribly important (for now); maybe isort? Black does call out that it is
-      # compatible.
-      # - run: make test-usort

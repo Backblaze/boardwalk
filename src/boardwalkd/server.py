@@ -111,7 +111,7 @@ def ui_method_sort_events_by_date(
 ) -> list[WorkspaceEvent]:
     """Custom UI templating method. Accepts a deque of Workspace events and
     sorts them by datetime in ascending order"""
-    key: Callable[[WorkspaceEvent], datetime] = lambda x: x.create_time  # type: ignore
+    key: Callable[[WorkspaceEvent], datetime] = lambda x: x.create_time  # type: ignore # noqa: E731
     return sorted(events, key=key, reverse=True)
 
 
@@ -648,9 +648,7 @@ class WorkspaceDetailsApiHandler(APIBaseHandler):
     @tornado.web.authenticated
     def get(self, workspace: str):
         try:
-            return self.write(
-                state.workspaces[workspace].details.dict()
-            )  # pyright: ignore [reportUnknownMemberType]
+            return self.write(state.workspaces[workspace].details.dict())  # pyright: ignore [reportUnknownMemberType]
         except KeyError:
             return self.send_error(404)
 
@@ -1004,7 +1002,7 @@ async def run(
 
     if tls_port_number is not None:
         if urlparse(url).scheme != "https":
-            raise BoardwalkException(f"URL scheme must be HTTPS when TLS is enabled")
+            raise BoardwalkException("URL scheme must be HTTPS when TLS is enabled")
 
         ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_ctx.load_cert_chain(certfile=tls_crt_path, keyfile=tls_key_path)  # type: ignore

@@ -69,7 +69,7 @@ class WorkspaceEvent(ProtocolBaseModel):
     @classmethod
     def severity_level(cls, v: str):
         if v not in ["info", "success", "error"]:
-            raise ValueError(f"invalid severity level")
+            raise ValueError("invalid severity level")
         return v
 
 
@@ -111,7 +111,7 @@ class Client:
             case _:
                 raise ValueError(f"{self.url.scheme} is not a valid url scheme")
 
-        websocket_url = urljoin(websocket_url.geturl(), f"/api/auth/login/socket")
+        websocket_url = urljoin(websocket_url.geturl(), "/api/auth/login/socket")
         conn = await websocket_connect(websocket_url)
         while True:
             msg = await conn.read_message()

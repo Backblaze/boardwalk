@@ -43,14 +43,18 @@ pydantic = ">=2.4.2"
 tornado = ">=6.2"
 
 [tool.poetry.group.dev.dependencies]
-black = ">=24.3.0"
 pyright = "==1.1.350"
 semgrep = ">=1.66.0"
-usort = ">=1.0.8.post1"
+ruff = "^0.3.4"
 
 [tool.poetry.scripts]
 boardwalk = "boardwalk.cli:cli"
 boardwalkd = "boardwalkd.cli:cli"
+
+[tool.ruff]
+extend-exclude = [
+    "typings/*",
+]
 
 [tool.pyright]
 exclude = [
