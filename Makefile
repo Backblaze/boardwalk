@@ -44,12 +44,11 @@ endif
 dist: clean
 	poetry build
 
-# Applys project's required code style
+# Applies fixable errors, and formats code
 .PHONY: format
 format:
-	poetry run black .
-	@# This is a workaround for https://github.com/facebook/usort/issues/216
-	LIBCST_PARSER_TYPE=native poetry run usort format .
+	poetry run ruff check --fix
+	poetry run ruff format
 
 # Installs modules to the local system (via pipx; will need Ansible injected)
 .PHONY: install
@@ -69,12 +68,21 @@ install-web-deps:
 
 # Runs all available tests
 .PHONY: test
-test: test-black test-pyright test-semgrep test-usort
+test: test-ruff test-pyright test-semgrep
 
-# Test that code is formatted with black
-.PHONY: test-black
-test-black: develop
-	poetry run black . --check
+# Run all available Ruff checks
+.PHONY: test-ruff
+test-ruff: test-ruff-linters test-ruff-formatting
+
+# Run all available Ruff linter checks
+.PHONY: test-ruff-linters
+test-ruff-linters: develop
+	poetry run ruff check
+
+# Run all available Ruff formatting checks
+.PHONY: test-ruff-formatting
+test-ruff-formatting: develop
+	poetry run ruff format --check
 
 # Perform type analysis
 .PHONY: test-pyright
@@ -95,9 +103,3 @@ ifndef GITHUB_ACTIONS
 else
 	echo Semgrep will run in its own GitHub Actions job.
 endif
-
-# Ensure imports are formatted in a uniform way
-.PHONY: test-usort
-test-usort: develop
-	@# This is a workaround for https://github.com/facebook/usort/issues/216
-	LIBCST_PARSER_TYPE=native poetry run usort check .

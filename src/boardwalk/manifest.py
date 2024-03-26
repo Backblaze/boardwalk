@@ -52,7 +52,7 @@ def get_ws() -> Workspace:
     # Try to import the Boardwalkfile.py
     try:
         sys.path.append(str(Path.cwd()))
-        import Boardwalkfile  # pyright: ignore [reportMissingImports, reportUnknownVariableType, reportUnusedImport]
+        import Boardwalkfile  # pyright: ignore [reportMissingImports, reportUnknownVariableType, reportUnusedImport]  # noqa: F401
 
         sys.path.pop()
     except ModuleNotFoundError:
