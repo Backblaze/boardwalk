@@ -74,8 +74,11 @@ jobs:
       # - run: poetry add ansible --no-interaction
 
       #----------------------------------------------
-      #              run test suite
+      #              run test suites
       #----------------------------------------------
+      # Run pytest
+      - run: make test-pytest
+
       # Check code formatting and import sorting
       - run: make test-ruff
 

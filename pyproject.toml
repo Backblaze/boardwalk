@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "boardwalk"
-version = "0.8.15"
+version = "0.8.16"
 description = "Boardwalk is a linear Ansible workflow engine"
 readme = "README.md"
 authors = [
@@ -46,6 +46,7 @@ tornado = ">=6.2"
 pyright = "==1.1.350"
 semgrep = ">=1.66.0"
 ruff = "^0.3.4"
+pytest = "^8.1.1"
 
 [tool.poetry.scripts]
 boardwalk = "boardwalk.cli:cli"
@@ -54,6 +55,9 @@ boardwalkd = "boardwalkd.cli:cli"
 [tool.ruff]
 extend-exclude = [
     "typings/*",
+]
+lint.extend-select = [
+    "I",
 ]
 
 [tool.pyright]

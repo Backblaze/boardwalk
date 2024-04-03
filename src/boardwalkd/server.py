@@ -5,7 +5,6 @@ This file contains the main HTTP server code
 from __future__ import annotations
 
 import asyncio
-
 import atexit
 import hashlib
 import json
@@ -16,7 +15,6 @@ import ssl
 import string
 from collections import deque
 from datetime import datetime, timedelta
-from distutils.util import strtobool
 from importlib.metadata import version as lib_version
 from pathlib import Path
 from typing import Any, Callable
@@ -27,6 +25,7 @@ import tornado.httpclient
 import tornado.web
 import tornado.websocket
 from boardwalk.app_exceptions import BoardwalkException
+from boardwalk.utils import strtobool
 from cryptography.fernet import Fernet
 from pydantic import ValidationError
 from tornado.escape import url_escape, url_unescape
@@ -35,7 +34,7 @@ from tornado.routing import HostMatches
 
 from boardwalkd.broadcast import handle_slack_broadcast
 from boardwalkd.protocol import ApiLoginMessage, WorkspaceDetails, WorkspaceEvent
-from boardwalkd.state import load_state, User, valid_user_roles, WorkspaceState
+from boardwalkd.state import User, WorkspaceState, load_state, valid_user_roles
 
 module_dir = Path(__file__).resolve().parent
 state = load_state()

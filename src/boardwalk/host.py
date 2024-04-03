@@ -9,7 +9,7 @@ import getpass
 import socket
 from base64 import b64decode
 from datetime import datetime
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Extra
 

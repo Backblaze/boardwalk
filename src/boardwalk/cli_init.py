@@ -5,22 +5,21 @@ init CLI subcommand
 from __future__ import annotations
 
 import logging
-
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
 import click
 
 from boardwalk.ansible import (
-    ansible_runner_run_tasks,
     AnsibleRunError,
     AnsibleRunnerFailedHost,
     AnsibleRunnerGeneralError,
     AnsibleRunnerUnreachableHost,
+    ansible_runner_run_tasks,
 )
 from boardwalk.app_exceptions import BoardwalkException
 from boardwalk.host import Host
-from boardwalk.manifest import get_ws, NoActiveWorkspace, Workspace
+from boardwalk.manifest import NoActiveWorkspace, Workspace, get_ws
 
 if TYPE_CHECKING:
     from ansible_runner import RunnerEvent

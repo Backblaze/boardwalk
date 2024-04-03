@@ -7,7 +7,7 @@ import logging
 import click
 
 from boardwalk.app_exceptions import BoardwalkException
-from boardwalk.manifest import get_ws, NoActiveWorkspace
+from boardwalk.manifest import NoActiveWorkspace, get_ws
 
 logger = logging.getLogger(__name__)
 

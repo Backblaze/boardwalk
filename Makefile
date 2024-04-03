@@ -16,8 +16,10 @@ clean:
 		src/boardwalkd/__pycache__ \
 		.boardwalk \
 		.boardwalkd \
+		.pytest_cache \
+		.ruff_cache \
 		|| :
-	podman image rm localhost/boardwalk || :
+	podman image rm $$(podman images 'localhost/boardwalk' --quiet) || :
 
 # Installs modules in editable mode
 .PHONY: develop
@@ -68,7 +70,12 @@ install-web-deps:
 
 # Runs all available tests
 .PHONY: test
-test: test-ruff test-pyright test-semgrep
+test: test-pytest test-ruff test-pyright test-semgrep
+
+# Run pytest
+.PHONY: test-pytest
+test-pytest: develop
+	poetry run pytest
 
 # Run all available Ruff checks
 .PHONY: test-ruff
