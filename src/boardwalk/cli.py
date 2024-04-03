@@ -8,25 +8,24 @@ import logging
 import os
 import signal
 import sys
-from distutils.util import strtobool
 from importlib.metadata import version as lib_version
-from typing import Literal, TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import click
 
 from boardwalk.app_exceptions import BoardwalkException
-
 from boardwalk.cli_catch import catch, release
 from boardwalk.cli_init import init
 from boardwalk.cli_login import login
 from boardwalk.cli_run import check, run
 from boardwalk.cli_workspace import workspace
 from boardwalk.manifest import (
-    get_ws,
     ManifestNotFound,
     NoActiveWorkspace,
     WorkspaceNotFound,
+    get_ws,
 )
+from boardwalk.utils import strtobool
 
 if TYPE_CHECKING:
     from typing import Any

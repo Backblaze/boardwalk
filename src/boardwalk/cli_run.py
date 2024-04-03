@@ -12,7 +12,6 @@ import random
 import socket
 import sys
 import time
-from distutils.util import strtobool
 from itertools import chain
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -29,18 +28,19 @@ from tornado.httpclient import HTTPClientError
 from tornado.simple_httpclient import HTTPTimeoutError
 
 from boardwalk.ansible import (
-    ansible_inventory,
-    ansible_runner_errors_to_output,
     AnsibleRunError,
     AnsibleRunnerBaseException,
     AnsibleRunnerFailedHost,
     AnsibleRunnerGeneralError,
     AnsibleRunnerUnreachableHost,
+    ansible_inventory,
+    ansible_runner_errors_to_output,
 )
 from boardwalk.app_exceptions import BoardwalkException
 from boardwalk.host import Host, RemoteHostLocked
-from boardwalk.manifest import get_boardwalkd_url, get_ws, NoActiveWorkspace, Workspace
+from boardwalk.manifest import NoActiveWorkspace, Workspace, get_boardwalkd_url, get_ws
 from boardwalk.state import RemoteStateModel, RemoteStateWorkflow, RemoteStateWorkspace
+from boardwalk.utils import strtobool
 
 if TYPE_CHECKING:
     from typing import ItemsView

@@ -1,4 +1,6 @@
 __pycache__/
+.pytest_cache/
+.ruff_cache/
 .boardwalk/
 .boardwalkd/
 .DS_store

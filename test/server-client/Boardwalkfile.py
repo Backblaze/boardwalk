@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-from boardwalk import Job, path, Workflow, Workspace, WorkspaceConfig
+from boardwalk import Job, Workflow, Workspace, WorkspaceConfig, path
 
 if TYPE_CHECKING:
     from boardwalk import AnsibleTasksType
