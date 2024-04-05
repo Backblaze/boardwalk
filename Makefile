@@ -33,7 +33,6 @@ ifdef BOARDWALKD_SLACK_WEBHOOK_URL
 		--develop \
 		--host-header-pattern="(localhost|127\.0\.0\.1)" \
 		--port=8888 \
-		--slack-webhook-url="$(BOARDWALKD_SLACK_WEBHOOK_URL)" \
 		--url='http://localhost:8888'
 else
 	poetry run boardwalkd serve \

@@ -15,6 +15,10 @@ from boardwalkd.server import run
 
 logging.basicConfig(level=logging.INFO)
 
+CONTEXT_SETTINGS: dict = dict(
+    auto_envvar_prefix="BOARDWALKD",
+)
+
 
 @click.group()
 def cli():
@@ -27,7 +31,7 @@ def cli():
     pass
 
 
-@cli.command()
+@cli.command(context_settings=CONTEXT_SETTINGS)
 @click.option(
     "--auth-expire-days",
     help=(
@@ -105,6 +109,7 @@ def cli():
     help="A Slack webhook URL to broadcast all key events to",
     type=str,
     default=None,
+    show_envvar=True,
 )
 @click.option(
     "--slack-error-webhook-url",
@@ -114,6 +119,7 @@ def cli():
     ),
     type=str,
     default=None,
+    show_envvar=True,
 )
 @click.option(
     "--tls-crt",
