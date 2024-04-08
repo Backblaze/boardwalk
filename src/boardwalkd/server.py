@@ -869,7 +869,7 @@ def make_app(
     # Set-up authentication
     if auth_method != "anonymous":
         try:
-            settings["cookie_secret"] = os.environ["BOARDWALK_SECRET"]
+            settings["cookie_secret"] = os.environ["BOARDWALKD_SECRET"]
         except KeyError:
             raise BoardwalkException(
                 (
@@ -886,13 +886,13 @@ def make_app(
         case "google_oauth":
             try:
                 settings["google_oauth"] = {
-                    "key": os.environ["BOARDWALK_GOOGLE_OAUTH_CLIENT_ID"],
-                    "secret": os.environ["BOARDWALK_GOOGLE_OAUTH_SECRET"],
+                    "key": os.environ["BOARDWALKD_GOOGLE_OAUTH_CLIENT_ID"],
+                    "secret": os.environ["BOARDWALKD_GOOGLE_OAUTH_SECRET"],
                 }
             except KeyError:
                 raise BoardwalkException(
                     (
-                        "BOARDWALK_GOOGLE_OAUTH_CLIENT_ID and BOARDWALK_GOOGLE_OAUTH_SECRET env vars"
+                        "BOARDWALKD_GOOGLE_OAUTH_CLIENT_ID and BOARDWALKD_GOOGLE_OAUTH_SECRET env vars"
                         " are required when auth_method is google_oauth"
                     )
                 )

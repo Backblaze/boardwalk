@@ -56,7 +56,7 @@ def cli():
         "All requests are performed as an 'anonymous' default user\n\n"
         "google_oauth\n\n"
         "Uses Google Oauth2 to identify users by their Google account email address."
-        " BOARDWALK_GOOGLE_OAUTH_CLIENT_ID and BOARDWALK_GOOGLE_OAUTH_SECRET"
+        " BOARDWALKD_GOOGLE_OAUTH_CLIENT_ID and BOARDWALKD_GOOGLE_OAUTH_SECRET"
         " environment variables must be set. The authorized redirect URI should be"
         " https://<hostname>/auth/login"
     ),
