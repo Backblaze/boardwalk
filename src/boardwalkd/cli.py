@@ -15,6 +15,10 @@ from boardwalkd.server import run
 
 logging.basicConfig(level=logging.INFO)
 
+CONTEXT_SETTINGS: dict = dict(
+    auto_envvar_prefix="BOARDWALKD",
+)
+
 
 @click.group()
 def cli():
@@ -27,7 +31,7 @@ def cli():
     pass
 
 
-@cli.command()
+@cli.command(context_settings=CONTEXT_SETTINGS)
 @click.option(
     "--auth-expire-days",
     help=(
@@ -52,7 +56,7 @@ def cli():
         "All requests are performed as an 'anonymous' default user\n\n"
         "google_oauth\n\n"
         "Uses Google Oauth2 to identify users by their Google account email address."
-        " BOARDWALK_GOOGLE_OAUTH_CLIENT_ID and BOARDWALK_GOOGLE_OAUTH_SECRET"
+        " BOARDWALKD_GOOGLE_OAUTH_CLIENT_ID and BOARDWALKD_GOOGLE_OAUTH_SECRET"
         " environment variables must be set. The authorized redirect URI should be"
         " https://<hostname>/auth/login"
     ),
@@ -105,6 +109,7 @@ def cli():
     help="A Slack webhook URL to broadcast all key events to",
     type=str,
     default=None,
+    show_envvar=True,
 )
 @click.option(
     "--slack-error-webhook-url",
@@ -114,6 +119,7 @@ def cli():
     ),
     type=str,
     default=None,
+    show_envvar=True,
 )
 @click.option(
     "--tls-crt",

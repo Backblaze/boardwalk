@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "boardwalk"
-version = "0.8.16"
+version = "0.8.17"
 description = "Boardwalk is a linear Ansible workflow engine"
 readme = "README.md"
 authors = [
