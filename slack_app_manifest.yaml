@@ -1,0 +1,51 @@
+display_information:
+  name: Boardwalk
+  description: Boardwalk is a linear Ansible workflow engine.
+  background_color: "#11359e"
+  long_description: "Boardwalk is a linear Ansible workflow engine. It's purpose-built to help systems engineers automate low-and-slow background jobs against large numbers of production hosts. It's ideal for rolling-maintenance jobs like kernel and operating system upgrades.\r
+
+    \r
+
+    This Slack application is intended to serve as a quick interface to one of the more common reasons one might visit the dashboard: that being to catch or release workspaces.\r
+
+    \r
+
+    License: MIT\r
+
+    Source code: https://github.com/Backblaze/boardwalk/"
+features:
+  app_home:
+    home_tab_enabled: true
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
+  bot_user:
+    display_name: Boardwalk
+    always_online: true
+  slash_commands:
+    - command: /brdwlk-version
+      description: Get the current version of Boardwalk
+      should_escape: false
+    - command: /brdwlk-catch-release
+      description: Catch or release workspace(s)
+      should_escape: false
+    - command: /brdwlk-list
+      description: List workspaces with an active worker
+      should_escape: false
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+      - commands
+      - im:write
+      - incoming-webhook
+      - users:read
+      - users:read.email
+settings:
+  event_subscriptions:
+    bot_events:
+      - app_home_opened
+  interactivity:
+    is_enabled: true
+  org_deploy_enabled: false
+  socket_mode_enabled: true
+  token_rotation_enabled: false

@@ -20,6 +20,17 @@ rules:
             ...
             self.set_secure_cookie(...)
             ...
+  - pattern-not: |  # So we can allow for opening Boardwalk if arriving from an external link and not enter a redirect loop
+      class $C(UIBaseHandler):
+        def $F(...):
+          ...
+          self.set_secure_cookie(
+             samesite="Lax",
+             secure=True,
+            expires_days=...,
+            ...
+          )
+          ...
   - pattern-not: |
       class $C(UIBaseHandler):
         def $F(...):

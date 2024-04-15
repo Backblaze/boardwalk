@@ -1,4 +1,5 @@
 # Boardwalk
+<img src="src/boardwalkd/static/boardwalk_icon.jpg" style="width: 25%;" align="right" />
 
 Boardwalk is a linear [Ansible](https://www.ansible.com/) workflow engine. It's
 purpose-built to help systems engineers automate low-and-slow background jobs

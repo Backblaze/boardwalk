@@ -34,7 +34,7 @@ def cli():
 @cli.command(context_settings=CONTEXT_SETTINGS)
 @click.option(
     "--auth-expire-days",
-    help=("The number of days login tokens and user API keys are valid before" " they expire"),
+    help=("The number of days login tokens and user API keys are valid before they expire"),
     type=float,
     default=14,
     show_default=True,
@@ -94,7 +94,7 @@ def cli():
 )
 @click.option(
     "--port",
-    help=("The non-TLS port number the server binds to. --port and/or" " --tls-port must be configured"),
+    help=("The non-TLS port number the server binds to. --port and/or --tls-port must be configured"),
     type=int,
     default=None,
 )
@@ -113,6 +113,33 @@ def cli():
     ),
     type=str,
     default=None,
+    show_envvar=True,
+)
+@click.option(
+    "--slack-app-token",
+    help=(
+        "A Slack App Token for the Slack App this Boardwalkd instance is to connect to."
+        " If specified, --slack-bot-token must also be provided."
+    ),
+    type=str,
+    default=None,
+    show_envvar=True,
+)
+@click.option(
+    "--slack-bot-token",
+    help=("A Slack OAuth Bot Token for the Slack App this Boardwalkd instance is to connect to."),
+    type=str,
+    default=None,
+    show_envvar=True,
+)
+@click.option(
+    "--slack-slash-command-prefix",
+    help=(
+        "The prefix to use in front of Boardwalk slash commands in Slack (e.g., /PREFIX-version). Needs to match the prefix supplied in the Slack App configuration."
+    ),
+    type=str,
+    default="brdwlk",
+    show_default=True,
     show_envvar=True,
 )
 @click.option(
@@ -155,6 +182,9 @@ def serve(
     port: int | None,
     slack_error_webhook_url: str,
     slack_webhook_url: str,
+    slack_app_token: str | None,
+    slack_bot_token: str | None,
+    slack_slash_command_prefix: str,
     tls_crt: str | None,
     tls_key: str | None,
     tls_port: int | None,
@@ -173,7 +203,7 @@ def serve(
 
     # If there is no TLS port then reject setting a TLS key and cert
     if (not tls_port) and (tls_crt or tls_key):
-        raise BoardwalkException("--tls-crt and --tls-key should not be configured" " unless --tls-port is also set")
+        raise BoardwalkException("--tls-crt and --tls-key should not be configured unless --tls-port is also set")
 
     # Validate TLS configuration (key and cert paths are already validated by click)
     if tls_port is not None:
@@ -181,9 +211,7 @@ def serve(
             assert tls_crt
             assert tls_key
         except AssertionError:
-            raise BoardwalkException(
-                "--tls-crt and --tls-key paths must be supplied when a" " --tls-port is configured"
-            )
+            raise BoardwalkException("--tls-crt and --tls-key paths must be supplied when a --tls-port is configured")
 
     # Validate --owner
     if owner:
@@ -196,6 +224,10 @@ def serve(
     else:
         owner = "anonymous@example.com"
 
+    # Validate Slack app/bot token
+    if (not slack_bot_token) and slack_app_token:
+        raise BoardwalkException("If --slack-app-token is supplied, --slack-bot-token must also be supplied")
+
     asyncio.run(
         run(
             auth_expire_days=auth_expire_days,
@@ -204,8 +236,11 @@ def serve(
             host_header_pattern=host_header_regex,
             owner=owner,
             port_number=port,
+            slack_app_token=slack_app_token,
+            slack_bot_token=slack_bot_token,
             slack_error_webhook_url=slack_error_webhook_url,
             slack_webhook_url=slack_webhook_url,
+            slack_slash_command_prefix=slack_slash_command_prefix,
             tls_crt_path=tls_crt,
             tls_key_path=tls_key,
             tls_port_number=tls_port,
