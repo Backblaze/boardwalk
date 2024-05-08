@@ -33,9 +33,7 @@ class User(StateBaseModel):
     def validate_roles(cls, input_roles: set[str]):
         for role in input_roles:
             if role not in valid_user_roles:
-                raise ValueError(
-                    f"Roles {input_roles} are not valid. Roles may be {valid_user_roles}"
-                )
+                raise ValueError(f"Roles {input_roles} are not valid. Roles may be {valid_user_roles}")
         return input_roles
 
 
@@ -50,9 +48,7 @@ class WorkspaceState(StateBaseModel):
 
     @field_validator("events")
     @classmethod
-    def validate_events(
-        cls, input_events: deque[WorkspaceEvent]
-    ) -> deque[WorkspaceEvent]:
+    def validate_events(cls, input_events: deque[WorkspaceEvent]) -> deque[WorkspaceEvent]:
         """
         Pydantic won't persist the maxlen argument for deque when cold loading
         from the statefile. This forces events to always be returned with maxlen

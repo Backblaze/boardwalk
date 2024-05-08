@@ -17,7 +17,7 @@ import boardwalk
 from boardwalk.app_exceptions import BoardwalkException
 
 if TYPE_CHECKING:
-    from typing import Any, Optional, TypedDict
+    from typing import Any, TypedDict
 
     from ansible_runner import Runner
 
@@ -37,10 +37,10 @@ if TYPE_CHECKING:
 
     class RunnerKwargs(TypedDict, total=False):
         cancel_callback: partial[bool]
-        cmdline: Optional[str]
+        cmdline: str | None
         envvars: RunnerKwargsEnvvars
         fact_cache_type: str
-        limit: Optional[str]
+        limit: str | None
         passwords: dict[str, str | None]
         project_dir: str
         quiet: bool
@@ -86,10 +86,7 @@ def ansible_runner_errors_to_output(runner: Runner, include_msg: bool = True) ->
             or event["event"] == "runner_item_on_failed"
             or event["event"] == "runner_on_async_failed"
             or event["event"] == "runner_on_unreachable"
-        ) and not (
-            "ignore_errors" in event["event_data"]
-            and event["event_data"]["ignore_errors"]
-        ):
+        ) and not ("ignore_errors" in event["event_data"] and event["event_data"]["ignore_errors"]):
             msg: list[str] = [
                 event["event"],
                 event["event_data"]["task"],
@@ -97,8 +94,7 @@ def ansible_runner_errors_to_output(runner: Runner, include_msg: bool = True) ->
                 event["event_data"]["host"],
             ]
             if include_msg and not (
-                "_ansible_no_log" in event["event_data"]["res"]
-                and event["event_data"]["res"]["_ansible_no_log"]
+                "_ansible_no_log" in event["event_data"]["res"] and event["event_data"]["res"]["_ansible_no_log"]
             ):
                 try:
                     msg.append(event["event_data"]["res"]["msg"])
@@ -134,9 +130,7 @@ def ansible_runner_run_tasks(
         "cancel_callback": partial(ansible_runner_cancel_callback, workspace),
         "envvars": {
             "ANSIBLE_BECOME_ASK_PASS": "False" if become_password is None else "True",
-            "ANSIBLE_CACHE_PLUGIN_CONNECTION": str(
-                workspace.path.joinpath("fact_cache")
-            ),
+            "ANSIBLE_CACHE_PLUGIN_CONNECTION": str(workspace.path.joinpath("fact_cache")),
             "ANSIBLE_CACHE_PLUGIN": "community.general.pickle",
             "ANSIBLE_NOCOLOR": "True",
         },

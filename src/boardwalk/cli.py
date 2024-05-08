@@ -75,9 +75,7 @@ def cli(ctx: click.Context, debug: bool | Literal[0, 1]):
     except KeyError:
         pass
     except ValueError:
-        raise BoardwalkException(
-            "BOARDWALK_DEBUG env variable has an invalid boolean value"
-        )
+        raise BoardwalkException("BOARDWALK_DEBUG env variable has an invalid boolean value")
 
     if debug:
         loglevel = logging.DEBUG

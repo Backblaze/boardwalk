@@ -12,7 +12,7 @@ import threading
 import time
 import webbrowser
 from collections import deque
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
@@ -63,7 +63,7 @@ class WorkspaceEvent(ProtocolBaseModel):
     def __init__(self, **kwargs: str):
         super().__init__(**kwargs)
         if not self.create_time:
-            self.create_time: datetime | None = datetime.utcnow()
+            self.create_time: datetime | None = datetime.now(UTC)
 
     @field_validator("severity")
     @classmethod
@@ -228,9 +228,7 @@ class Client:
             else:
                 raise e
 
-    def workspace_post_details(
-        self, workspace_name: str, workspace_details: WorkspaceDetails
-    ):
+    def workspace_post_details(self, workspace_name: str, workspace_details: WorkspaceDetails):
         """Updates the workspace details at the server"""
         try:
             self.authenticated_request(
@@ -260,9 +258,7 @@ class Client:
             else:
                 raise e
 
-    def workspace_heartbeat_keepalive(
-        self, workspace_name: str, quit: threading.Event
-    ) -> None:
+    def workspace_heartbeat_keepalive(self, workspace_name: str, quit: threading.Event) -> None:
         """Tries to post a heartbeat to the server every 5 seconds"""
         while True:
             if quit.is_set():
@@ -281,9 +277,7 @@ class Client:
                 pass
             time.sleep(5)  # nosemgrep: python.lang.best-practice.sleep.arbitrary-sleep
 
-    def workspace_heartbeat_keepalive_connect(
-        self, workspace_name: str
-    ) -> threading.Event:
+    def workspace_heartbeat_keepalive_connect(self, workspace_name: str) -> threading.Event:
         """Starts a background thread to post heartbeats to the server so it
         knows when a client is alive"""
         executor = concurrent.futures.ThreadPoolExecutor()
@@ -365,9 +359,7 @@ class Client:
     def workspace_get_semaphores(self, workspace_name: str) -> WorkspaceSemaphores:
         """Queries the server for workspace semaphores"""
         try:
-            request = self.authenticated_request(
-                path=f"/api/workspace/{workspace_name}/semaphores"
-            )
+            request = self.authenticated_request(path=f"/api/workspace/{workspace_name}/semaphores")
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound

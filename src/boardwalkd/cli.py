@@ -34,10 +34,7 @@ def cli():
 @cli.command(context_settings=CONTEXT_SETTINGS)
 @click.option(
     "--auth-expire-days",
-    help=(
-        "The number of days login tokens and user API keys are valid before"
-        " they expire"
-    ),
+    help=("The number of days login tokens and user API keys are valid before" " they expire"),
     type=float,
     default=14,
     show_default=True,
@@ -97,10 +94,7 @@ def cli():
 )
 @click.option(
     "--port",
-    help=(
-        "The non-TLS port number the server binds to. --port and/or"
-        " --tls-port must be configured"
-    ),
+    help=("The non-TLS port number the server binds to. --port and/or" " --tls-port must be configured"),
     type=int,
     default=None,
 )
@@ -175,18 +169,11 @@ def serve(
 
     # Validate any port is configured
     if not (port or tls_port):
-        raise BoardwalkException(
-            "One or both of --port or --tls-port must be configured"
-        )
+        raise BoardwalkException("One or both of --port or --tls-port must be configured")
 
     # If there is no TLS port then reject setting a TLS key and cert
     if (not tls_port) and (tls_crt or tls_key):
-        raise BoardwalkException(
-            (
-                "--tls-crt and --tls-key should not be configured"
-                " unless --tls-port is also set"
-            )
-        )
+        raise BoardwalkException("--tls-crt and --tls-key should not be configured" " unless --tls-port is also set")
 
     # Validate TLS configuration (key and cert paths are already validated by click)
     if tls_port is not None:
@@ -195,10 +182,7 @@ def serve(
             assert tls_key
         except AssertionError:
             raise BoardwalkException(
-                (
-                    "--tls-crt and --tls-key paths must be supplied when a"
-                    " --tls-port is configured"
-                )
+                "--tls-crt and --tls-key paths must be supplied when a" " --tls-port is configured"
             )
 
     # Validate --owner
@@ -208,9 +192,7 @@ def serve(
         except EmailNotValidError:
             raise BoardwalkException("Email addressed passed to --owner is invalid")
     elif auth_method != "anonymous":
-        raise BoardwalkException(
-            "--owner must be defined when --auth-method is not 'anonymous'"
-        )
+        raise BoardwalkException("--owner must be defined when --auth-method is not 'anonymous'")
     else:
         owner = "anonymous@example.com"
 

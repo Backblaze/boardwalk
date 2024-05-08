@@ -16,6 +16,9 @@ clean:
 		src/boardwalkd/__pycache__ \
 		.boardwalk \
 		.boardwalkd \
+		test/boardwalk/__pycache__ \
+		test/server-client/.boardwalk \
+		test/server-client/__pycache__ \
 		.pytest_cache \
 		.ruff_cache \
 		|| :
