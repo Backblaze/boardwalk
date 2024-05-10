@@ -5,7 +5,7 @@ RUN python3 -m pip install --user pipx \
     && PATH=PATH:/root/.local/bin pipx install poetry \
     && PATH=PATH:/root/.local/bin poetry build
 
-FROM python:3.10-slim
+FROM python:3.13.0b1-slim
 COPY --from=build /build/dist ./dist
 ENV DEBIAN_FRONTEND=noninteractive
 RUN groupadd -g 1000 not_root && useradd -u 1000 -g 1000 not_root \
