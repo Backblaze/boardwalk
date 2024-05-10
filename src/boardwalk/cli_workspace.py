@@ -53,9 +53,7 @@ def workspace_list():
 
 
 @workspace.command("reset", short_help="Resets active workspace")
-@click.confirmation_option(
-    prompt="Are you sure you want to reset the active workspace?"
-)
+@click.confirmation_option(prompt="Are you sure you want to reset the active workspace?")
 def workspace_reset():
     """Resets/clears the active workspace state"""
     try:

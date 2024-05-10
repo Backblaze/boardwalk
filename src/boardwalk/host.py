@@ -8,7 +8,7 @@ from __future__ import annotations
 import getpass
 import socket
 from base64 import b64decode
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Extra
@@ -31,7 +31,9 @@ class Host(BaseModel, extra=Extra.forbid):
     meta: dict[str, str | int | bool] = {}
     remote_mutex_path: str = "/opt/boardwalk.mutex"
     remote_alert_msg: str = "ALERT: Boardwalk is running a workflow against this host. Services may be interrupted"
-    remote_alert_string_formatted: str = f"$(tput -T xterm bold)$(tput -T xterm setaf 1)'{remote_alert_msg}'$(tput -T xterm sgr0)"
+    remote_alert_string_formatted: str = (
+        f"$(tput -T xterm bold)$(tput -T xterm setaf 1)'{remote_alert_msg}'$(tput -T xterm sgr0)"
+    )
     remote_alert_motd: str = f"#!/bin/sh\necho {remote_alert_string_formatted}"
     remote_alert_motd_path: str = "/etc/update-motd.d/99-boardwalk-alert"
     remote_alert_wall_cmd: str = f"wall {remote_alert_string_formatted}"
@@ -125,7 +127,7 @@ class Host(BaseModel, extra=Extra.forbid):
             {
                 "name": "create_remote_lock",
                 "ansible.builtin.copy": {
-                    "content": f"{getpass.getuser()}@{socket.gethostname()} at {datetime.utcnow()}",
+                    "content": f"{getpass.getuser()}@{socket.gethostname()} at {datetime.now(UTC)}",
                     "dest": str(self.remote_mutex_path),
                     "mode": "0644",
                     "owner": "root",
@@ -187,9 +189,7 @@ class Host(BaseModel, extra=Extra.forbid):
 
     def gather_facts(self) -> dict[str, Any]:
         """Returns the output of Ansible's setup module"""
-        tasks: AnsibleTasksType = [
-            {"name": "setup", "ansible.builtin.setup": {"gather_timeout": 30}}
-        ]
+        tasks: AnsibleTasksType = [{"name": "setup", "ansible.builtin.setup": {"gather_timeout": 30}}]
         runner = self.ansible_run(
             invocation_msg="gather_facts",
             gather_facts=False,
@@ -197,10 +197,7 @@ class Host(BaseModel, extra=Extra.forbid):
         )
         facts: dict[str, Any] = {"ansible_local": {}}
         for event in runner.events:
-            if (
-                event["event"] == "runner_on_ok"
-                and event["event_data"]["task"] == "setup"
-            ):
+            if event["event"] == "runner_on_ok" and event["event_data"]["task"] == "setup":
                 facts = event["event_data"]["res"]["ansible_facts"]
         if len(facts) > 0:
             return facts
@@ -211,9 +208,7 @@ class Host(BaseModel, extra=Extra.forbid):
         """Gets boardwalk's remote state fact as an object"""
 
         # Get existing ansible_local facts, if any
-        tasks: AnsibleTasksType = [
-            {"name": "setup", "ansible.builtin.setup": {"filter": ["ansible_local"]}}
-        ]
+        tasks: AnsibleTasksType = [{"name": "setup", "ansible.builtin.setup": {"filter": ["ansible_local"]}}]
         runner = self.ansible_run(
             invocation_msg="get_remote_state",
             gather_facts=False,
@@ -222,15 +217,10 @@ class Host(BaseModel, extra=Extra.forbid):
 
         # Get existing boardwalk_state fact, if any
         for event in runner.events:
-            if (
-                event["event"] == "runner_on_ok"
-                and event["event_data"]["task"] == "setup"
-            ):
+            if event["event"] == "runner_on_ok" and event["event_data"]["task"] == "setup":
                 try:
                     return boardwalk.RemoteStateModel.parse_obj(
-                        event["event_data"]["res"]["ansible_facts"]["ansible_local"][
-                            "boardwalk_state"
-                        ]
+                        event["event_data"]["res"]["ansible_facts"]["ansible_local"]["boardwalk_state"]
                     )
                 except KeyError:
                     pass
@@ -284,9 +274,7 @@ class Host(BaseModel, extra=Extra.forbid):
             tasks=tasks,
         )
         if not check:
-            self.ansible_facts["ansible_local"]["boardwalk_state"] = (
-                remote_state_obj.dict()
-            )
+            self.ansible_facts["ansible_local"]["boardwalk_state"] = remote_state_obj.dict()
             workspace.flush()
 
 

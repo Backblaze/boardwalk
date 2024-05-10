@@ -16,7 +16,8 @@ from boardwalk.app_exceptions import BoardwalkException
 from boardwalk.state import LocalState
 
 if TYPE_CHECKING:
-    from typing import Any, Callable
+    from collections.abc import Callable
+    from typing import Any
 
     from boardwalk.ansible import AnsibleFacts, AnsibleTasksType, InventoryHostVars
 
@@ -65,9 +66,7 @@ def get_ws() -> Workspace:
         for subclass in item.__subclasses__():
             subclasses.append(subclass.__qualname__)
         if len(subclasses) != len(set(subclasses)):
-            raise DuplicateManifestClass(
-                "Duplicate class names defined in Boardwalkfile.py"
-            )
+            raise DuplicateManifestClass("Duplicate class names defined in Boardwalkfile.py")
 
     # Get the active Workspace name, if there is one
     # If the BOARDWALK_WORKSPACE var is set, try to use that Workspace name
@@ -117,9 +116,7 @@ class Job:
         """Optional user method. Defines any required Job input options"""
         return tuple()  # type: ignore
 
-    def preconditions(
-        self, facts: AnsibleFacts, inventory_vars: InventoryHostVars
-    ) -> bool:
+    def preconditions(self, facts: AnsibleFacts, inventory_vars: InventoryHostVars) -> bool:
         """Optional user method. Return True if preconditions are met, else return False"""
         return True
 
@@ -243,9 +240,7 @@ class WorkspaceConfig:
     def _is_valid_sort_order(self, value: str):
         """Checks if a given sort order is valid. Raises a ValueError if not"""
         if value not in self.valid_sort_orders:
-            raise ValueError(
-                f"Valid default_sort_order values are: {', '.join(self.valid_sort_orders)}"
-            )
+            raise ValueError(f"Valid default_sort_order values are: {', '.join(self.valid_sort_orders)}")
 
 
 class Workspace(ABC):
@@ -263,7 +258,7 @@ class Workspace(ABC):
     def __new__(cls):
         # Singleton. Only create a new instance if one doesn't already exist
         if cls._instance is None:
-            cls._instance = super(Workspace, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self):
@@ -291,11 +286,9 @@ class Workspace(ABC):
         cause unexpected issues such as hosts being in the state that shouldn't"""
         if self.cfg.host_pattern != self.state.host_pattern:
             raise BoardwalkException(
-                (
-                    "The workspace's host_pattern has changed since `boardwalk init` was first ran."
-                    f' It was "{self.state.host_pattern}" but is now "{self.cfg.host_pattern}".'
-                    " Run `boardwalk workspace reset` and then `boardwalk init`. Or, change it back"
-                )
+                "The workspace's host_pattern has changed since `boardwalk init` was first ran."
+                f' It was "{self.state.host_pattern}" but is now "{self.cfg.host_pattern}".'
+                " Run `boardwalk workspace reset` and then `boardwalk init`. Or, change it back"
             )
 
     @abstractmethod
@@ -307,11 +300,7 @@ class Workspace(ABC):
         """Flush workspace state to disk"""
         # The statefile is first written to a temp file so that failures in flushing
         # will not corrupt an existing statefile
-        with Path(
-            NamedTemporaryFile(
-                mode="wb", delete=False, dir=self.path, prefix="statefile.json."
-            ).name
-        ) as tf:
+        with Path(NamedTemporaryFile(mode="wb", delete=False, dir=self.path, prefix="statefile.json.").name) as tf:
             tf.write_text(self.state.json())
             tf.rename(self.path.joinpath("statefile.json"))
 

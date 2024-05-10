@@ -150,9 +150,7 @@ def add_gathered_facts_to_state(event: RunnerEvent, ws: Workspace):
     if event["event"] == "runner_on_ok" and event["event_data"]["task"] == "setup":
         # If the host is already in the statefile, just update record
         if event["event_data"]["host"] in ws.state.hosts:
-            ws.state.hosts[event["event_data"]["host"]].ansible_facts = event[
-                "event_data"
-            ]["res"]["ansible_facts"]
+            ws.state.hosts[event["event_data"]["host"]].ansible_facts = event["event_data"]["res"]["ansible_facts"]
         # Otherwise, add the host to the state as a new host
         else:
             ws.state.hosts[event["event_data"]["host"]] = Host(
@@ -165,10 +163,7 @@ def handle_failed_init_hosts(event: RunnerEvent, retry_file_path: Path):
     """Processes runner events to find failed hosts during init. Saves any failed
     or unreachable hosts to a retry file and writes warnings and errors to stdout"""
     # Save any unreachable/failed hosts to the retry file
-    if (
-        event["event"] == "runner_on_unreachable"
-        or event["event"] == "runner_on_failed"
-    ):
+    if event["event"] == "runner_on_unreachable" or event["event"] == "runner_on_failed":
         logger.warn(event["stdout"])
         with open(retry_file_path, "a") as file:
             file.write(f"{event['event_data']['host']}\n")

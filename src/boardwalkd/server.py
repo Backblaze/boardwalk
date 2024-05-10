@@ -14,10 +14,11 @@ import secrets
 import ssl
 import string
 from collections import deque
-from datetime import datetime, timedelta
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from importlib.metadata import version as lib_version
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import ParseResult, urljoin, urlparse
 
 import tornado.auth
@@ -57,9 +58,7 @@ class UIBaseHandler(tornado.web.RequestHandler):
         svr_url: ParseResult = self.settings["url"]
         if req_url.scheme != svr_url.scheme or req_url.netloc != svr_url.netloc:
             redir_url = req_url._replace(scheme=svr_url.scheme, netloc=svr_url.netloc)
-            app_log.info(
-                f"Redirecting request {req_url.geturl()} to {redir_url.geturl()}"
-            )
+            app_log.info(f"Redirecting request {req_url.geturl()} to {redir_url.geturl()}")
             return self.redirect(redir_url.geturl())
 
         # Gets the logged in user, if any, to determine if their account is
@@ -96,7 +95,7 @@ def ui_method_sha256(handler: UIBaseHandler, value: str) -> str:
 def ui_method_secondsdelta(handler: UIBaseHandler, time: datetime) -> float:
     """Custom UI templating method. Accepts a datetime and returns the delta
     between time given and now in number of seconds"""
-    delta = datetime.utcnow() - time
+    delta = datetime.now(UTC) - time
     return delta.total_seconds()
 
 
@@ -105,12 +104,12 @@ def ui_method_server_version(handler: UIBaseHandler) -> str:
     return lib_version("boardwalk")
 
 
-def ui_method_sort_events_by_date(
-    handler: UIBaseHandler, events: deque[WorkspaceEvent]
-) -> list[WorkspaceEvent]:
+def ui_method_sort_events_by_date(handler: UIBaseHandler, events: deque[WorkspaceEvent]) -> list[WorkspaceEvent]:
     """Custom UI templating method. Accepts a deque of Workspace events and
     sorts them by datetime in ascending order"""
-    key: Callable[[WorkspaceEvent], datetime] = lambda x: x.create_time  # type: ignore # noqa: E731
+    # While we assume UTC--and the code did/does--this allows for backward compatibility
+    # with older `boardwalk` client versions
+    key: Callable[[WorkspaceEvent], datetime] = lambda x: x.create_time.replace(tzinfo=UTC)  # type: ignore # noqa: E731
     return sorted(events, key=key, reverse=True)
 
 
@@ -235,9 +234,7 @@ class UserRoleHandler(AdminUIBaseHandler):
             return self.send_error(406)
 
         # Don't allow users to remove admin from themselves or the owner
-        if (
-            user == self.current_user.decode() or user == self.settings["owner"]
-        ) and role == "admin":
+        if (user == self.current_user.decode() or user == self.settings["owner"]) and role == "admin":
             return self.send_error(406)
 
         try:
@@ -362,11 +359,7 @@ class GoogleOAuth2LoginHandler(UIBaseHandler, tornado.auth.GoogleOAuth2Mixin):
     def decrypt_url(self, encoded_url: str) -> str:
         """Reverses self.encode_url()"""
         unescaped_cipher_text = url_unescape(encoded_url)
-        return (
-            Fernet(self.url_encryption_key)
-            .decrypt(unescaped_cipher_text.encode())
-            .decode()
-        )
+        return Fernet(self.url_encryption_key).decrypt(unescaped_cipher_text.encode()).decode()
 
 
 class IndexHandler(UIBaseHandler):
@@ -379,9 +372,7 @@ class IndexHandler(UIBaseHandler):
             edit = strtobool(edit)  # type: ignore
         except (AttributeError, ValueError):
             edit = 0
-        return self.render(
-            "index.html", title="Index", workspaces=state.workspaces, edit=edit
-        )
+        return self.render("index.html", title="Index", workspaces=state.workspaces, edit=edit)
 
 
 class WorkspaceCatchHandler(UIBaseHandler):
@@ -396,9 +387,7 @@ class WorkspaceCatchHandler(UIBaseHandler):
 
         # Record who clicked the catch button
         cur_user = self.current_user.decode()
-        event = WorkspaceEvent(
-            severity="info", message=f"Workspace caught by {cur_user}"
-        )
+        event = WorkspaceEvent(severity="info", message=f"Workspace caught by {cur_user}")
         internal_workspace_event(workspace, event)
 
         return self.render("index_workspace_release.html", workspace_name=workspace)
@@ -412,9 +401,7 @@ class WorkspaceCatchHandler(UIBaseHandler):
 
         # Record who clicked the release button
         cur_user = self.current_user.decode()
-        event = WorkspaceEvent(
-            severity="info", message=f"Workspace released by {cur_user}"
-        )
+        event = WorkspaceEvent(severity="info", message=f"Workspace released by {cur_user}")
         internal_workspace_event(workspace, event)
 
         return self.render("index_workspace_catch.html", workspace_name=workspace)
@@ -429,9 +416,7 @@ class WorkspaceEventsHandler(UIBaseHandler):
             state.workspaces[workspace]
         except KeyError:
             return self.send_error(404)
-        return self.render(
-            "workspace_events.html", workspace_name=workspace, title="Events"
-        )
+        return self.render("workspace_events.html", workspace_name=workspace, title="Events")
 
 
 class WorkspaceEventsTableHandler(UIBaseHandler):
@@ -454,7 +439,7 @@ class WorkspaceMutexHandler(UIBaseHandler):
         try:
             # If the host is possibly still connected we will not delete the
             # mutex. Workspaces should send a heartbeat every 5 seconds
-            delta: timedelta = datetime.utcnow() - state.workspaces[workspace].last_seen  # type: ignore
+            delta: timedelta = datetime.now(UTC) - state.workspaces[workspace].last_seen  # type: ignore
             if delta.total_seconds() < 10:
                 return self.send_error(412)
             state.workspaces[workspace].semaphores.has_mutex = False
@@ -492,9 +477,7 @@ class WorkspacesHandler(UIBaseHandler):
             edit = strtobool(edit)  # type: ignore
         except (AttributeError, ValueError):
             edit = 0
-        return self.render(
-            "index_workspace.html", workspaces=state.workspaces, edit=edit
-        )
+        return self.render("index_workspace.html", workspaces=state.workspaces, edit=edit)
 
 
 """
@@ -598,9 +581,7 @@ class AuthLoginApiWebsocketHandler(tornado.websocket.WebSocketHandler):
 
         this_client_id = id_client()
         app_log.info(f"Login client ID {this_client_id} opened")
-        login_url = urljoin(
-            self.settings["url"].geturl(), f"/api/auth/login?id={this_client_id}"
-        )
+        login_url = urljoin(self.settings["url"].geturl(), f"/api/auth/login?id={this_client_id}")
         return self.write_message(ApiLoginMessage(login_url=login_url).dict())
 
     def on_close(self):
@@ -669,7 +650,7 @@ class WorkspaceDetailsApiHandler(APIBaseHandler):
         except KeyError:
             state.workspaces[workspace] = WorkspaceState()
             state.workspaces[workspace].details = new_details
-        state.workspaces[workspace].last_seen = datetime.utcnow()
+        state.workspaces[workspace].last_seen = datetime.now(UTC)
         state.flush()
 
         # Log the updated details to the events table
@@ -691,7 +672,7 @@ class WorkspaceHeartbeatApiHandler(APIBaseHandler):
     @tornado.web.authenticated
     def post(self, workspace: str):
         try:
-            state.workspaces[workspace].last_seen = datetime.utcnow()
+            state.workspaces[workspace].last_seen = datetime.now(UTC)
         except KeyError:
             return self.send_error(404)
 
@@ -724,22 +705,17 @@ class WorkspaceEventApiHandler(APIBaseHandler):
             app_log.error(e)
             return self.send_error(422)
 
-        event.received_time = datetime.utcnow()
+        event.received_time = datetime.now(UTC)
 
         try:
             state.workspaces[workspace].events.append(event)
         except KeyError:
             return self.send_error(404)
 
-        app_log.info(
-            f"worker_event: {self.request.remote_ip} {workspace} {event.severity} {event.message}"
-        )
+        app_log.info(f"worker_event: {self.request.remote_ip} {workspace} {event.severity} {event.message}")
 
         if broadcast:
-            if (
-                self.settings["slack_webhook_url"]
-                or self.settings["slack_error_webhook_url"]
-            ):
+            if self.settings["slack_webhook_url"] or self.settings["slack_error_webhook_url"]:
                 await handle_slack_broadcast(
                     event,
                     workspace,
@@ -822,11 +798,9 @@ def internal_workspace_event(workspace: str, event: WorkspaceEvent):
     Appends an internally-generated workspace event to the state and logs to the
     application log
     """
-    event.received_time = datetime.utcnow()
+    event.received_time = datetime.now(UTC)
     state.workspaces[workspace].events.append(event)
-    app_log.info(
-        f"internal_workspace_event: {workspace} {event.severity} {event.message}"
-    )
+    app_log.info(f"internal_workspace_event: {workspace} {event.severity} {event.message}")
     state.flush()
 
 
@@ -872,10 +846,8 @@ def make_app(
             settings["cookie_secret"] = os.environ["BOARDWALKD_SECRET"]
         except KeyError:
             raise BoardwalkException(
-                (
-                    "The BOARDWALK_SECRET environment variable is required when any"
-                    " authentication method is enabled in order to generate secure cookies"
-                )
+                "The BOARDWALK_SECRET environment variable is required when any"
+                " authentication method is enabled in order to generate secure cookies"
             )
 
     # Bootstrap the chosen auth_method
@@ -891,10 +863,8 @@ def make_app(
                 }
             except KeyError:
                 raise BoardwalkException(
-                    (
-                        "BOARDWALKD_GOOGLE_OAUTH_CLIENT_ID and BOARDWALKD_GOOGLE_OAUTH_SECRET env vars"
-                        " are required when auth_method is google_oauth"
-                    )
+                    "BOARDWALKD_GOOGLE_OAUTH_CLIENT_ID and BOARDWALKD_GOOGLE_OAUTH_SECRET env vars"
+                    " are required when auth_method is google_oauth"
                 )
             handlers.append((r"/auth/login", GoogleOAuth2LoginHandler))  # type: ignore
         case _:
