@@ -556,6 +556,7 @@ def bootstrap_with_server(workspace: Workspace, ctx: click.Context):
                 workflow=workspace.cfg.workflow.__class__.__qualname__,
                 worker_command="check" if _check_mode else "run",
                 worker_hostname=socket.gethostname(),
+                worker_limit=ctx.params.get("limit"),  # type: ignore
                 worker_username=getpass.getuser(),
             )
         )

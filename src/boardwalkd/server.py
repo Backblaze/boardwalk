@@ -660,6 +660,7 @@ class WorkspaceDetailsApiHandler(APIBaseHandler):
             f" Workflow: {workspace_details.workflow},"
             f" Worker: {workspace_details.worker_username}@{workspace_details.worker_hostname},"
             f" Host Pattern: {workspace_details.host_pattern},"
+            f" Limit Pattern: {workspace_details.worker_limit if workspace_details.worker_limit else '<unknown>'},"
             f" Command: {workspace_details.worker_command}"
         )
         event = WorkspaceEvent(severity="info", message=message)

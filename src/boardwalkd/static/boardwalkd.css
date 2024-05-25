@@ -34,3 +34,7 @@
 .workspace-title {
     word-wrap: break-word;
 }
+
+.context-underline {
+    border-bottom: 1px dotted #000;
+}

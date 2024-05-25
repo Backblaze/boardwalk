@@ -49,6 +49,7 @@ class WorkspaceDetails(ProtocolBaseModel):
     workflow: str = ""
     worker_command: str = ""
     worker_hostname: str = ""
+    worker_limit: str = ""
     worker_username: str = ""
 
 
