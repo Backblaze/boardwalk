@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 
 [tool.poetry]
 name = "boardwalk"
-version = "0.8.18"
+version = "0.8.19"
 description = "Boardwalk is a linear Ansible workflow engine"
 readme = "README.md"
 authors = [

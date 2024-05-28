@@ -59,6 +59,18 @@
                             <td>{{ workspace.details.host_pattern }}</td>
                         </tr>
                         <tr>
+                            <th scope="row" title="An additional --limit applied to this workspace's Host Pattern">
+                                <span class="context-underline">Limit Pattern</span>
+                            </th>
+                            <td>
+                                {% if not workspace.details.worker_limit %}
+                                    <span class="context-underline" title="A limit was not provided--thus equivalent to 'all'--or the worker client is old and did not send a limit">&lt;unknown&gt;</span>
+                                {% else %}
+                                    {{ workspace.details.worker_limit }}
+                                {% end %}
+                            </td>
+                        </tr>
+                        <tr>
                             <th scope="row">Command</th>
                             <td>{{ workspace.details.worker_command }}</td>
                         </tr>
