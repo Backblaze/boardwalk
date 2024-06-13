@@ -39,6 +39,9 @@ from boardwalkd.state import User, WorkspaceState, load_state, valid_user_roles
 
 module_dir = Path(__file__).resolve().parent
 state = load_state()
+SLACK_TOKENS: dict[str, str | None] = {"app": None, "bot": None}
+SLACK_SLASH_COMMAND_PREFIX: str = "brdwlk"
+SERVER_URL: str | None = None
 atexit.register(state.flush)
 
 
@@ -95,7 +98,7 @@ def ui_method_sha256(handler: UIBaseHandler, value: str) -> str:
 def ui_method_secondsdelta(handler: UIBaseHandler, time: datetime) -> float:
     """Custom UI templating method. Accepts a datetime and returns the delta
     between time given and now in number of seconds"""
-    delta = datetime.now(UTC) - time
+    delta = datetime.now(UTC) - time.replace(tzinfo=UTC)
     return delta.total_seconds()
 
 
@@ -272,7 +275,7 @@ class AnonymousLoginHandler(UIBaseHandler):
             "boardwalk_user",
             anon_username,
             expires_days=self.settings["auth_expire_days"],
-            samesite="Strict",
+            samesite="Lax",  # To allow, for example, Slack to open the dashboard in a new window when the link is clicked from the Slack App
             secure=True,
         )
         return self.redirect(
@@ -439,7 +442,7 @@ class WorkspaceMutexHandler(UIBaseHandler):
         try:
             # If the host is possibly still connected we will not delete the
             # mutex. Workspaces should send a heartbeat every 5 seconds
-            delta: timedelta = datetime.now(UTC) - state.workspaces[workspace].last_seen  # type: ignore
+            delta: timedelta = datetime.now(UTC) - state.workspaces[workspace].last_seen.replace(tzinfo=UTC)  # type: ignore
             if delta.total_seconds() < 10:
                 return self.send_error(412)
             state.workspaces[workspace].semaphores.has_mutex = False
@@ -945,13 +948,17 @@ async def run(
     port_number: int | None,
     tls_crt_path: str | None,
     tls_key_path: str | None,
+    slack_app_token: str | None,
+    slack_bot_token: str | None,
     tls_port_number: int | None,
     slack_error_webhook_url: str,
     slack_webhook_url: str,
+    slack_slash_command_prefix: str,
     url: str,
 ):
     """Starts the tornado server and IO loop"""
     global state
+    global SLACK_SLASH_COMMAND_PREFIX
 
     app = make_app(
         auth_expire_days=auth_expire_days,
@@ -988,5 +995,19 @@ async def run(
     state.users[owner].roles.add("admin")
     state.users[owner].enabled = True
     state.flush()
+
+    # If configured, intialize Slack integration
+    if slack_app_token:
+        SLACK_TOKENS["app"] = slack_app_token
+        SLACK_TOKENS["bot"] = slack_bot_token
+        SLACK_SLASH_COMMAND_PREFIX = slack_slash_command_prefix
+
+        # Store the server URL so that other modules can read from it directly
+        global SERVER_URL
+        SERVER_URL = url
+
+        from boardwalkd import slack
+
+        await slack.connect()
 
     await asyncio.Event().wait()

@@ -2,10 +2,11 @@
 Code for handling server broadcasts
 """
 
-import json
-import logging
-
-from tornado.httpclient import AsyncHTTPClient, HTTPError, HTTPRequest
+from slack_sdk.models.blocks import (
+    MarkdownTextObject,
+    SectionBlock,
+)
+from slack_sdk.webhook.async_client import AsyncWebhookClient
 
 from boardwalkd.protocol import WorkspaceEvent
 
@@ -30,46 +31,20 @@ async def handle_slack_broadcast(
         slack_message_severity = ":red_circle: ERROR"
     else:
         raise ValueError(f"Event severity is invalid: {event.severity}")
-    slack_message_blocks = {
-        "blocks": [
-            {
-                "type": "section",
-                "fields": [
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*{slack_message_severity}*",
-                    },
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*<{server_url}#{workspace}|{workspace}>*",
-                    },
-                ],
-            },
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"```\n{event.message}\n```",
-                },
-            },
-        ]
-    }
-    payload = json.dumps(slack_message_blocks)
 
-    async def post_msg(url: str):
-        request = HTTPRequest(
-            method="POST",
-            headers={"Content-Type": "application/json"},
-            body=payload,
-            url=url,
-        )
-        client = AsyncHTTPClient()
-        try:
-            await client.fetch(request)
-        except HTTPError as e:
-            logging.error(f"slack_webhook:{e}")
+    slack_message_blocks = [
+        SectionBlock(
+            fields=[
+                MarkdownTextObject(text=f"*{slack_message_severity}*"),
+                MarkdownTextObject(text=f"*<{server_url}#{workspace}|{workspace}>*"),
+            ]
+        ),
+        SectionBlock(text=MarkdownTextObject(text=f"```\n{event.message}\n```")),
+    ]
 
     if error_webhook_url and event.severity == "error":
-        await post_msg(error_webhook_url)
+        webhook_client = AsyncWebhookClient(url=error_webhook_url)
+        await webhook_client.send(blocks=slack_message_blocks)
     elif webhook_url:
-        await post_msg(webhook_url)
+        webhook_client = AsyncWebhookClient(url=webhook_url)
+        await webhook_client.send(blocks=slack_message_blocks)
