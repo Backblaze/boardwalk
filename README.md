@@ -169,6 +169,34 @@ release, minus 1 minor version. So, if the current stable version is `3.22.x`,
 Boardwalk should work with `3.21.x`. Consider using
 [`pyenv`](https://github.com/pyenv/pyenv) to maintain fresh python environment.
 
+#### Shell Completion
+
+To enable shell completion for `boardwalk` and `boardwalkd`, the following set
+of commands will generate the completion script and add them to your shell (a
+shell restart will be needed):
+
+##### Bash
+```bash
+_BOARDWALK_COMPLETE=bash_source boardwalk > ~/.boardwalk-complete.bash
+_BOARDWALKD_COMPLETE=bash_source boardwalkd > ~/.boardwalkd-complete.bash
+echo '. ~/.boardwalk-complete.bash' >> ~/.bashrc
+echo '. ~/.boardwalkd-complete.bash' >> ~/.bashrc
+```
+
+##### Zsh
+```zsh
+_BOARDWALK_COMPLETE=zsh_source boardwalk > ~/.boardwalk-complete.zsh
+_BOARDWALKD_COMPLETE=zsh_source boardwalkd > ~/.boardwalkd-complete.zsh
+echo '. ~/.boardwalk-complete.zsh' >> ~/.zshrc
+echo '. ~/.boardwalkd-complete.zsh' >> ~/.zshrc
+```
+
+##### Fish
+```sh
+_BOARDWALK_COMPLETE=fish_source boardwalk > ~/.config/fish/completions/boardwalk.fish
+_BOARDWALKD_COMPLETE=fish_source boardwalkd > ~/.config/fish/completions/boardwalkd.fish
+```
+
 #### Container Install
 
 Boardwalk may be built as a container image by running `make container`.
