@@ -7,7 +7,7 @@ import logging
 import click
 
 from boardwalk.app_exceptions import BoardwalkException
-from boardwalk.manifest import NoActiveWorkspace, Workspace, WorkspaceNotFound, get_ws
+from boardwalk.manifest import ManifestNotFound, NoActiveWorkspace, Workspace, WorkspaceNotFound, get_ws
 
 logger = logging.getLogger(__name__)
 
@@ -27,11 +27,22 @@ def workspace_show():
     click.echo(ws.name)
 
 
+def workspace_use_completion(ctx, param, incomplete):
+    """Allows click to perform shell completion for workspace names in `boardwalk workspace use`"""
+    try:
+        get_ws()
+        return sorted(
+            [name for name in [i.__qualname__ for i in Workspace.__subclasses__()] if name.startswith(incomplete)]
+        )
+    except ManifestNotFound:
+        return []
+
+
 @workspace.command(
     "use",
     short_help="Sets the active workspace",
 )
-@click.argument("workspace_name")
+@click.argument("workspace_name", shell_complete=workspace_use_completion)
 def workspace_use(workspace_name: str):
     Workspace.use(workspace_name)
     ws = get_ws()
