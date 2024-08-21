@@ -29,6 +29,23 @@ plenty of detail and context.
 
 ## Development Guidelines
 
+### Fork the Repository
+
+If you are planning to submit a pull request, please begin by [forking this repository in the GitHub UI](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo), then cloning your fork:
+
+```shell
+git clone git@github.com:<github-username>/boardwalk.git
+cd boardwalk
+```
+
+Create a local branch in which to work on your contribution:
+
+```shell
+git switch -c my-cool-fix
+```
+
+When you're ready to submit, see the section below, [Submitting a Pull Request](#submitting-a-pull-request).
+
 ### Development Dependencies
 
 In addition to the python version specified in the `pyproject.toml`, you will
@@ -84,3 +101,22 @@ Most output should use a logger, with a few exceptions:
 - Cases where the output of a command is intended to be consumed in a specific
   format, and the formatting features of a logger aren't useful. Examples
   include `boardwalk version` and `boardwalk workspace dump`.
+
+### Submitting a Pull Request
+
+When you're ready to submit your pull request, add and commit your files with a relevant message, including the issue number, if the PR fixes a specific issue:
+
+```shell
+git add <new and updated files>
+git commit -m "Cool update. Fixes #123"
+```
+
+Now push your changes to a new branch to your GitHub repository:
+
+```shell
+git push --set-upstream origin my-cool-fix
+```
+
+The git response will display the pull request URL, or you can go to the branch page in your repo, `https://github.com/<github-username>/boardwalk/tree/my-cool-fix`, and click the 'Compare & pull request' button.
+
+After you submit your pull request, a project maintainer will review it and respond within two weeks, likely much less unless we are flooded with contributions!
