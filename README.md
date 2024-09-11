@@ -1,7 +1,7 @@
 # Boardwalk
 <img src="src/boardwalkd/static/boardwalk_icon.jpg" style="width: 25%;" align="right" />
 
-Boardwalk is a linear [Ansible](https://www.ansible.com/) workflow engine. It's
+Boardwalk is an open-source linear [Ansible](https://www.ansible.com/) workflow engine. It's
 purpose-built to help systems engineers automate low-and-slow background jobs
 against large numbers of production hosts. It's ideal for rolling-maintenance
 jobs like kernel and operating system upgrades.
@@ -10,6 +10,8 @@ Boardwalk makes it easy to define workflows composed of a series of jobs to
 perform tasks on hosts using Ansible. It connects to hosts one-at-a-time running
 jobs in a defined order and maintaining a local state as it goes; this makes
 stopping and resuming long-running Ansible workflows easy and efficient.
+
+[Read the Boardwalk announcement at the Backblaze blog](https://www.backblaze.com/blog/backblaze-open-sources-boardwalk-workflow-engine-for-ansible/).
 
 💥 __Boardwalk is alpha software. Interfaces and behaviors may change between
 updates.__ 💥
@@ -49,6 +51,10 @@ interface used by [AWX](https://github.com/ansible/awx).
   Boardwalk shouldn't create its own inventory system, nor should it create its
   own secret management system, because Ansible already has solutions to those
   areas.
+
+## Open-Source License
+
+Boardwalk is open source, licensed under the terms of the [MIT license](LICENSE).
 
 ## Contributing
 
