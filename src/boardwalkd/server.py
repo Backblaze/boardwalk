@@ -25,14 +25,14 @@ import tornado.auth
 import tornado.httpclient
 import tornado.web
 import tornado.websocket
-from boardwalk.app_exceptions import BoardwalkException
-from boardwalk.utils import strtobool
 from cryptography.fernet import Fernet
 from pydantic import ValidationError
 from tornado.escape import url_escape, url_unescape
 from tornado.log import access_log, app_log
 from tornado.routing import HostMatches
 
+from boardwalk.app_exceptions import BoardwalkException
+from boardwalk.utils import strtobool
 from boardwalkd.broadcast import handle_slack_broadcast
 from boardwalkd.protocol import ApiLoginMessage, WorkspaceDetails, WorkspaceEvent
 from boardwalkd.state import User, WorkspaceState, load_state, valid_user_roles

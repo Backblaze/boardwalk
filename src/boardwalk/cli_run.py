@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import concurrent.futures
 import getpass
-import logging
 import os
 import random
 import socket
@@ -18,12 +17,7 @@ from typing import TYPE_CHECKING
 
 import ansible_runner
 import click
-from boardwalkd.protocol import (
-    WorkspaceClient,
-    WorkspaceDetails,
-    WorkspaceEvent,
-    WorkspaceHasMutex,
-)
+from loguru import logger
 from tornado.httpclient import HTTPClientError
 from tornado.simple_httpclient import HTTPTimeoutError
 
@@ -41,13 +35,18 @@ from boardwalk.host import Host, RemoteHostLocked
 from boardwalk.manifest import NoActiveWorkspace, Workspace, get_boardwalkd_url, get_ws
 from boardwalk.state import RemoteStateModel, RemoteStateWorkflow, RemoteStateWorkspace
 from boardwalk.utils import strtobool
+from boardwalkd.protocol import (
+    WorkspaceClient,
+    WorkspaceDetails,
+    WorkspaceEvent,
+    WorkspaceHasMutex,
+)
 
 if TYPE_CHECKING:
     from collections.abc import ItemsView
 
     from boardwalk.ansible import HostVarsType, InventoryHostVars
 
-logger = logging.getLogger(__name__)
 
 become_password: str | None = None
 boardwalkd_client: WorkspaceClient | None = None
@@ -202,6 +201,7 @@ def run(
         hosts=hosts_working_list,
         inventory_vars=inventory_vars,
         workspace=ws,
+        verbosity=ctx.obj["VERBOSITY"],
     )
 
 
@@ -258,6 +258,7 @@ def run_workflow(
     hosts: list[Host],
     inventory_vars: HostVarsType,
     workspace: Workspace,
+    verbosity: int,
 ):
     """Runs the workspace's workflow against a list of hosts"""
     i = 0
@@ -284,7 +285,7 @@ def run_workflow(
             unreachable_exception = None
             try:
                 directly_confirm_host_preconditions(host, inventory_vars[host.name], workspace)
-                execute_host_workflow(host, workspace)
+                execute_host_workflow(host, workspace, verbosity)
             except AnsibleRunnerUnreachableHost as e:
                 unreachable_exception = e
             finally:
@@ -438,7 +439,7 @@ def check_host_preconditions_locally(
                     and not boardwalk_state.workspaces[workspace.name].workflow.succeeded
                 ):
                     hosts_meeting_preconditions.append(host)
-                    logger.warn(
+                    logger.warning(
                         f"{host.name}: Host started workflow but never completed."
                         " Job preconditions are ignored for this host"
                     )
@@ -449,7 +450,7 @@ def check_host_preconditions_locally(
         for job in chain(workflow.i_jobs, workflow.i_exit_jobs):
             if not job.preconditions(facts=host.ansible_facts, inventory_vars=inventory_vars[host.name]):
                 any_job_preconditions_unmet = True
-                logger.warn(
+                logger.warning(
                     f"{host.name}: Job {job.name} preconditions unmet in local state"
                     " and will be skipped. If this is in error, re-run `boardwalk init`"
                 )
@@ -626,7 +627,7 @@ def directly_confirm_host_preconditions(host: Host, inventory_vars: InventoryHos
                 boardwalk_state.workspaces[workspace.name].workflow.started
                 and not boardwalk_state.workspaces[workspace.name].workflow.succeeded
             ):
-                logger.warn(
+                logger.warning(
                     f"{host.name}: Host started workflow but never completed. Job preconditions are ignored for this host"
                 )
                 return True
@@ -638,7 +639,7 @@ def directly_confirm_host_preconditions(host: Host, inventory_vars: InventoryHos
     for job in chain(workflow.i_jobs, workflow.i_exit_jobs):
         if not job.preconditions(facts=host.ansible_facts, inventory_vars=inventory_vars):
             all_job_preconditions_met = False
-            logger.warn(f"Job {job.name} preconditions unmet on host")
+            logger.warning(f"Job {job.name} preconditions unmet on host")
     if boardwalkd_client and not all_job_preconditions_met:
         boardwalkd_client.queue_event(
             WorkspaceEvent(
@@ -653,7 +654,7 @@ def directly_confirm_host_preconditions(host: Host, inventory_vars: InventoryHos
     return True
 
 
-def execute_workflow_jobs(host: Host, workspace: Workspace, job_kind: str):
+def execute_workflow_jobs(host: Host, workspace: Workspace, job_kind: str, verbosity: int):
     """
     Executes workflow jobs. Different kinds of job types are specified
     """
@@ -680,24 +681,26 @@ def execute_workflow_jobs(host: Host, workspace: Workspace, job_kind: str):
             boardwalkd_client.queue_event(
                 WorkspaceEvent(
                     severity="info",
-                    message=f"{host.name}: Running {job_kind} job {job.name}",
+                    message=f"{host.name}: Running {job_kind} {job.job_type.name} job {job.name}",
                 ),
             )
         # Get tasks (which may also run user-supplied python code locally)
         tasks = job.tasks()
         if len(tasks) > 0:
             host.ansible_run(
+                verbosity=verbosity,
+                job_type=job.job_type,
                 become_password=become_password,
                 become=True,
                 check=_check_mode,
                 gather_facts=False,
-                invocation_msg=f"{job_kind}_Job_{job.name}",
+                invocation_msg=f"{job_kind}_{job.job_type.name}_Job_{job.name}",
                 quiet=False,
                 tasks=tasks,
             )
 
 
-def execute_host_workflow(host: Host, workspace: Workspace):
+def execute_host_workflow(host: Host, workspace: Workspace, verbosity: int):
     """Handles executing all jobs defined in a workflow against a host"""
     unreachable_exception = None
 
@@ -725,14 +728,14 @@ def execute_host_workflow(host: Host, workspace: Workspace):
             broadcast=boardwalkd_send_broadcasts,
         )
     try:
-        execute_workflow_jobs(host, workspace, job_kind="main")
+        execute_workflow_jobs(host, workspace, job_kind="main", verbosity=verbosity)
     except AnsibleRunnerUnreachableHost as e:
         unreachable_exception = e
     finally:
         # If the host was unreachable there's no point in trying to recover here
         if unreachable_exception:
             raise unreachable_exception
-        execute_workflow_jobs(host, workspace, job_kind="exit")
+        execute_workflow_jobs(host, workspace, job_kind="exit", verbosity=verbosity)
 
     logger.info(f"{host.name}: Updating remote state")
     if boardwalkd_client:

@@ -9,19 +9,21 @@ container:
 # Cleans up temporary data that might get created during normal development
 .PHONY: clean
 clean:
-	rm -r \
-		dist \
-		src/*.egg-info \
-		src/boardwalk/__pycache__ \
-		src/boardwalkd/__pycache__ \
-		.boardwalk \
-		.boardwalkd \
-		test/boardwalk/__pycache__ \
-		test/server-client/.boardwalk \
-		test/server-client/__pycache__ \
-		.pytest_cache \
-		.ruff_cache \
-		|| :
+	set -o pipefail
+
+	@echo '[.] Removing built packages ...'
+	rm -rf dist/
+
+	@echo '[.] Cleaning __pycache__ directories ...'
+	find . -type d -name '__pycache__' | xargs rm -rf
+
+	@echo '[.] Cleaning .boardwalk and .boardwalkd directories ...'
+	find . -type d -name '.boardwalk' -or -name '.boardwalkd' | xargs rm -rf
+
+	@echo '[.] Cleaning pytest and ruff caches ...'
+	find . -type d -name '.pytest_cache' -or -name '.ruff_cache' | xargs rm -rf
+
+	@echo '[.] Removing podman images for localhost/boardwalk ...'
 	podman image rm $$(podman images 'localhost/boardwalk' --quiet) || :
 
 # Installs modules in editable mode
@@ -69,6 +71,14 @@ install-web-deps:
 	curl "https://unpkg.com/htmx.org@$(HTMX_VERSION)/dist/htmx.min.js" -o src/boardwalkd/static/htmx.min.js
 	curl "https://cdn.jsdelivr.net/npm/bootstrap@$(BOOTSTRAP_VERSION)/dist/css/bootstrap.min.css" -o src/boardwalkd/static/bootstrap.min.css
 	curl "https://cdn.jsdelivr.net/npm/bootstrap@$(BOOTSTRAP_VERSION)/dist/js/bootstrap.bundle.min.js" -o src/boardwalkd/static/bootstrap.bundle.min.js
+
+# Render all d2 diagrams in ./diagrams to PNG
+.PHONY: render-d2
+render-d2:
+	for file in $$(find ./diagrams -type f -name '*.d2' -not -name '_*.d2'); \
+	do \
+		d2 $$file $${file%.*}.png; \
+	done
 
 # Runs all available tests
 .PHONY: test

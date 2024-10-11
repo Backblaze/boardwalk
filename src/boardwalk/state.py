@@ -2,12 +2,12 @@
 This file holds the state model
 """
 
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel
 
 from boardwalk.host import Host
 
 
-class StateBaseModel(BaseModel, extra=Extra.forbid):
+class StateBaseModel(BaseModel, extra="forbid"):
     """Base model for local and remote state"""
 
 

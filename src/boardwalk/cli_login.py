@@ -5,10 +5,10 @@ login CLI subcommand
 import asyncio
 
 import click
-from boardwalkd.protocol import Client
 
 from boardwalk.app_exceptions import BoardwalkException
 from boardwalk.manifest import get_boardwalkd_url
+from boardwalkd.protocol import Client
 
 
 @click.command("login")
