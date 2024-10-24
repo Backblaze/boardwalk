@@ -1,0 +1,43 @@
+# Import color overrides
+...@_d2_configuration
+
+boardwalkd {
+    near: top-center
+}
+
+worker1; worker2; workerN
+
+
+worker1 -> boardwalkd: (1,2)
+worker2 -> boardwalkd: (1,2)
+workerN -> boardwalkd: (1,2)
+
+
+h1: Hosts
+h2: Hosts
+h3: Hosts
+
+worker1 -> h1: (3)
+worker2 -> h2: (3)
+workerN -> h3: (3)
+
+# ```text
+#            +------------+
+#            | boardwalkd |-----------+
+#            +------------+           |
+#                  ^ (1)              |
+#                  |                  |
+#      +-----------+-----------+      |
+#      |           |           |      |
+# +---------+ +---------+ +---------+ |
+# | Worker1 | | Worker2 | | WorkerN | |
+# +---------+ +---------+ +---------+ |
+# |    ^ (2)  |    ^ (2)  |    ^ (2)  |
+# |    |      |    |      |    |      |
+# \    +------\----+------\----+------+
+#  |           |           |
+#  v (3)       v (3)       v (3)
+# +-------+   +-------+   +-------+
+# | Hosts |   | Hosts |   | Hosts |
+# +-------+   +-------+   +-------+
+

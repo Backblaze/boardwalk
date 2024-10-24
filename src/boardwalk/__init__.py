@@ -6,6 +6,12 @@ from .manifest import (
     Job as Job,
 )
 from .manifest import (
+    PlaybookJob as PlaybookJob,
+)
+from .manifest import (
+    TaskJob as TaskJob,
+)
+from .manifest import (
     Workflow as Workflow,
 )
 from .manifest import (

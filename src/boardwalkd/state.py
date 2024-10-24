@@ -7,7 +7,7 @@ from collections import deque
 from datetime import datetime
 from pathlib import Path
 
-from pydantic import BaseModel, EmailStr, Extra, field_validator
+from pydantic import BaseModel, EmailStr, field_validator
 
 from boardwalkd.protocol import WorkspaceDetails, WorkspaceEvent, WorkspaceSemaphores
 
@@ -17,7 +17,7 @@ statefile_path = statefile_dir_path.joinpath("statefile.json")
 valid_user_roles = {"default", "admin"}
 
 
-class StateBaseModel(BaseModel, extra=Extra.forbid):
+class StateBaseModel(BaseModel, extra="forbid"):
     """BaseModel for state usage"""
 
 

@@ -5,13 +5,13 @@ This file has utilities for working with Ansible
 from __future__ import annotations
 
 import json
-import logging
 import sys
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import ansible_runner
+from loguru import logger
 
 import boardwalk
 from boardwalk.app_exceptions import BoardwalkException
@@ -45,7 +45,9 @@ if TYPE_CHECKING:
         project_dir: str
         quiet: bool
         suppress_env_files: bool
-        playbook: RunnerPlaybook
+        playbook: RunnerPlaybook | AnsibleTasksType
+        verbosity: int
+        extravars: dict | None
 
     class RunnerKwargsEnvvars(TypedDict, total=False):
         ANSIBLE_BECOME_ASK_PASS: str
@@ -60,9 +62,6 @@ if TYPE_CHECKING:
         hosts: str
         tasks: AnsibleTasksType
         vars: dict[str, str | bool]
-
-
-logger = logging.getLogger(__name__)
 
 
 def ansible_runner_cancel_callback(ws: Workspace):
@@ -99,11 +98,11 @@ def ansible_runner_errors_to_output(runner: Runner, include_msg: bool = True) ->
                 try:
                     msg.append(event["event_data"]["res"]["msg"])
                 except KeyError:
-                    logger.warn("Event error did not contain msg")
+                    logger.warning("Event error did not contain msg")
                 try:
                     msg.append(event["stdout"])
                 except KeyError:
-                    logger.warn("Event error did not contain stdout")
+                    logger.warning("Event error did not contain stdout")
             output.append(": ".join(msg))
     return "\n".join(output)
 
@@ -111,6 +110,7 @@ def ansible_runner_errors_to_output(runner: Runner, include_msg: bool = True) ->
 def ansible_runner_run_tasks(
     hosts: str,
     invocation_msg: str,
+    job_type: boardwalk.manifest.JobTypes,
     tasks: AnsibleTasksType,
     become: bool = False,
     become_password: str | None = None,
@@ -119,6 +119,7 @@ def ansible_runner_run_tasks(
     limit: str | None = None,
     quiet: bool = True,
     timeout: int | None = None,
+    verbosity: int = 0,
 ) -> ansible_runner.Runner:
     """
     Wraps ansible_runner.run to run Ansible tasks with some defaults for
@@ -139,6 +140,7 @@ def ansible_runner_run_tasks(
         "project_dir": str(Path.cwd()),
         "quiet": quiet,
         "suppress_env_files": True,
+        "verbosity": verbosity,
     }
     if check:
         runner_kwargs["cmdline"] = "--check"
@@ -147,13 +149,20 @@ def ansible_runner_run_tasks(
     if timeout:
         runner_kwargs["envvars"]["ANSIBLE_TASK_TIMEOUT"] = str(timeout)
 
-    runner_kwargs["playbook"] = {
-        "hosts": hosts,
-        "gather_facts": gather_facts,
-        "become": become,
-        "tasks": tasks,
-        "vars": {"boardwalk_operation": True},
-    }
+    logger.trace(f"Constructing runner_kwargs for job type {job_type.name}")
+    if job_type == boardwalk.manifest.JobTypes.TASK:
+        runner_kwargs["playbook"] = {
+            "hosts": hosts,
+            "gather_facts": gather_facts,
+            "become": become,
+            "tasks": tasks,
+            "vars": {"boardwalk_operation": True},
+        }
+    if job_type == boardwalk.manifest.JobTypes.PLAYBOOK:
+        # Executing a (list of) playbook(s) requires some different settings
+        runner_kwargs["limit"] = hosts
+        runner_kwargs["extravars"] = {"boardwalk_operation": True}
+        runner_kwargs["playbook"] = tasks
 
     output_msg_prefix = f"{hosts}: ansible_runner invocation"
     if limit:

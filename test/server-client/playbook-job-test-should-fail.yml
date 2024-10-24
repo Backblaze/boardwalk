@@ -1,0 +1,7 @@
+---
+- name: Test running playbooks from Boardwalk
+  hosts: localhost
+  tasks:
+    - name: Fail
+      ansible.builtin.fail:
+        msg: Task failed successfully!

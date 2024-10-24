@@ -3,11 +3,12 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [project]
+name = "boardwalk"
 requires-python = ">=3.11"
 
 [tool.poetry]
 name = "boardwalk"
-version = "0.8.21"
+version = "0.8.22"
 description = "Boardwalk is a linear Ansible workflow engine"
 readme = "README.md"
 authors = [
@@ -46,16 +47,24 @@ pydantic = ">=2.4.2"
 tornado = ">=6.2"
 slack-bolt = "^1.18.1"
 aiohttp = "^3.9.3"           # Required by slack-bolt's AsyncApp
+loguru = "^0.7.2"
 
 [tool.poetry.group.dev.dependencies]
 pyright = "==1.1.350"
-semgrep = ">=1.66.0"
-ruff = "^0.3.4"
+semgrep = ">=1.92.0"
+ruff = "^0.6.4"
 pytest = "^8.1.1"
+anyio = "^4.6.2.post1"
 
 [tool.poetry.scripts]
 boardwalk = "boardwalk.cli:cli"
 boardwalkd = "boardwalkd.cli:cli"
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    # Not entirely concerned about Pydantic warnings at the moment.
+    'ignore:::pydantic.*:',
+]
 
 [tool.ruff]
 line-length = 120

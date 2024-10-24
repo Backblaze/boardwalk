@@ -1,0 +1,7 @@
+---
+- name: Test running playbooks from Boardwalk
+  hosts: localhost
+  tasks:
+    - name: Say hello, Boardwalk... from a playbook!
+      ansible.builtin.debug:
+        msg: Hello, Boardwalk! From a playbook!

@@ -6,7 +6,6 @@ and contains functions to support clients using the server
 import asyncio
 import concurrent.futures
 import json
-import logging
 import socket
 import threading
 import time
@@ -16,7 +15,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
-from pydantic import BaseModel, Extra, field_validator
+from loguru import logger
+from pydantic import BaseModel, field_validator
 from tornado.httpclient import (
     HTTPClient,
     HTTPClientError,
@@ -27,10 +27,8 @@ from tornado.httpclient import (
 from tornado.simple_httpclient import HTTPTimeoutError
 from tornado.websocket import websocket_connect
 
-logger = logging.getLogger(__name__)
 
-
-class ProtocolBaseModel(BaseModel, extra=Extra.forbid):
+class ProtocolBaseModel(BaseModel, extra="forbid"):
     """BaseModel for protocol usage"""
 
 
@@ -263,7 +261,7 @@ class Client:
         """Tries to post a heartbeat to the server every 5 seconds"""
         while True:
             if quit.is_set():
-                logging.debug("Heartbeat keepalive thread closing")
+                logger.debug("Heartbeat keepalive thread closing")
                 return
             try:
                 self.workspace_post_heartbeat(workspace_name)

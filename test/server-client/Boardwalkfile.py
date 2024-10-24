@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-from boardwalk import Job, Workflow, Workspace, WorkspaceConfig, path
+from boardwalk import PlaybookJob, TaskJob, Workflow, Workspace, WorkspaceConfig, path
 
 if TYPE_CHECKING:
     from boardwalk import AnsibleTasksType
@@ -47,6 +47,30 @@ class MalformedYAMLWorkspace(Workspace):
         )
 
 
+class ShouldSucceedPlaybookExecutionTestWorkspace(Workspace):
+    def config(self):
+        return WorkspaceConfig(
+            host_pattern="localhost",
+            workflow=ShouldSucceedPlaybookExecutionTestWorkflow(),
+        )
+
+
+class ShouldFailPlaybookExecutionTestWorkspace(Workspace):
+    def config(self):
+        return WorkspaceConfig(
+            host_pattern="localhost",
+            workflow=ShouldFailPlaybookExecutionTestWorkflow(),
+        )
+
+
+class ShouldSucceedMixedJobTypesWorkspace(Workspace):
+    def config(self):
+        return WorkspaceConfig(
+            host_pattern="localhost",
+            workflow=ShouldSucceedMixedJobTypesWorkflow(),
+        )
+
+
 class UITestVerVeryLongWorkflowNameWorkflow(Workflow):
     def jobs(self):
         return TestJob()
@@ -70,20 +94,72 @@ class MalformedYAMLWorkflow(Workflow):
         return TestJob()
 
 
-class TestJob(Job):
+class ShouldSucceedPlaybookExecutionTestWorkflow(Workflow):
+    def jobs(self):
+        return ShouldSucceedPlaybookExecutionTestJob()
+
+    def exit_jobs(self):
+        return TestJob()
+
+
+class ShouldFailPlaybookExecutionTestWorkflow(Workflow):
+    def jobs(self):
+        return ShouldFailPlaybookExecutionTestJob()
+
+    def exit_jobs(self):
+        return TestJob()
+
+
+class ShouldSucceedMixedJobTypesWorkflow(Workflow):
+    def jobs(self):
+        return [
+            TestJob(),
+            ShouldSucceedPlaybookExecutionTestJob(),
+        ]
+
+    def exit_jobs(self):
+        return TestJob()
+
+
+class TestJob(TaskJob):
     def tasks(self) -> AnsibleTasksType:
-        return [{"debug": {"msg": "hello test"}}]
+        return [{"ansible.builtin.debug": {"msg": "Hello, Boardwalk!"}}]
 
 
-class FailTestJob(Job):
+class FailTestJob(TaskJob):
     def tasks(self) -> AnsibleTasksType:
-        return [{"fail": {"msg": "failed successfully"}}]
+        return [{"ansible.builtin.fail": {"msg": "Task failed successfully."}}]
 
 
-class MalformedYAMLJob(Job):
+class MalformedYAMLJob(TaskJob):
     """
     Tests a playbook that has malformed YAML
     """
 
     def tasks(self) -> AnsibleTasksType:
-        return [{"import_tasks": path("malformed_playbook.yml")}]
+        return [{"ansible.builtin.import_tasks": path("malformed_playbook.yml")}]
+
+
+class ShouldSucceedPlaybookExecutionTestJob(PlaybookJob):
+    """
+    Tests importing and running full playbooks against a specified host.
+    """
+
+    def playbooks(self) -> AnsibleTasksType:
+        return [
+            {"ansible.builtin.import_playbook": path("playbook-job-test-should-succeed.yml")},
+            {"ansible.builtin.import_playbook": path("playbook-job-test-should-be-skipped.yml")},
+        ]
+
+
+class ShouldFailPlaybookExecutionTestJob(PlaybookJob):
+    """
+    Tests importing and running full playbooks against a specified host.
+    """
+
+    def playbooks(self) -> AnsibleTasksType:
+        return [
+            {"ansible.builtin.import_playbook": path("playbook-job-test-should-succeed.yml")},
+            {"ansible.builtin.import_playbook": path("playbook-job-test-should-be-skipped.yml")},
+            {"ansible.builtin.import_playbook": path("playbook-job-test-should-fail.yml")},
+        ]

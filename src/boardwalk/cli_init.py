@@ -4,11 +4,11 @@ init CLI subcommand
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
 import click
+from loguru import logger
 
 from boardwalk.ansible import (
     AnsibleRunError,
@@ -19,7 +19,7 @@ from boardwalk.ansible import (
 )
 from boardwalk.app_exceptions import BoardwalkException
 from boardwalk.host import Host
-from boardwalk.manifest import NoActiveWorkspace, Workspace, get_ws
+from boardwalk.manifest import JobTypes, NoActiveWorkspace, Workspace, get_ws
 
 if TYPE_CHECKING:
     from ansible_runner import RunnerEvent
@@ -34,9 +34,6 @@ if TYPE_CHECKING:
         limit: str
         tasks: AnsibleTasksType
         timeout: int
-
-
-logger = logging.getLogger(__name__)
 
 
 @click.command(short_help="Inits local workspace state by getting host facts")
@@ -99,7 +96,7 @@ def init(ctx: click.Context, limit: str, retry: bool):
     # Run Ansible
     hosts_were_unreachable = False
     try:
-        runner = ansible_runner_run_tasks(**runner_kwargs)
+        runner = ansible_runner_run_tasks(**runner_kwargs, job_type=JobTypes.TASK)
     except (
         AnsibleRunnerFailedHost,
         AnsibleRunnerGeneralError,
@@ -136,7 +133,7 @@ def init(ctx: click.Context, limit: str, retry: bool):
 
     # Note if any hosts were unreachable
     if hosts_were_unreachable:
-        logger.warn("Some hosts were unreachable. Consider running again with --retry")
+        logger.warning("Some hosts were unreachable. Consider running again with --retry")
 
     # If we didn't find any hosts, raise an exception
     if len(ws.state.hosts) == 0:
@@ -164,9 +161,9 @@ def handle_failed_init_hosts(event: RunnerEvent, retry_file_path: Path):
     or unreachable hosts to a retry file and writes warnings and errors to stdout"""
     # Save any unreachable/failed hosts to the retry file
     if event["event"] == "runner_on_unreachable" or event["event"] == "runner_on_failed":
-        logger.warn(event["stdout"])
+        logger.warning(event["stdout"])
         with open(retry_file_path, "a") as file:
             file.write(f"{event['event_data']['host']}\n")
     # If no hosts matched or there are warnings, write them out
     if event["event"] == "warning" or event["event"] == "playbook_on_no_hosts_matched":
-        logger.warn(event["stdout"])
+        logger.warning(event["stdout"])

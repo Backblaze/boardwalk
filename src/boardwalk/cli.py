@@ -4,14 +4,13 @@ This is the main file for handling the CLI
 
 from __future__ import annotations
 
-import logging
-import os
 import signal
 import sys
 from importlib.metadata import version as lib_version
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import click
+from loguru import logger  # noqa: F401
 
 from boardwalk.app_exceptions import BoardwalkException
 from boardwalk.cli_catch import catch, release
@@ -25,12 +24,10 @@ from boardwalk.manifest import (
     WorkspaceNotFound,
     get_ws,
 )
-from boardwalk.utils import strtobool
 
 if TYPE_CHECKING:
     from typing import Any
 
-logger = logging.getLogger(__name__)
 
 terminating = False
 
@@ -43,52 +40,41 @@ def handle_signal(sig: int, frame: Any):
     signals sent to child processes (ansible-playbook)
     """
     global terminating
-    logger.warn(f"Received signal {sig}")
+    logger.warning(f"Received signal {sig}")
     if not terminating:
         terminating = True
         raise KeyboardInterrupt
     else:
-        logger.warn("Boardwalk is already terminating")
+        logger.warning("Boardwalk is already terminating")
 
 
 @click.group()
 @click.option(
-    "--debug/--no-debug",
-    "-D/-nD",
-    help=(
-        "Whether or not output debug messages. Alternatively may be set with"
-        " the BOARDWALK_DEBUG=1 environment variable"
-    ),
-    default=False,
+    "-v",
+    "--verbose",
+    count=True,
+    default=0,
+    envvar="BOARDWALK_VERBOSITY",
+    help="Whether or not output messages should be verbose. Additional -v's increases the verbosity",
     show_default=True,
+    show_envvar=True,
+    type=click.IntRange(min=0, max=5, clamp=True),
 )
 @click.pass_context
-def cli(ctx: click.Context, debug: bool | Literal[0, 1]):
+def cli(ctx: click.Context, verbose: int):
     """
     Boardwalk is a linear remote execution workflow engine built on top of Ansible.
     See the README.md @ https://github.com/Backblaze/boardwalk for more info
 
     To see more info about any subcommand, do `boardwalk <subcommand> --help`
     """
-    try:
-        debug = strtobool(os.environ["BOARDWALK_DEBUG"])
-    except KeyError:
-        pass
-    except ValueError:
-        raise BoardwalkException("BOARDWALK_DEBUG env variable has an invalid boolean value")
+    ctx.ensure_object(dict)
 
-    if debug:
-        loglevel = logging.DEBUG
-        logformat = "%(levelname)s:%(name)s:%(threadName)s:%(message)s"
-    else:
-        loglevel = logging.INFO
-        logformat = "%(levelname)s:%(name)s:%(message)s"
-
-    logging.basicConfig(
-        format=logformat,
-        handlers=[logging.StreamHandler(sys.stdout)],
-        level=loglevel,
-    )
+    loglevel = "INFO" if verbose == 0 else "DEBUG" if verbose == 1 else "TRACE"
+    ctx.obj["VERBOSITY"] = verbose
+    logger.remove()
+    logger.add(sys.stdout, level=loglevel)
+    logger.info(f"Log level is {loglevel}")
 
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGHUP, handle_signal)

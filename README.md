@@ -1,5 +1,6 @@
-# Boardwalk
-<img src="src/boardwalkd/static/boardwalk_icon.jpg" style="width: 25%;" align="right" />
+Boardwalk
+=========
+<img src="src/boardwalkd/static/boardwalk_icon.jpg" style="width: 25%;" align="right" alt="A picture of a boardwalk through a forest."/>
 
 Boardwalk is an open-source linear [Ansible](https://www.ansible.com/) workflow engine. It's
 purpose-built to help systems engineers automate low-and-slow background jobs
@@ -16,7 +17,24 @@ stopping and resuming long-running Ansible workflows easy and efficient.
 💥 __Boardwalk is alpha software. Interfaces and behaviors may change between
 updates.__ 💥
 
-## Motivation & Goals
+<!-- toc -->
+# Table of Contents
+- [Motivation & Goals](#motivation--goals)
+- [Open-Source License](#open-source-license)
+- [Contributing](#contributing)
+- [Concepts](#concepts)
+    - [Workspace](#workspace)
+    - [Workflow](#workflow)
+    - [Jobs](#jobs)
+    - [Local State](#local-state)
+    - [Remote State](#remote-state)
+- [Usage](#usage)
+    - [Installation](#installation)
+    - [The `Boardwalkfile.py`](#the-boardwalkfilepy)
+- [Command-line Interface](#environment-variables)
+- [`boardwalkd` Server](#boardwalkd-server)
+
+# Motivation & Goals
 
 Ansible is already a very capable agentless, modular, remote execution engine.
 It uses task playbooks that are easy to read and run against any number of
@@ -40,7 +58,7 @@ Ansible workflows. It interfaces with Ansible via
 [ansible-runner](https://github.com/ansible/ansible-runner), which is the same
 interface used by [AWX](https://github.com/ansible/awx).
 
-### Non-Goals
+## Non-Goals
 
 - ⛔️ Be a scheduler. Boardwalk doesn't need to solve the problems that cron,
   systemd timers or other schedulers do. Boardwalk does have primitives for
@@ -52,31 +70,19 @@ interface used by [AWX](https://github.com/ansible/awx).
   own secret management system, because Ansible already has solutions to those
   areas.
 
-## Open-Source License
+# Open-Source License
 
 Boardwalk is open source, licensed under the terms of the [MIT license](LICENSE).
 
-## Contributing
+# Contributing
 
-See [here](./CONTRIBUTING.md).
+See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-## Concepts
+# Concepts
 
-Conceptual overview diagram:
+<img src="diagrams/conceptual_overview.png" alt="Boardwalk can use multiple Workspaces. Each Workspace has exactly one Workflow, while each Workflow has at least one Job associated with it. If multiple Jobs exist in a Workflow, they are executed in sequence." />
 
-```text
-+----------------------------------------+
-| Workspace                              |
-| +------------------------------------+ |
-| | Workflow                           | |
-| | +------+     +------+     +------+ | |
-| | | Job1 | --> | Job2 | --> | JobN | | |
-| | +------+     +------+     +------+ | |
-| +------------------------------------+ |
-+----------------------------------------+
-```
-
-### Workspace
+## Workspace
 
 Workspaces define isolated configurations and state for working on projects with
 Boardwalk. They define the Ansible host pattern Boardwalk should target, the
@@ -85,7 +91,7 @@ Workflow Boardwalk will use, and some essential configuration options.
 Workspaces are defined in the [Boardwalkfile.py](#the-boardwalkfile-py). The
 active Workspace is selected with `boardwalk workspace use <workspace name>`.
 
-### Workflow
+## Workflow
 
 Every Workspace specifies a Workflow. Workflows are the set of Jobs that will be
 run against hosts in the Workspace. They define the Jobs, Jobs options, and the
@@ -98,7 +104,7 @@ Workflows are defined in the [Boardwalkfile.py](#the-boardwalkfile-py).
 Workflows can be dry-run with `boardwalk check`, which runs Ansible in `--check`
 mode. Workflows are run with `boardwalk run`.
 
-### Jobs
+## Jobs
 
 Jobs define what is actually executed in a Workflow. They define Ansible tasks
 that are run against hosts. They accept options that can be passed into them and
@@ -107,7 +113,7 @@ will run against it.
 
 Jobs are defined in the [Boardwalkfile.py](#the-boardwalkfile-py).
 
-#### Job Preconditions
+### Job Preconditions
 
 Preconditions are an important feature of Boardwalk Jobs; they are the mechanism
 indicating to Boardwalk whether a Workflow needs to be run on a host. When used
@@ -136,7 +142,7 @@ have changed. Thus, it's very important not to rely on preconditions alone for
 safety. Additional safety checks should be included in the Ansible tasks run by
 Jobs.
 
-### Local State
+## Local State
 
 Boardwalk maintains a local "statefile" for each Workspace. The primary data
 contained in the local state are Ansible facts associated with hosts. Inventory
@@ -146,15 +152,15 @@ The state is initially built using `boardwalk init`, and Workflows update the
 state with fresh Ansible facts as hosts are completed. The local state can be
 reset with `boardwalk workspace reset`.
 
-### Remote State
+## Remote State
 
 Boardwalk maintains a remote statefile on each host in
 `/etc/ansible/facts.d/boardwalk_state`. This file is used internally by
 Boardwalk.
 
-## Usage
+# Usage
 
-### Installation
+## Installation
 
 We recommend installing `boardwalk` in a [`pipx`](https://pipx.pypa.io/stable/)
 environment, to ensure that your system or user pip packages are not affected by
@@ -175,13 +181,13 @@ release, minus 1 minor version. So, if the current stable version is `3.22.x`,
 Boardwalk should work with `3.21.x`. Consider using
 [`pyenv`](https://github.com/pyenv/pyenv) to maintain fresh python environment.
 
-#### Shell Completion
+### Shell Completion
 
 To enable shell completion for `boardwalk` and `boardwalkd`, the following set
 of commands will generate the completion script and add them to your shell (a
 shell restart will be needed):
 
-##### Bash
+#### Bash
 ```bash
 _BOARDWALK_COMPLETE=bash_source boardwalk > ~/.boardwalk-complete.bash
 _BOARDWALKD_COMPLETE=bash_source boardwalkd > ~/.boardwalkd-complete.bash
@@ -189,7 +195,7 @@ echo '. ~/.boardwalk-complete.bash' >> ~/.bashrc
 echo '. ~/.boardwalkd-complete.bash' >> ~/.bashrc
 ```
 
-##### Zsh
+#### Zsh
 ```zsh
 _BOARDWALK_COMPLETE=zsh_source boardwalk > ~/.boardwalk-complete.zsh
 _BOARDWALKD_COMPLETE=zsh_source boardwalkd > ~/.boardwalkd-complete.zsh
@@ -197,27 +203,27 @@ echo '. ~/.boardwalk-complete.zsh' >> ~/.zshrc
 echo '. ~/.boardwalkd-complete.zsh' >> ~/.zshrc
 ```
 
-##### Fish
+#### Fish
 ```sh
 _BOARDWALK_COMPLETE=fish_source boardwalk > ~/.config/fish/completions/boardwalk.fish
 _BOARDWALKD_COMPLETE=fish_source boardwalkd > ~/.config/fish/completions/boardwalkd.fish
 ```
 
-#### Container Install
+### Container Install
 
 Boardwalk may be built as a container image by running `make container`.
 
 The entrypoint is simply `python -m` so either `boardwalk` or `boardwalkd`
 must be specified as the command when running.
 
-### The `Boardwalkfile.py`
+## The `Boardwalkfile.py`
 
 Boardwalk is both a python library and command-line tool. The `boardwalk`
 command-line tool expects a file called `Boardwalkfile.py` to exist in the
 current working directory where it's run. The `Boardwalkfile.py` defines what
 Workspaces, Workflows, and Jobs are available for use and how they are used.
 
-#### Example `Boardwalkfile.py`
+### Example `Boardwalkfile.py`
 
 ```python
 """
@@ -226,7 +232,7 @@ OS upgrades for storage pods in the staging environment
 """
 
 # Imports the boardwalk module and classes used in the Boardwalkfile.py
-from boardwalk import Job, Workflow, WorkflowConfig, Workspace, WorkspaceConfig, path
+from boardwalk import TaskJob, Workflow, WorkflowConfig, Workspace, WorkspaceConfig, path
 
 # Optionally sets the URL to a boardwalkd server
 boardwalkd_url = "http://localhost:8888"
@@ -282,9 +288,9 @@ class PodDistUpgradeWorkflow(Workflow):
         return WorkflowConfig(always_retry_failed_hosts=False)
 
 
-# Defines a Job with the name "PodPreTasksJob", which is called in the
+# Defines a TaskJob with the name "PodPreTasksJob", which is called in the
 # PodDistUpgradeWorkflow Workflow as the first Job
-class PodPreTasksJob(Job):
+class PodPreTasksJob(TaskJob):
     """
     Jobs have an optional "tasks" method that returns a list of Ansible tasks.
     The format for tasks is structurally the same as Ansible tasks defined using
@@ -300,9 +306,9 @@ class PodPreTasksJob(Job):
     def tasks(self):
         return [{"import_tasks": path("dist_upgrade/pod_pre_tasks.yml")}]
 
-# Defines a Job with the name "DistUpgradeJob", which is called in the
+# Defines a TaskJob with the name "DistUpgradeJob", which is called in the
 # PodDistUpgradeWorkflow Workflow as the second Job
-class DistUpgradeJob(Job):
+class DistUpgradeJob(TaskJob):
     """
     Jobs have an optional "required_options" method that returns either a string
     or tuple of strings. The return value specifies options that can be passed
@@ -348,16 +354,16 @@ class DistUpgradeJob(Job):
             {"import_tasks": path("dist_upgrade/main.yml")},
         ]
 
-# Defines a Job with the name "PodPostTasksJob", which is called in the
+# Defines a TaskJob with the name "PodPostTasksJob", which is called in the
 # PodDistUpgradeWorkflow Workflow as the last Job
-class PodPostTasksJob(Job):
+class PodPostTasksJob(TaskJob):
     def tasks(self):
         return [
             {"import_tasks": path("dist_upgrade/pod_post_tasks.yml")}
         ]
 ```
 
-### Command-line Interface
+## Command-line Interface
 
 Once you have a `Boardwalkfile.py`, `boardwalk` can be used to run workflows. The
 example command-line usage below is using the `Boardwalkfile.py` example above.
@@ -398,13 +404,13 @@ boardwalk --help
 boardwalk workspace --help
 ```
 
-### Environment Variables
+## Environment Variables
 
 - `BOARDWALK_WORKSPACE`: When set, Boardwalk will use the value as the Workspace
   in use. This allows the tool to run against multiple Workspaces at the same
   time from the same working directory.
 
-### Ansible Configuration & Options
+## Ansible Configuration & Options
 
 Ansible, when run inside Boardwalk, will use almost the exact same configuration
 as any Ansible commands will use outside of Boardwalk. The only differences are:
@@ -418,14 +424,14 @@ ansible.cfg](https://docs.ansible.com/ansible/latest/reference_appendices/config
 and/or [environment
 variables](https://docs.ansible.com/ansible/latest/reference_appendices/config.html).
 
-#### Ansible Fact Cache
+### Ansible Fact Cache
 
 Boardwalk maintains a fact cache per-workspace. The fact cache is populated for
 all hosts in a workspace during `boardwalk init`, and for each individual host
 as a Workflow runs. If `boardwalk init` hasn't been run in a long time, it may
 have stale data about hosts in the workspace.
 
-#### Ansible Performance
+### Ansible Performance
 
 Some optimal configuration settings are recommended. Ansible settings below are
 shown as environment variables here, but they may also be provided in an
@@ -448,13 +454,13 @@ against large numbers of hosts: `ANSIBLE_FORKS` should be set to as high a value
 as the controller can handle. Maximizing `ANSIBLE_FORKS` depends upon the
 controller's CPU, memory, and open files limits.
 
-### Automatic Vars
+## Automatic Vars
 
 Boardwalk injects a boolean variable into Ansible operations,
 `boardwalk_operation`. This variable is always `True` when Ansible is being run
 by Boardwalk.
 
-### `boardwalkd` Server
+## `boardwalkd` Server
 
 Boardwalk is bundled along with `boardwalkd`, which is a central network server
 that Boardwalk can coordinate with. By specifying `boardwalkd_url` in the
@@ -468,41 +474,24 @@ Boardwalk will use the server for several purposes: It enables Boardwalk to:
 
 See `boardwalkd serve --help` for options to run the server.
 
-#### Architecture
+### Architecture
 
 In the diagram and descriptions below, the word "worker" refers to the
 `boardwalk` CLI when it is connected to `boardwalkd`.
 
-```text
-           +------------+
-           | boardwalkd |-----------+
-           +------------+           |
-                 ^ (1)              |
-                 |                  |
-     +-----------+-----------+      |
-     |           |           |      |
-+---------+ +---------+ +---------+ |
-| Worker1 | | Worker2 | | WorkerN | |
-+---------+ +---------+ +---------+ |
-|    ^ (2)  |    ^ (2)  |    ^ (2)  |
-|    |      |    |      |    |      |
-\    +------\----+------\----+------+
- |           |           |
- v (3)       v (3)       v (3)
-+-------+   +-------+   +-------+
-| Hosts |   | Hosts |   | Hosts |
-+-------+   +-------+   +-------+
+<img src="diagrams/architecture.png" alt="A diagram showing the relationship between boardwalkd, boardwalk workers, and managed hosts. A single boardwalkd server exists, to which one or more workers may connect (reference items 1 and 2 in the Key). Each worker operates on a specific set of hosts (reference item 3 in the Key)." />
 
-(1) Worker details, Workspace data, Workflow events, heartbeats sent from
-    workers to boardwalkd over HTTP(S).
+> Key
+> ---
+> (1) Worker details, Workspace data, Workflow events,
+heartbeats sent from workers to boardwalkd over HTTP(S).
+>
+> (2) Workers poll boardwalkd over HTTP(S) for semaphores including Workspace
+mutexes and Workspace catches.
+>
+> (3) Workers connect directly to hosts over SSH.
 
-(2) Workers poll boardwalkd over HTTP(S) for semaphores including Workspace
-    mutexes and Workspace catches.
-
-(3) Workers connect directly to hosts over SSH.
-```
-
-#### Catch & Release Behavior With Boardwalkd
+### Catch & Release Behavior With Boardwalkd
 
 When Boardwalk encounters an error on a host, it will automatically catch the
 workspace. When a `boardwalkd` server is configured, automatic catching of
@@ -512,11 +501,11 @@ and local catches cannot be released from the server UI. If Boardwalk encounters
 an error and for any reason it cannot catch the Workspace on the server, it will
 fall back to catching locally.
 
-#### Boardwalkd Database Storage and Persistence
+### Boardwalkd Database Storage and Persistence
 `boardwalkd` uses a single JSON file to save state. The JSON file is flushed to
 the working directory of the server, in `.boardwalkd/statefile.json`
 
-#### Security
+### Security
 
 __Authentication__: By default, `boardwalkd` uses anonymous authentication. It's
 important that an authentication method be configured. See

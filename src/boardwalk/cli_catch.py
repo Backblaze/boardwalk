@@ -2,14 +2,11 @@
 catch and release CLI subcommands
 """
 
-import logging
-
 import click
+from loguru import logger
 
 from boardwalk.app_exceptions import BoardwalkException
 from boardwalk.manifest import NoActiveWorkspace, get_ws
-
-logger = logging.getLogger(__name__)
 
 
 @click.command(

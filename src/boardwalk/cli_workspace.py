@@ -2,14 +2,11 @@
 workspace CLI subcommand group
 """
 
-import logging
-
 import click
+from loguru import logger
 
 from boardwalk.app_exceptions import BoardwalkException
 from boardwalk.manifest import ManifestNotFound, NoActiveWorkspace, Workspace, WorkspaceNotFound, get_ws
-
-logger = logging.getLogger(__name__)
 
 
 @click.group(short_help="Subcommand group for working with workspaces")
@@ -30,7 +27,11 @@ def workspace_show():
 def workspace_use_completion(ctx, param, incomplete):
     """Allows click to perform shell completion for workspace names in `boardwalk workspace use`"""
     try:
-        get_ws()
+        try:
+            get_ws()
+        except NoActiveWorkspace:
+            pass
+
         return sorted(
             [name for name in [i.__qualname__ for i in Workspace.__subclasses__()] if name.startswith(incomplete)]
         )

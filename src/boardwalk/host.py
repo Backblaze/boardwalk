@@ -11,7 +11,7 @@ from base64 import b64decode
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel
 
 import boardwalk
 from boardwalk.ansible import ansible_runner_run_tasks
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from boardwalk.ansible import AnsibleTasksType
 
 
-class Host(BaseModel, extra=Extra.forbid):
+class Host(BaseModel, extra="forbid"):
     """Data and methods for managing an individual host"""
 
     ansible_facts: dict[str, Any]
@@ -42,6 +42,8 @@ class Host(BaseModel, extra=Extra.forbid):
         self,
         invocation_msg: str,
         tasks: AnsibleTasksType,
+        job_type: boardwalk.manifest.JobTypes,
+        verbosity: int = 0,
         become: bool = False,
         become_password: str | None = None,
         check: bool = False,
@@ -52,6 +54,8 @@ class Host(BaseModel, extra=Extra.forbid):
         Wraps ansible_runner_run_tasks for performing Ansible tasks against this host
         """
         return ansible_runner_run_tasks(
+            verbosity=verbosity,
+            job_type=job_type,
             hosts=self.name,
             invocation_msg=invocation_msg,
             tasks=tasks,
@@ -84,6 +88,7 @@ class Host(BaseModel, extra=Extra.forbid):
             invocation_msg="check_remote_host_lock",
             gather_facts=False,
             tasks=tasks,
+            job_type=boardwalk.manifest.JobTypes.TASK,
         )
 
         lockfile_stat_exists = False
@@ -158,6 +163,7 @@ class Host(BaseModel, extra=Extra.forbid):
             gather_facts=False,
             invocation_msg="lock_remote_host",
             tasks=tasks,
+            job_type=boardwalk.manifest.JobTypes.TASK,
         )
 
     def release(self, become_password: str | None = None, check: bool = False) -> None:
@@ -185,6 +191,7 @@ class Host(BaseModel, extra=Extra.forbid):
             gather_facts=False,
             invocation_msg="release_remote_host",
             tasks=tasks,
+            job_type=boardwalk.manifest.JobTypes.TASK,
         )
 
     def gather_facts(self) -> dict[str, Any]:
@@ -194,6 +201,7 @@ class Host(BaseModel, extra=Extra.forbid):
             invocation_msg="gather_facts",
             gather_facts=False,
             tasks=tasks,
+            job_type=boardwalk.manifest.JobTypes.TASK,
         )
         facts: dict[str, Any] = {"ansible_local": {}}
         for event in runner.events:
@@ -213,6 +221,7 @@ class Host(BaseModel, extra=Extra.forbid):
             invocation_msg="get_remote_state",
             gather_facts=False,
             tasks=tasks,
+            job_type=boardwalk.manifest.JobTypes.TASK,
         )
 
         # Get existing boardwalk_state fact, if any
@@ -272,6 +281,7 @@ class Host(BaseModel, extra=Extra.forbid):
             gather_facts=False,
             invocation_msg="set_remote_state",
             tasks=tasks,
+            job_type=boardwalk.manifest.JobTypes.TASK,
         )
         if not check:
             self.ansible_facts["ansible_local"]["boardwalk_state"] = remote_state_obj.dict()

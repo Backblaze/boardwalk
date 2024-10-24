@@ -7,10 +7,12 @@ from __future__ import annotations
 
 import os
 import sys
+import warnings
 from abc import ABC, abstractmethod
+from enum import Enum
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 
 from boardwalk.app_exceptions import BoardwalkException
 from boardwalk.state import LocalState
@@ -60,7 +62,7 @@ def get_ws() -> Workspace:
         raise ManifestNotFound
 
     # Check if there are duplicate class names
-    class_list = [Job, Workspace, Workflow, WorkspaceConfig]
+    class_list = [TaskJob, Workspace, Workflow, WorkspaceConfig]
     for item in class_list:
         subclasses: list[str] = []
         for subclass in item.__subclasses__():
@@ -103,8 +105,15 @@ def get_boardwalkd_url() -> str:
     return boardwalkd_url
 
 
-class Job:
-    """Defines a single Job as methods"""
+class JobTypes(Enum):
+    TASK = 1
+    PLAYBOOK = 2
+
+
+class BaseJob:
+    """
+    The base class for Jobs
+    """
 
     def __init__(self, options: dict[str, Any] = dict()):
         self.name = self.__class__.__name__
@@ -119,12 +128,6 @@ class Job:
     def preconditions(self, facts: AnsibleFacts, inventory_vars: InventoryHostVars) -> bool:
         """Optional user method. Return True if preconditions are met, else return False"""
         return True
-
-    def tasks(self) -> AnsibleTasksType:
-        """Optional user method. Return list of Ansible tasks to run. If an
-        empty list is returned, then the workflow doesn't connect to a host,
-        however, any code in this method still runs"""
-        return []
 
     def _required_options(self) -> tuple[str]:
         """
@@ -148,6 +151,55 @@ class Job:
             raise ValueError(f"Required options missing: {', '.join(missing_options)}")
 
 
+class TaskJob(BaseJob):
+    """Defines a single Job as methods, used to execute Tasks"""
+
+    def __init__(self):
+        super().__init__()
+        self.job_type = JobTypes.TASK
+
+    def tasks(self) -> AnsibleTasksType:
+        """Optional user method. Return list of Ansible tasks to run. If an
+        empty list is returned, then the workflow doesn't connect to a host,
+        however, any code in this method still runs"""
+        return []
+
+
+class Job(TaskJob):
+    """Defines a single Job as methods, used to execute Tasks.
+
+    Deprecated in favor of TaskJob.
+    """
+
+    def __init__(self):
+        warnings.warn(
+            "The job type Job is deprecated, and will be removed in a future release. Use TaskJob or PlaybookJob, as appropriate.",
+            DeprecationWarning,
+        )
+        super().__init__()
+
+
+class PlaybookJob(BaseJob):
+    """Defines a single Job as methods, used to execute Playbooks"""
+
+    def __init__(self):
+        super().__init__()
+        self.job_type = JobTypes.PLAYBOOK
+
+    def tasks(self) -> AnsibleTasksType:
+        """Helper method used to return the contents of the self.playbooks() function."""
+        return self.playbooks()
+
+    def playbooks(self) -> AnsibleTasksType:
+        """
+        Optional user method. Return list of Ansible playbooks to run, in the
+        format of an ansible.builtin.import_playbook task. If an empty list is
+        returned, then the workflow doesn't connect to a host, however, any code
+        in this method still runs
+        """
+        return []
+
+
 class WorkflowConfig:
     """
     Configuration block for Workflows
@@ -169,10 +221,10 @@ class Workflow(ABC):
     def __init__(self):
         # If user-provided Jobs as a single Job, convert to tuple
         workflow_jobs = self.jobs()
-        if isinstance(workflow_jobs, Job):
+        if isinstance(workflow_jobs, TaskJob) or isinstance(workflow_jobs, PlaybookJob):
             workflow_jobs = (workflow_jobs,)
         workflow_exit_jobs = self.exit_jobs()
-        if isinstance(workflow_exit_jobs, Job):
+        if isinstance(workflow_exit_jobs, TaskJob) or isinstance(workflow_exit_jobs, PlaybookJob):
             workflow_exit_jobs = (workflow_exit_jobs,)
         # self._jobs is the list of initialized Jobs.
         self.i_jobs = workflow_jobs
@@ -185,12 +237,24 @@ class Workflow(ABC):
         """Optionally-supplied WorkflowConfig options"""
         return WorkflowConfig()
 
+    @overload
     @abstractmethod
-    def jobs(self) -> Job | tuple[Job, ...]:
+    def jobs(self) -> TaskJob | tuple[TaskJob, ...]: ...
+
+    @overload
+    @abstractmethod
+    def jobs(self) -> PlaybookJob | tuple[PlaybookJob, ...]: ...
+
+    @overload
+    @abstractmethod
+    def jobs(self) -> tuple[TaskJob | PlaybookJob, ...]: ...
+
+    @abstractmethod
+    def jobs(self):
         """Required user method. Defines the Jobs in a workflow. Order matters"""
         raise NotImplementedError
 
-    def exit_jobs(self) -> Job | tuple[Job, ...]:
+    def exit_jobs(self) -> TaskJob | PlaybookJob | tuple[TaskJob | PlaybookJob, ...]:
         """
         Optional user method. Defines Workflow Jobs that we will always try
         to run, even on failure. Order matters. exit_jobs run after regular Jobs
