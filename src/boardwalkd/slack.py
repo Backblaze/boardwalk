@@ -10,7 +10,6 @@ from importlib.metadata import version as lib_version
 from logging import Logger
 from typing import Any
 
-from boardwalk.app_exceptions import BoardwalkException
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.async_app import AsyncAck, AsyncApp, AsyncBoltContext
 from slack_sdk.errors import SlackApiError
@@ -36,6 +35,7 @@ from slack_sdk.models.blocks import (
 from slack_sdk.models.views import View
 from slack_sdk.web.async_client import AsyncWebClient
 
+from boardwalk.app_exceptions import BoardwalkException
 from boardwalkd.protocol import WorkspaceEvent
 from boardwalkd.server import SERVER_URL, SLACK_SLASH_COMMAND_PREFIX, SLACK_TOKENS, internal_workspace_event
 from boardwalkd.server import state as STATE

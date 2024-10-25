@@ -2,12 +2,10 @@
 Common application exception classes
 """
 
-import logging
 import typing
 
 from click import ClickException
-
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 
 class BoardwalkException(ClickException):

@@ -1,4 +1,5 @@
 import pytest
+
 from boardwalk.utils import strtobool
 
 

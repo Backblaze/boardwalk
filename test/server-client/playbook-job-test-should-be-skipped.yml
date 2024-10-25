@@ -1,0 +1,7 @@
+---
+- name: Test running playbooks from Boardwalk
+  hosts: this-wont-ever-execute.invalid
+  tasks:
+    - name: If it does execute...
+      ansible.builtin.debug:
+        msg: Sad panda. =(
