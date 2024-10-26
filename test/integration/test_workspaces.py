@@ -1,4 +1,5 @@
 import os
+import platform
 import signal
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,28 @@ from anyio.streams.text import TextReceiveStream
         pytest.param("ShouldSucceedTestWorkspace", False, ""),
         pytest.param("ShouldSucceedPlaybookExecutionTestWorkspace", False, ""),
         pytest.param("UITestVeryVeryLongWorkSpaceNameWorkspace", False, ""),
+        # Next four are from test/server-client/pylib/regression_bz_svreng_608.py
+        pytest.param("TaskJobWithOptionsShouldSucceedWorkspace", False, ""),
+        pytest.param("PlaybookJobWithOptionsShouldSucceedWorkspace", False, ""),
+        pytest.param(
+            "TaskJobWithPreconditionsShouldSucceedIfHostIsMacOSXWorkspace",
+            False,
+            "",
+            marks=pytest.mark.skipif(
+                condition="macos" not in platform.platform().lower(),
+                reason="Workspace's preconditions depends on the host being MacOS.",
+            ),
+        ),
+        # Technically this one doesn't _fail_, but this lets it fit neatly into the parameterized tests.
+        pytest.param(
+            "TaskJobWithPreconditionsShouldBeSkippedIfHostIsMacOSXWorkspace",
+            True,
+            "No hosts meet preconditions",
+            marks=pytest.mark.skipif(
+                condition="macos" not in platform.platform().lower(),
+                reason="Workspace's preconditions depends on the host being MacOS.",
+            ),
+        ),
         pytest.param(
             "ShouldFailTestWorkspace",
             True,
@@ -54,10 +77,13 @@ async def test_development_workspaces(
             with fail_after(delay=90) as scope:
                 async with await open_process(command=command, env=new_environ) as process:
                     async for text in TextReceiveStream(process.stdout):  # type:ignore
+                        # To allow for reading what was received, if the test ends up failing.
+                        print(text)
                         output_stdout.append(text)
                         if failure_expected and "Waiting for release before continuing" in text:
                             process.send_signal(signal.SIGINT)
                     async for text in TextReceiveStream(process.stderr):  # type:ignore
+                        print(text)
                         output_stderr.append(text)
 
         assert not scope.cancelled_caught
@@ -65,4 +91,5 @@ async def test_development_workspaces(
     if failure_expected:
         assert failure_msg in "".join(output_stdout)
     else:
+        assert "Host completed successfully; wrapping up" in "".join(output_stdout)
         assert process.returncode == 0

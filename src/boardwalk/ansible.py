@@ -47,7 +47,7 @@ if TYPE_CHECKING:
         suppress_env_files: bool
         playbook: RunnerPlaybook | AnsibleTasksType
         verbosity: int
-        extravars: dict | None
+        extravars: dict[str, Any] | None
 
     class RunnerKwargsEnvvars(TypedDict, total=False):
         ANSIBLE_BECOME_ASK_PASS: str
@@ -120,6 +120,7 @@ def ansible_runner_run_tasks(
     quiet: bool = True,
     timeout: int | None = None,
     verbosity: int = 0,
+    extra_vars: dict = {},
 ) -> ansible_runner.Runner:
     """
     Wraps ansible_runner.run to run Ansible tasks with some defaults for
@@ -161,7 +162,7 @@ def ansible_runner_run_tasks(
     if job_type == boardwalk.manifest.JobTypes.PLAYBOOK:
         # Executing a (list of) playbook(s) requires some different settings
         runner_kwargs["limit"] = hosts
-        runner_kwargs["extravars"] = {"boardwalk_operation": True}
+        runner_kwargs["extravars"] = {"boardwalk_operation": True} | extra_vars
         runner_kwargs["playbook"] = tasks
 
     output_msg_prefix = f"{hosts}: ansible_runner invocation"

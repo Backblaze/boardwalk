@@ -49,6 +49,7 @@ class Host(BaseModel, extra="forbid"):
         check: bool = False,
         gather_facts: bool = True,
         quiet: bool = True,
+        extra_vars: dict = {},
     ) -> Runner:
         """
         Wraps ansible_runner_run_tasks for performing Ansible tasks against this host
@@ -64,6 +65,7 @@ class Host(BaseModel, extra="forbid"):
             check=check,
             gather_facts=gather_facts,
             quiet=quiet,
+            extra_vars=extra_vars,
         )
 
     def is_locked(self) -> str | bool:

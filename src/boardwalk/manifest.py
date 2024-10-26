@@ -154,8 +154,8 @@ class BaseJob:
 class TaskJob(BaseJob):
     """Defines a single Job as methods, used to execute Tasks"""
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, options: dict[str, Any] = dict()):
+        super().__init__(options=options)
         self.job_type = JobTypes.TASK
 
     def tasks(self) -> AnsibleTasksType:
@@ -171,20 +171,27 @@ class Job(TaskJob):
     Deprecated in favor of TaskJob.
     """
 
-    def __init__(self):
+    def __init__(self, options: dict[str, Any] = dict()):
         warnings.warn(
             "The job type Job is deprecated, and will be removed in a future release. Use TaskJob or PlaybookJob, as appropriate.",
             DeprecationWarning,
         )
-        super().__init__()
+        super().__init__(options=options)
+
+    def tasks(self) -> AnsibleTasksType:
+        """Optional user method. Return list of Ansible tasks to run. If an
+        empty list is returned, then the workflow doesn't connect to a host,
+        however, any code in this method still runs"""
+        return []
 
 
 class PlaybookJob(BaseJob):
     """Defines a single Job as methods, used to execute Playbooks"""
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, options: dict[str, Any] = dict()):
+        super().__init__(options=options)
         self.job_type = JobTypes.PLAYBOOK
+        self.extra_vars = options
 
     def tasks(self) -> AnsibleTasksType:
         """Helper method used to return the contents of the self.playbooks() function."""
