@@ -697,6 +697,7 @@ def execute_workflow_jobs(host: Host, workspace: Workspace, job_kind: str, verbo
                 invocation_msg=f"{job_kind}_{job.job_type.name}_Job_{job.name}",
                 quiet=False,
                 tasks=tasks,
+                extra_vars=job.options,
             )
 
 
@@ -754,6 +755,7 @@ def execute_host_workflow(host: Host, workspace: Workspace, verbosity: int):
         )
     host.set_remote_state(remote_state, become_password, _check_mode)
 
+    logger.success(f"{host.name}: Host completed successfully; wrapping up")
     if boardwalkd_client:
         boardwalkd_client.queue_event(
             WorkspaceEvent(

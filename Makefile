@@ -84,10 +84,14 @@ render-d2:
 .PHONY: test
 test: test-pytest test-ruff test-pyright test-semgrep
 
-# Run pytest
+# Run pytest verbosely if we're running manually, but normally if we're in a CI environment.
 .PHONY: test-pytest
 test-pytest: develop
+ifndef CI
+	poetry run pytest  --verbose
+else
 	poetry run pytest
+endif
 
 # Run all available Ruff checks
 .PHONY: test-ruff

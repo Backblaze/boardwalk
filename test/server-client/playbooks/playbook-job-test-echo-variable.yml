@@ -1,0 +1,7 @@
+---
+- name: Test echoing a set variable
+  hosts: localhost
+  tasks:
+    - name: Tell me my variable, please!
+      ansible.builtin.debug:
+        msg: "Your variable is: {{ boardwalk_playbookjob_test_variable }}"

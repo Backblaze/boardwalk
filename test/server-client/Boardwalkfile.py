@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
+from pylib.regression_bz_svreng_609 import *  # noqa: F403
+
 from boardwalk import PlaybookJob, TaskJob, Workflow, Workspace, WorkspaceConfig, path
 
 if TYPE_CHECKING:
@@ -147,8 +149,8 @@ class ShouldSucceedPlaybookExecutionTestJob(PlaybookJob):
 
     def playbooks(self) -> AnsibleTasksType:
         return [
-            {"ansible.builtin.import_playbook": path("playbook-job-test-should-succeed.yml")},
-            {"ansible.builtin.import_playbook": path("playbook-job-test-should-be-skipped.yml")},
+            {"ansible.builtin.import_playbook": path("playbooks/playbook-job-test-should-succeed.yml")},
+            {"ansible.builtin.import_playbook": path("playbooks/playbook-job-test-should-be-skipped.yml")},
         ]
 
 
@@ -159,7 +161,7 @@ class ShouldFailPlaybookExecutionTestJob(PlaybookJob):
 
     def playbooks(self) -> AnsibleTasksType:
         return [
-            {"ansible.builtin.import_playbook": path("playbook-job-test-should-succeed.yml")},
-            {"ansible.builtin.import_playbook": path("playbook-job-test-should-be-skipped.yml")},
-            {"ansible.builtin.import_playbook": path("playbook-job-test-should-fail.yml")},
+            {"ansible.builtin.import_playbook": path("playbooks/playbook-job-test-should-succeed.yml")},
+            {"ansible.builtin.import_playbook": path("playbooks/playbook-job-test-should-be-skipped.yml")},
+            {"ansible.builtin.import_playbook": path("playbooks/playbook-job-test-should-fail.yml")},
         ]
