@@ -178,12 +178,6 @@ class Job(TaskJob):
         )
         super().__init__(options=options)
 
-    def tasks(self) -> AnsibleTasksType:
-        """Optional user method. Return list of Ansible tasks to run. If an
-        empty list is returned, then the workflow doesn't connect to a host,
-        however, any code in this method still runs"""
-        return []
-
 
 class PlaybookJob(BaseJob):
     """Defines a single Job as methods, used to execute Playbooks"""
