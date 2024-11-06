@@ -1,0 +1,106 @@
+name: "Sphinx: Render docs"
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        type: boolean
+        description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
+        required: false
+        default: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+    permissions:
+      contents: write
+    steps:
+      #----------------------------------------------
+      #       check-out repo and set-up python
+      #----------------------------------------------
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Manually triggered debugging; see: https://github.com/mxschmitt/action-tmate?tab=readme-ov-file#manually-triggered-debug
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        # Need to run this always in the development; cause this is in a PR, it doesn't allow manual workflows to be triggered?
+        # if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug_enabled }}
+        with:
+          # Starts the tmate session, prints connection details, then resumes the workflow
+          detached: true
+          # Requires the initiating user's SSH key to be provided
+          limit-access-to-actor: true
+
+      - name: Set up python
+        id: setup-python
+        uses: actions/setup-python@v5.3.0
+        with:
+          python-version: '3.11'
+
+      #----------------------------------------------
+      # Install and configure Poetry, or restore from cache
+      #----------------------------------------------
+      - name: Load cached Poetry installation
+        id: cached-poetry
+        uses: actions/cache@v4.1.2
+        with:
+          path: ~/.local  # the path depends on the OS
+          key: poetry-docs-0  # increment to reset cache
+
+      - name: Install Poetry
+        if: steps.cached-poetry.outputs.cache-hit != 'true'
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
+
+      #----------------------------------------------
+      #       load cached venv if cache exists
+      #----------------------------------------------
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4.1.2
+        with:
+          path: .venv
+          key: boardwalk-docs-venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+
+      #----------------------------------------------
+      # install your root project, if required
+      #----------------------------------------------
+      - name: Install project, with dependencies foor building documentation
+        run: poetry install --no-interaction --with=docs --sync
+
+      - name: Run 'make docs', to build documentation
+        run: poetry run make docs
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: html-docs
+          path: docs/build/
+
+      # - name: Deploy main branch docs to gh-pages branch
+      #   uses: peaceiris/actions-gh-pages@v4
+      #   if: github.ref == 'refs/heads/main'
+      #   with:
+      #     github_token: ${{ secrets.GITHUB_TOKEN }}
+      #     publish_dir: docs/build/
+
+      # Since it doesn't seem GHActions supports `or`, using this as an intermediate testing step.
+      # The above will remain once we merge this workflow back into the main repo.
+      - name: Deploy testing docs to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        if: github.ref == 'refs/heads/dev'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/build/

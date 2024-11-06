@@ -1,6 +1,8 @@
 Boardwalk
 =========
+<div id="boardwalk-readme-icon">
 <img src="src/boardwalkd/static/boardwalk_icon.jpg" style="width: 25%;" align="right" alt="A picture of a boardwalk through a forest."/>
+</div>
 
 Boardwalk is an open-source linear [Ansible](https://www.ansible.com/) workflow engine. It's
 purpose-built to help systems engineers automate low-and-slow background jobs
@@ -17,7 +19,8 @@ stopping and resuming long-running Ansible workflows easy and efficient.
 💥 __Boardwalk is alpha software. Interfaces and behaviors may change between
 updates.__ 💥
 
-<!-- toc -->
+
+<!-- GitHub-Table-of-Contents_Before -->
 # Table of Contents
 - [Motivation & Goals](#motivation--goals)
 - [Open-Source License](#open-source-license)
@@ -30,9 +33,11 @@ updates.__ 💥
     - [Remote State](#remote-state)
 - [Usage](#usage)
     - [Installation](#installation)
-    - [The `Boardwalkfile.py`](#the-boardwalkfilepy)
+    - [The `Boardwalkfile.py`](#the-boardwalkfile)
 - [Command-line Interface](#environment-variables)
 - [`boardwalkd` Server](#boardwalkd-server)
+
+<!-- GitHub-Table-of-Contents_After -->
 
 # Motivation & Goals
 
@@ -72,11 +77,11 @@ interface used by [AWX](https://github.com/ansible/awx).
 
 # Open-Source License
 
-Boardwalk is open source, licensed under the terms of the [MIT license](LICENSE).
+Boardwalk is open source, licensed under the terms of the [MIT license](https://github.com/Backblaze/boardwalk/blob/main/LICENSE).
 
 # Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md).
+See [CONTRIBUTING.md](https://github.com/Backblaze/boardwalk/blob/main/CONTRIBUTING.md).
 
 # Concepts
 
@@ -88,7 +93,7 @@ Workspaces define isolated configurations and state for working on projects with
 Boardwalk. They define the Ansible host pattern Boardwalk should target, the
 Workflow Boardwalk will use, and some essential configuration options.
 
-Workspaces are defined in the [Boardwalkfile.py](#the-boardwalkfile-py). The
+Workspaces are defined in the [Boardwalkfile.py](#the-boardwalkfile). The
 active Workspace is selected with `boardwalk workspace use <workspace name>`.
 
 ## Workflow
@@ -100,7 +105,7 @@ purpose of a Workflow is to mutate a host from one state to another. Typically
 Workflows depend upon some Ansible fact(s) having changed after the Workflow has
 completed all of its Jobs.
 
-Workflows are defined in the [Boardwalkfile.py](#the-boardwalkfile-py).
+Workflows are defined in the [Boardwalkfile.py](#the-boardwalkfile).
 Workflows can be dry-run with `boardwalk check`, which runs Ansible in `--check`
 mode. Workflows are run with `boardwalk run`.
 
@@ -111,7 +116,7 @@ that are run against hosts. They accept options that can be passed into them and
 used in tasks. They define preconditions that a host must meet before a Workflow
 will run against it.
 
-Jobs are defined in the [Boardwalkfile.py](#the-boardwalkfile-py).
+Jobs are defined in the [Boardwalkfile.py](#the-boardwalkfile).
 
 ### Job Preconditions
 
@@ -216,7 +221,7 @@ Boardwalk may be built as a container image by running `make container`.
 The entrypoint is simply `python -m` so either `boardwalk` or `boardwalkd`
 must be specified as the command when running.
 
-## The `Boardwalkfile.py`
+## The `Boardwalkfile`
 
 Boardwalk is both a python library and command-line tool. The `boardwalk`
 command-line tool expects a file called `Boardwalkfile.py` to exist in the

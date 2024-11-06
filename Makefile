@@ -50,6 +50,12 @@ endif
 dist: clean
 	poetry build
 
+# Builds the Sphinx HTML documentation -- Shortcut for `cd docs && make html`
+.PHONY: docs
+docs: develop
+	poetry install --with=docs --sync
+	poetry run make --directory=./docs/ html
+
 # Applies fixable errors, and formats code
 .PHONY: format
 format:
