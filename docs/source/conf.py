@@ -12,7 +12,7 @@ from importlib.metadata import version as lib_version
 project = "Boardwalk"
 copyright = f"{datetime.now(tz=UTC).year}, Backblaze"
 author = "Backblaze"
-release = f"{lib_version("boardwalk")}"
+release = f"{lib_version('boardwalk')}"
 
 
 # -- General configuration ---------------------------------------------------
