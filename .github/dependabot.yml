@@ -8,11 +8,6 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
-  # Keep the requirements.txt for Sphinx builds in `/docs` up to date, also.
-  - package-ecosystem: "pip"
-    directory: "/docs"
-    schedule:
-      interval: "daily"
   # For keeping workflows up-to-date.
   - package-ecosystem: "github-actions"
     directory: "/"
