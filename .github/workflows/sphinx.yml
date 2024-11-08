@@ -1,13 +1,13 @@
 name: "Sphinx: Render docs"
 
 on:
-  pull_request:
+  pull_request: {}
   push:
     branches:
       - main
     tags:
       - 'v*.*.*'
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 jobs:
   build:
@@ -70,20 +70,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: html-docs
-          path: docs/build/
+          # Lower default retention -- the artifacts can be rebuilt from source, if needed
+          retention-days: 14
+          # Don't include the doctrees subdir; it's just pickled data Sphinx generates to make the HTML
+          path: |
+            docs/build/
+            !docs/build/doctrees
 
-      # - name: Deploy main branch docs to gh-pages branch
-      #   uses: peaceiris/actions-gh-pages@v4
-      #   if: github.ref == 'refs/heads/main'
-      #   with:
-      #     github_token: ${{ secrets.GITHUB_TOKEN }}
-      #     publish_dir: docs/build/
-
-      # Since it doesn't seem GHActions supports `or`, using this as an intermediate testing step.
-      # The above will remain once we merge this workflow back into the main repo.
-      - name: Deploy testing docs to gh-pages branch
+      - name: Deploy documentation to the gh-pages branch for publishing
         uses: peaceiris/actions-gh-pages@v4
-        if: github.ref == 'refs/heads/dev'
+        if: github.ref == 'refs/heads/main'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: docs/build/
+          publish_dir: docs/build/html

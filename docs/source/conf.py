@@ -7,17 +7,6 @@ import subprocess
 from datetime import UTC, datetime
 from importlib.metadata import version as lib_version
 
-# -- Helper functions -----------------------------------------------------
-
-
-def get_git_revision_hash() -> str:
-    return subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("ascii").strip()
-
-
-def get_git_revision_short_hash() -> str:
-    return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode("ascii").strip()
-
-
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
@@ -27,6 +16,12 @@ author = "Backblaze"
 VERSION: str = lib_version("boardwalk")
 release = f"v{VERSION}"
 version = VERSION
+
+# -- Helper functions -----------------------------------------------------
+
+
+def get_git_revision_short_hash() -> str:
+    return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode("ascii").strip()
 
 
 # -- General configuration ---------------------------------------------------
@@ -116,9 +111,6 @@ html_logo = "_img/src/boardwalkd/static/boardwalk_icon.jpg"
 # html_favicon = "_static/logo-square.svg"
 html_title = f"Boardwalk v{VERSION} ({get_git_revision_short_hash()})"
 html_theme_options = {
-    "extra_footer": f"""
-    <div>Documentation generated with commit <span onclick="navigator.clipboard.writeText('{get_git_revision_hash()}')" title="{get_git_revision_hash()}">{get_git_revision_short_hash()}</span></div>
-    """,
     "home_page_in_toc": True,
     "logo": {
         "alt_text": "Boardwalk documentation - Home",
