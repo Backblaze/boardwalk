@@ -3,8 +3,20 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
+import subprocess
 from datetime import UTC, datetime
 from importlib.metadata import version as lib_version
+
+# -- Helper functions -----------------------------------------------------
+
+
+def get_git_revision_hash() -> str:
+    return subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("ascii").strip()
+
+
+def get_git_revision_short_hash() -> str:
+    return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode("ascii").strip()
+
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -12,7 +24,9 @@ from importlib.metadata import version as lib_version
 project = "Boardwalk"
 copyright = f"{datetime.now(tz=UTC).year}, Backblaze"
 author = "Backblaze"
-release = f"{lib_version('boardwalk')}"
+VERSION: str = lib_version("boardwalk")
+release = f"v{VERSION}"
+version = VERSION
 
 
 # -- General configuration ---------------------------------------------------
@@ -33,8 +47,6 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 nitpicky = True
 nitpick_ignore = [
-    # This does anchor correctly when testing the rendered page.
-    ("myst", "the-boardwalkfile"),
     # I think these are just by virtue of the fact we have these behind an `if TYPE_CHECKING:` line? Need to (eventually) figure these out.
     ("py:class", "boardwalk.ansible.AnsibleFacts"),
     ("py:class", "boardwalk.ansible.AnsibleTasksType"),
@@ -102,12 +114,15 @@ html_extra_path = [
 html_static_path = ["_static"]
 html_logo = "_img/src/boardwalkd/static/boardwalk_icon.jpg"
 # html_favicon = "_static/logo-square.svg"
-html_title = ""
+html_title = f"Boardwalk v{VERSION} ({get_git_revision_short_hash()})"
 html_theme_options = {
+    "extra_footer": f"""
+    <div>Documentation generated with commit <span onclick="navigator.clipboard.writeText('{get_git_revision_hash()}')" title="{get_git_revision_hash()}">{get_git_revision_short_hash()}</span></div>
+    """,
     "home_page_in_toc": True,
     "logo": {
         "alt_text": "Boardwalk documentation - Home",
-        "text": "Boardwalk, a linear Ansible workflow engine",
+        "text": f"Boardwalk, a linear Ansible workflow engine <br /><sub>v{VERSION}</sub>",
     },
     "repository_branch": "main",
     "repository_url": "https://github.com/Backblaze/boardwalk/",

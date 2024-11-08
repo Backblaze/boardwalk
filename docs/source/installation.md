@@ -3,8 +3,9 @@
 gfm_only: True
 -------
 
-# Overview
+# Installation
 
 ```{include} ../../README.md
-:start-after: <!-- README.md-Table-of-Contents_After -->
+:start-after: <!-- README.md_Installation_Section_Before -->
+:end-before: <!-- README.md_Installation_Section_After -->
 ```

@@ -4,7 +4,7 @@ gfm_only: True
 -------
 
 ```{include} ../../README.md
-:end-before: GitHub-Table-of-Contents_Before
+:end-before: <!-- README.md-Table-of-Contents_Before -->
 ```
 
 ```{toctree}
@@ -13,6 +13,7 @@ gfm_only: True
 :caption: General
 
 overview.md
+installation.md
 ```
 
 ```{toctree}
