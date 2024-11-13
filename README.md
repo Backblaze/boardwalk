@@ -23,6 +23,7 @@ updates.__ 💥
 <!-- README.md-Table-of-Contents_Before -->
 # Table of Contents
 - [Motivation & Goals](#motivation--goals)
+- [Installation](#installation)
 - [Open-Source License](#open-source-license)
 - [Contributing](#contributing)
 - [Concepts](#concepts)
@@ -32,7 +33,6 @@ updates.__ 💥
     - [Local State](#local-state)
     - [Remote State](#remote-state)
 - [Usage](#usage)
-    - [Installation](#installation)
     - [The `Boardwalkfile.py`](#the-boardwalkfilepy)
 - [Command-line Interface](#environment-variables)
 - [`boardwalkd` Server](#boardwalkd-server)
@@ -223,7 +223,6 @@ Boardwalk.
 
 # Usage
 
-(the-boardwalkfilepy)=
 ## The `Boardwalkfile.py`
 
 Boardwalk is both a python library and command-line tool. The `boardwalk`

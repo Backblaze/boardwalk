@@ -1,3 +1,7 @@
+<!--
+# This page is used to generate the toctree, and to link to the referenced auto-generated files.
+-->
+
 # Command-line help reference
 
 This section contains auto-generated CLI manual pages.[^1]

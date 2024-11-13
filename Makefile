@@ -11,8 +11,9 @@ container:
 clean:
 	set -o pipefail
 
-	@echo '[.] Removing built packages ...'
+	@echo '[.] Removing built packages and documentation ...'
 	rm -rf dist/
+	make --directory=./docs/ clean
 
 	@echo '[.] Cleaning __pycache__ directories ...'
 	find . -type d -name '__pycache__' | xargs rm -rf
