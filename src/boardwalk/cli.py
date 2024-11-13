@@ -74,7 +74,8 @@ def cli(ctx: click.Context, verbose: int):
     ctx.obj["VERBOSITY"] = verbose
     logger.remove()
     logger.add(sys.stdout, level=loglevel)
-    logger.info(f"Log level is {loglevel}")
+    if verbose > 0:
+        logger.info(f"Log level is {loglevel}")
 
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGHUP, handle_signal)

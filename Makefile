@@ -11,8 +11,9 @@ container:
 clean:
 	set -o pipefail
 
-	@echo '[.] Removing built packages ...'
+	@echo '[.] Removing built packages and documentation ...'
 	rm -rf dist/
+	make --directory=./docs/ clean
 
 	@echo '[.] Cleaning __pycache__ directories ...'
 	find . -type d -name '__pycache__' | xargs rm -rf
@@ -49,6 +50,12 @@ endif
 
 dist: clean
 	poetry build
+
+# Builds the Sphinx HTML documentation -- Shortcut for `cd docs && make html`
+.PHONY: docs
+docs: develop
+	poetry install --with=docs --sync
+	poetry run make --directory=./docs/ html
 
 # Applies fixable errors, and formats code
 .PHONY: format

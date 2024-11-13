@@ -1,6 +1,8 @@
 Boardwalk
 =========
+<div id="boardwalk-readme-icon">
 <img src="src/boardwalkd/static/boardwalk_icon.jpg" style="width: 25%;" align="right" alt="A picture of a boardwalk through a forest."/>
+</div>
 
 Boardwalk is an open-source linear [Ansible](https://www.ansible.com/) workflow engine. It's
 purpose-built to help systems engineers automate low-and-slow background jobs
@@ -17,9 +19,11 @@ stopping and resuming long-running Ansible workflows easy and efficient.
 💥 __Boardwalk is alpha software. Interfaces and behaviors may change between
 updates.__ 💥
 
-<!-- toc -->
+
+<!-- README.md-Table-of-Contents_Before -->
 # Table of Contents
 - [Motivation & Goals](#motivation--goals)
+- [Installation](#installation)
 - [Open-Source License](#open-source-license)
 - [Contributing](#contributing)
 - [Concepts](#concepts)
@@ -29,10 +33,11 @@ updates.__ 💥
     - [Local State](#local-state)
     - [Remote State](#remote-state)
 - [Usage](#usage)
-    - [Installation](#installation)
     - [The `Boardwalkfile.py`](#the-boardwalkfilepy)
 - [Command-line Interface](#environment-variables)
 - [`boardwalkd` Server](#boardwalkd-server)
+
+<!-- README.md-Table-of-Contents_After -->
 
 # Motivation & Goals
 
@@ -70,13 +75,71 @@ interface used by [AWX](https://github.com/ansible/awx).
   own secret management system, because Ansible already has solutions to those
   areas.
 
+# Installation
+<!-- README.md_Installation_Section_Before -->
+
+We recommend installing `boardwalk` in a [`pipx`](https://pipx.pypa.io/stable/)
+environment, to ensure that your system or user pip packages are not affected by
+Boardwalk's dependencies. Refer to `pipx`'s documentation for how to install it,
+and then execute the following commands:
+```sh
+# Boardwalk depends on `ansible` in order to run.
+pipx install ansible>=6.5.0
+# Inject Boardwalk into the environment so it can use Ansible. Optionally,
+# appending an @<git reference> allows for installing specific commits,
+# branches, or tags.
+pipx inject ansible git+ssh://git@github.com/Backblaze/boardwalk.git
+```
+
+__Note__:
+Boardwalk should be designed to be compatible with the current stable Python3
+release, minus 1 minor version. So, if the current stable version is `3.22.x`,
+Boardwalk should work with `3.21.x`. Consider using
+[`pyenv`](https://github.com/pyenv/pyenv) to maintain fresh python environment.
+
+## Shell Completion
+
+To enable shell completion for `boardwalk` and `boardwalkd`, the following set
+of commands will generate the completion script and add them to your shell (a
+shell restart will be needed):
+
+### Bash
+```bash
+_BOARDWALK_COMPLETE=bash_source boardwalk > ~/.boardwalk-complete.bash
+_BOARDWALKD_COMPLETE=bash_source boardwalkd > ~/.boardwalkd-complete.bash
+echo '. ~/.boardwalk-complete.bash' >> ~/.bashrc
+echo '. ~/.boardwalkd-complete.bash' >> ~/.bashrc
+```
+
+### Zsh
+```zsh
+_BOARDWALK_COMPLETE=zsh_source boardwalk > ~/.boardwalk-complete.zsh
+_BOARDWALKD_COMPLETE=zsh_source boardwalkd > ~/.boardwalkd-complete.zsh
+echo '. ~/.boardwalk-complete.zsh' >> ~/.zshrc
+echo '. ~/.boardwalkd-complete.zsh' >> ~/.zshrc
+```
+
+### Fish
+```sh
+_BOARDWALK_COMPLETE=fish_source boardwalk > ~/.config/fish/completions/boardwalk.fish
+_BOARDWALKD_COMPLETE=fish_source boardwalkd > ~/.config/fish/completions/boardwalkd.fish
+```
+
+## Container Install
+
+Boardwalk may be built as a container image by running `make container`.
+
+The entrypoint is simply `python -m` so either `boardwalk` or `boardwalkd`
+must be specified as the command when running.
+<!-- README.md_Installation_Section_After -->
+
 # Open-Source License
 
-Boardwalk is open source, licensed under the terms of the [MIT license](LICENSE).
+Boardwalk is open source, licensed under the terms of the [MIT license](https://github.com/Backblaze/boardwalk/blob/main/LICENSE).
 
 # Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md).
+See [CONTRIBUTING.md](https://github.com/Backblaze/boardwalk/blob/main/CONTRIBUTING.md).
 
 # Concepts
 
@@ -88,7 +151,7 @@ Workspaces define isolated configurations and state for working on projects with
 Boardwalk. They define the Ansible host pattern Boardwalk should target, the
 Workflow Boardwalk will use, and some essential configuration options.
 
-Workspaces are defined in the [Boardwalkfile.py](#the-boardwalkfile-py). The
+Workspaces are defined in the [Boardwalkfile.py](#the-boardwalkfilepy). The
 active Workspace is selected with `boardwalk workspace use <workspace name>`.
 
 ## Workflow
@@ -100,7 +163,7 @@ purpose of a Workflow is to mutate a host from one state to another. Typically
 Workflows depend upon some Ansible fact(s) having changed after the Workflow has
 completed all of its Jobs.
 
-Workflows are defined in the [Boardwalkfile.py](#the-boardwalkfile-py).
+Workflows are defined in the [Boardwalkfile.py](#the-boardwalkfilepy).
 Workflows can be dry-run with `boardwalk check`, which runs Ansible in `--check`
 mode. Workflows are run with `boardwalk run`.
 
@@ -111,7 +174,7 @@ that are run against hosts. They accept options that can be passed into them and
 used in tasks. They define preconditions that a host must meet before a Workflow
 will run against it.
 
-Jobs are defined in the [Boardwalkfile.py](#the-boardwalkfile-py).
+Jobs are defined in the [Boardwalkfile.py](#the-boardwalkfilepy).
 
 ### Job Preconditions
 
@@ -159,62 +222,6 @@ Boardwalk maintains a remote statefile on each host in
 Boardwalk.
 
 # Usage
-
-## Installation
-
-We recommend installing `boardwalk` in a [`pipx`](https://pipx.pypa.io/stable/)
-environment, to ensure that your system or user pip packages are not affected by
-Boardwalk's dependencies. Refer to `pipx`'s documentation for how to install it,
-and then execute the following commands:
-```sh
-# Boardwalk depends on `ansible` in order to run.
-pipx install ansible>=6.5.0
-# Inject Boardwalk into the environment so it can use Ansible. Optionally,
-# appending an @<git reference> allows for installing specific commits,
-# branches, or tags.
-pipx inject ansible git+ssh://git@github.com/Backblaze/boardwalk.git
-```
-
-__Note__:
-Boardwalk should be designed to be compatible with the current stable Python3
-release, minus 1 minor version. So, if the current stable version is `3.22.x`,
-Boardwalk should work with `3.21.x`. Consider using
-[`pyenv`](https://github.com/pyenv/pyenv) to maintain fresh python environment.
-
-### Shell Completion
-
-To enable shell completion for `boardwalk` and `boardwalkd`, the following set
-of commands will generate the completion script and add them to your shell (a
-shell restart will be needed):
-
-#### Bash
-```bash
-_BOARDWALK_COMPLETE=bash_source boardwalk > ~/.boardwalk-complete.bash
-_BOARDWALKD_COMPLETE=bash_source boardwalkd > ~/.boardwalkd-complete.bash
-echo '. ~/.boardwalk-complete.bash' >> ~/.bashrc
-echo '. ~/.boardwalkd-complete.bash' >> ~/.bashrc
-```
-
-#### Zsh
-```zsh
-_BOARDWALK_COMPLETE=zsh_source boardwalk > ~/.boardwalk-complete.zsh
-_BOARDWALKD_COMPLETE=zsh_source boardwalkd > ~/.boardwalkd-complete.zsh
-echo '. ~/.boardwalk-complete.zsh' >> ~/.zshrc
-echo '. ~/.boardwalkd-complete.zsh' >> ~/.zshrc
-```
-
-#### Fish
-```sh
-_BOARDWALK_COMPLETE=fish_source boardwalk > ~/.config/fish/completions/boardwalk.fish
-_BOARDWALKD_COMPLETE=fish_source boardwalkd > ~/.config/fish/completions/boardwalkd.fish
-```
-
-### Container Install
-
-Boardwalk may be built as a container image by running `make container`.
-
-The entrypoint is simply `python -m` so either `boardwalk` or `boardwalkd`
-must be specified as the command when running.
 
 ## The `Boardwalkfile.py`
 
