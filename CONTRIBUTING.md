@@ -88,6 +88,18 @@ Automated tests should be developed for cases that clearly improve Boardwalk's
 reliability, user and developer experience. Otherwise, there is no specific
 enforcement of test coverage.
 
+#### `ansible-lint`
+
+Both
+[Ansible](https://github.com/ansible/ansible/tree/devel?tab=GPL-3.0-1-ov-file#readme)
+and
+[`ansible-lint`](https://github.com/ansible/ansible-lint?tab=GPL-3.0-1-ov-file#readme)
+are licensed under the GNU GPLv3. Consequently, to guard against the GPLv3.0
+license attaching to Boardwalk, `ansible-lint` is not included as a development
+dependency, even as an optional development dependency. Consequently, to execute
+`make test-ansible-lint`, `ansible-lint` will need to be available (e.g., via a
+`pipx` install, or similar).
+
 ### Versioning
 
 The boardwalk pip module uses semantic versioning. Please make sure to update

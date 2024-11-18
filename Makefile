@@ -89,7 +89,11 @@ render-d2:
 
 # Runs all available tests
 .PHONY: test
-test: test-pytest test-ruff test-pyright test-semgrep
+test: test-pytest test-ruff test-pyright test-semgrep test-ansible-lint
+
+.PHONY: test-ansible-lint
+test-ansible-lint: develop
+	-cd test && poetry run ansible-lint --config-file ansible-lint.yaml
 
 # Run pytest verbosely if we're running manually, but normally if we're in a CI environment.
 .PHONY: test-pytest

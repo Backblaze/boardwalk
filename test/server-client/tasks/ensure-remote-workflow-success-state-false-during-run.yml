@@ -1,0 +1,41 @@
+---
+
+- name: ensure-remote-workflow-success-state-false-during-run | Ensure required variables are defined
+  ansible.builtin.assert:
+    that:
+      - test_workspace_name is defined
+
+- name: ensure-remote-workflow-success-state-false-during-run | Create (local) temp directory
+  ansible.builtin.tempfile:
+    path: /tmp/
+    state: directory
+  delegate_to: localhost
+  register: tempfile
+
+- name: ensure-remote-workflow-success-state-false-during-run | Update permissions on the temp directory
+  ansible.builtin.file:
+    path: "{{ tempfile.path }}"
+    mode: "0777"
+  delegate_to: localhost
+
+- name: ensure-remote-workflow-success-state-false-during-run | Fetch /etc/ansible/facts.d/boardwalk_state.fact
+  ansible.builtin.fetch:
+    src: /etc/ansible/facts.d/boardwalk_state.fact
+    dest: "{{ tempfile.path }}/boardwalk_state.fact"
+    flat: true
+  register: fetched_file
+
+- name: ensure-remote-workflow-success-state-false-during-run | Read the boardwalk_state.fact file we retrieved
+  ansible.builtin.set_fact:
+    boardwalk_state: "{{ lookup('ansible.builtin.file', fetched_file.dest) | from_json }}"
+
+- name: ensure-remote-workflow-success-state-false-during-run | Assert that the running workspace's workflow has not succeeded
+  ansible.builtin.assert:
+    that:
+      - boardwalk_state["workspaces"][test_workspace_name]["workflow"]["started"] == True
+      - boardwalk_state["workspaces"][test_workspace_name]["workflow"]["succeeded"] == False
+    fail_msg: >
+      The workspace {{ test_workspace_name }} does not have its remote state set as `started == True` and `succeeded == False`; a workflow
+      that is currently executing cannot, by definition, have its workflow as both started and succeeded. The remote state is currently
+      set to `started == {{ boardwalk_state["workspaces"][test_workspace_name]["workflow"]["started"] }}` and
+      `succeeded == {{ boardwalk_state["workspaces"][test_workspace_name]["workflow"]["succeeded"] }}`.

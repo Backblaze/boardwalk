@@ -1,0 +1,13 @@
+---
+# A dummy playbook used to consolidate all test playbooks and task files into a
+# single location that can be used to test their correctness with
+# `ansible-lint`.
+
+- name: A dummy playbook to enable use of ansible-lint against Boardwalk ansible task files
+  hosts:
+    - nonexistent.invalid
+  check_mode: true
+  become: false
+  tasks:
+    - name: Import tasks
+      ansible.builtin.import_tasks: server-client/tasks/ensure-remote-workflow-success-state-false-during-run.yml

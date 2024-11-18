@@ -1,0 +1,32 @@
+---
+# .ansible-lint
+
+# exclude_paths included in this file are parsed relative to this file's location
+# and not relative to the CWD of execution. CLI arguments passed to the --exclude
+# option are parsed relative to the CWD of execution.
+exclude_paths:
+  - .cache/ # implicit unless exclude_paths is defined in config
+  - semgrep-rules.yml
+  - server-client/playbooks/malformed_playbook.yml
+# parseable: true
+quiet: true
+# strict: true
+# verbosity: 1
+
+use_default_rules: true
+
+# Ansible-lint does not automatically load rules that have the 'opt-in' tag.
+# You must enable opt-in rules by listing each rule 'id' below.
+enable_list:
+  - args
+  - empty-string-compare # opt-in
+  - no-log-password # opt-in
+  - no-same-owner # opt-in
+  - name[prefix] # opt-in
+  - galaxy-version-incorrect # opt-in
+  # add yaml here if you want to avoid ignoring yaml checks when yamllint
+  # library is missing. Normally its absence just skips using that rule.
+  - yaml
+
+# Allow setting custom prefix for name[prefix] rule
+task_name_prefix: "{stem} | "
