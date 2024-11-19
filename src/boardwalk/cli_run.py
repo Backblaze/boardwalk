@@ -716,8 +716,11 @@ def execute_host_workflow(host: Host, workspace: Workspace, verbosity: int):
     remote_state = host.get_remote_state()
     try:
         remote_state.workspaces[workspace.name].workflow.started = True
+        remote_state.workspaces[workspace.name].workflow.succeeded = False
     except KeyError:
-        remote_state.workspaces[workspace.name] = RemoteStateWorkspace(workflow=RemoteStateWorkflow(started=True))
+        remote_state.workspaces[workspace.name] = RemoteStateWorkspace(
+            workflow=RemoteStateWorkflow(started=True, succeeded=False)
+        )
     host.set_remote_state(remote_state, become_password, _check_mode)
 
     if boardwalkd_client:
