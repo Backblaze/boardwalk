@@ -2,15 +2,19 @@
 name: Run Boardwalk test suites
 
 on:
-  workflow_dispatch:
   pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
   pull-requests: read
 
 jobs:
-  make-test:
+  python-tests:
+    name: Boardwalk Test Suite
     runs-on: ubuntu-latest
 
     steps:
@@ -79,10 +83,35 @@ jobs:
       # Run pytest
       - run: make test-pytest
 
-      # Check code formatting and import sorting
-      - run: make test-ruff
-
       # Commented out because we're planning on switching to a different static
       # typechecker, and frankly whatever is taking pyright _minutes_ to run is
       # a little excessive, for now.
       # - run: make test-pyright
+
+  ansible-lint:
+    name: Ansible Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run ansible-lint
+        uses: ansible/ansible-lint@v24.10.0
+        # optional (see below):
+        with:
+          args: "--config-file ${{ github.workspace }}/test/ansible-lint.yaml"
+          working_directory: ${{ github.workspace }}/test
+
+  ruff-lint-check:
+    name: Ruff - Linting check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/ruff-action@v1
+
+  ruff-formatting-check:
+    name: Ruff - Formatting check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/ruff-action@v1
+        with:
+          args: "format --check"
