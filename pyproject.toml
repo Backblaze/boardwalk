@@ -41,7 +41,7 @@ include = [
 "Issues" = "https://github.com/Backblaze/boardwalk/issues"
 
 [tool.poetry.dependencies]
-aiohttp = "^3.11.7"                 # Required by slack-bolt's AsyncApp
+aiohttp = "^3.11.8"                 # Required by slack-bolt's AsyncApp
 ansible-runner = ">=2.3.0"
 click = ">=8.1.3"
 cryptography = ">=38.0.3"
