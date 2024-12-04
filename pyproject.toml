@@ -57,7 +57,7 @@ tornado = ">=6.4.2"
 anyio = "^4.6.2.post1"
 pyright = "==1.1.350"
 pytest = "^8.1.1"
-ruff = "^0.8.0"
+ruff = "^0.8.1"
 semgrep = ">=1.92.0"
 
 [tool.poetry.group.docs]
