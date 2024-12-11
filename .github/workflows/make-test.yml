@@ -94,7 +94,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run ansible-lint
-        uses: ansible/ansible-lint@v24.10.0
+        uses: ansible/ansible-lint@v24.12.0
         # optional (see below):
         with:
           args: "--config-file ${{ github.workspace }}/test/ansible-lint.yaml"
