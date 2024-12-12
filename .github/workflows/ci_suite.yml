@@ -58,44 +58,28 @@ jobs:
     name: Boardwalk Test Suite
     needs: workflow_entrypoint
     runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      # Using the caching mechanism for Poetry provided by `actions/setup-python` requires that Poetry be available beforehand
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          installer-parallel: true
 
       - name: Set up python
         id: setup-python
         uses: actions/setup-python@v5.3.0
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
+          cache: 'poetry'  # Use the caching provided by actions/setup-python, since it's included.
 
-      - name: If Poetry cache exists, restore the cache to cut down on CI build time
-        id: cached-poetry
-        uses: actions/cache@v4.2.0
-        with:
-          path: ~/.local  # the path depends on the OS
-          key: poetry-0  # increment to reset cache
-      
-      - name: If we don't have a cached Poetry installation, install it
-        if: steps.cached-poetry.outputs.cache-hit != 'true'
-        uses: snok/install-poetry@v1
-        with:
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-          installer-parallel: true
-
-      - name: If a cached virtual environment exists, load it
-        id: cached-poetry-dependencies
-        uses: actions/cache@v4.2.0
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
-
-      - name: Install dependencies if they were not cached
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
-
-      - name: Install the main project
+      - name: Install the project via Poetry
         run: poetry install --no-interaction
       
       # If we need to add this for the replacement typechecker, uncomment this.
