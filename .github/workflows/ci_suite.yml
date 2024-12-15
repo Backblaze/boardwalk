@@ -65,22 +65,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      # Using the caching mechanism for Poetry provided by `actions/setup-python` requires that Poetry be available beforehand
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          virtualenvs-create: true
-          installer-parallel: true
-
-      - name: Set up python
-        id: setup-python
-        uses: actions/setup-python@v5.3.0
+      - name: Install Poetry, setup Python, and install the Poetry project
+        uses: ./.github/actions/poetry_project_setup.yml
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'poetry'  # Use the caching provided by actions/setup-python, since it's included.
-
-      - name: Install the project via Poetry
-        run: poetry install --no-interaction
       
       # If we need to add this for the replacement typechecker, uncomment this.
       # - run: poetry add ansible --no-interaction
@@ -92,3 +80,17 @@ jobs:
       # typechecker, and frankly whatever is taking pyright _minutes_ to run is
       # a little excessive, for now.
       # - run: make test-pyright
+
+  docs_build_test:
+    name: Run a test build of documentation
+    needs: workflow_entrypoint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Poetry, setup Python, and install the Poetry project
+        uses: ./.github/actions/poetry_project_setup
+
+      - name: Ensure documentation is able to build without errors
+        run: make docs
