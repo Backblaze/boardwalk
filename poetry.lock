@@ -2221,13 +2221,13 @@ type = ["importlib_metadata (>=7.0.2)", "jaraco.develop (>=7.21)", "mypy (>=1.12
 
 [[package]]
 name = "slack-bolt"
-version = "1.21.3"
+version = "1.22.0"
 description = "The Bolt Framework for Python"
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "slack_bolt-1.21.3-py2.py3-none-any.whl", hash = "sha256:f5c41bfd5758db2023a7591e93d05ebb218aaae704e0dc382ae400bc1d5f2670"},
-    {file = "slack_bolt-1.21.3.tar.gz", hash = "sha256:f91ca5dc22da749a42e40a1885b466a4f2af1f65d40c544fccce56e4bb95f1fe"},
+    {file = "slack_bolt-1.22.0-py2.py3-none-any.whl", hash = "sha256:349097136a586617e5fb71f40f58a30fa847f664c598577f67a01f99faa1a9eb"},
+    {file = "slack_bolt-1.22.0.tar.gz", hash = "sha256:b9c66d088fe3ec8bdd0494278eb500fe58092c2941de86d6822d00f4b3c7c88b"},
 ]
 
 [package.dependencies]
@@ -2978,4 +2978,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<4"
-content-hash = "ee1a373d80645c09d2b6ed99e55cddbd5c90f9be3f0f5f2e621b9e9d41961238"
+content-hash = "c2a2a994491cfce6088050fc5be5570a4b9e3ac3e0f055b9d0588185f3d934eb"
