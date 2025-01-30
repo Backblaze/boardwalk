@@ -2163,16 +2163,16 @@ files = [
 
 [[package]]
 name = "semgrep"
-version = "1.100.0"
+version = "1.106.0"
 description = "Lightweight static analysis for many languages. Find bug variants with patterns that look like source code."
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "semgrep-1.100.0-cp39.cp310.cp311.py39.py310.py311-none-macosx_10_14_x86_64.whl", hash = "sha256:c2ac42a60f913ef6057921df4808ebadb81a7f37ab2f80b88725a60fddb22d79"},
-    {file = "semgrep-1.100.0-cp39.cp310.cp311.py39.py310.py311-none-macosx_11_0_arm64.whl", hash = "sha256:faf1e290d05e7e2b8c2cec208e93032633dffea9b4c5071f24277cee45ac8ccd"},
-    {file = "semgrep-1.100.0-cp39.cp310.cp311.py39.py310.py311-none-musllinux_1_0_aarch64.manylinux2014_aarch64.whl", hash = "sha256:bf3333aa83cfc1f22cb67a36736b13af0c6b05ac3256f7e8c1f63b2ca733cb46"},
-    {file = "semgrep-1.100.0-cp39.cp310.cp311.py39.py310.py311-none-musllinux_1_0_x86_64.manylinux2014_x86_64.whl", hash = "sha256:13a55457577d59daee1b1068832102f1da96bbaef84ed238e64f24af96918ec2"},
-    {file = "semgrep-1.100.0.tar.gz", hash = "sha256:cd71d52f54105763f70631e64e5bf72083e2ee8ab5bc7c0e39e3bcab73d9b4f5"},
+    {file = "semgrep-1.106.0-cp39.cp310.cp311.py39.py310.py311-none-macosx_10_14_x86_64.whl", hash = "sha256:5fcf2fae049308dc9b64f00289a808aae1d0a09ab83a1aa2261e66478fab82cf"},
+    {file = "semgrep-1.106.0-cp39.cp310.cp311.py39.py310.py311-none-macosx_11_0_arm64.whl", hash = "sha256:e1e6febf0b45a799c1939dbd4540ec83f33560d7d00d6d15c5c18572042aee64"},
+    {file = "semgrep-1.106.0-cp39.cp310.cp311.py39.py310.py311-none-musllinux_1_0_aarch64.manylinux2014_aarch64.whl", hash = "sha256:94ab43a3ec9825a0e94e342f67df7eb299b44f0b4a0193150bafb65a18290134"},
+    {file = "semgrep-1.106.0-cp39.cp310.cp311.py39.py310.py311-none-musllinux_1_0_x86_64.manylinux2014_x86_64.whl", hash = "sha256:786d1ff0f7e316a5322d5d826a7f3f06099bfab4ab1d7470bd58ea4cdbba5721"},
+    {file = "semgrep-1.106.0.tar.gz", hash = "sha256:4eb13cc971abd835fbde3cfb9b9601065f523a1bcc88366df543d45fd078adf6"},
 ]
 
 [package.dependencies]
