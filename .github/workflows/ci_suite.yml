@@ -1,0 +1,96 @@
+---
+name: CI Suite
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  workflow_entrypoint:
+    name: Entrypoint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Intentionally Empty Step
+        run: exit 0
+
+  run_linters:
+    name: Run linters
+    needs: workflow_entrypoint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Proceed to run linters
+        id: linter-setup
+        run: ':'
+
+      - name: Run ansible-lint
+        if: steps.linter-setup.conclusion == 'success' && !cancelled()
+        uses: ansible/ansible-lint@v25.5.0
+        with:
+          args: "--config-file ${{ github.workspace }}/test/ansible-lint.yaml"
+          working_directory: ${{ github.workspace }}/test
+
+      - name: Ruff - Linting
+        if: steps.linter-setup.conclusion == 'success' && !cancelled()
+        uses: astral-sh/ruff-action@v3
+
+      - name: Ruff - Formatting
+        if: steps.linter-setup.conclusion == 'success' && !cancelled()
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "format --check"
+
+  run_all_tests:
+    name: Boardwalk Test Suite
+    needs: workflow_entrypoint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Poetry, setup Python, and install the Poetry project
+        uses: ./.github/actions/poetry_project_setup/
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      # If we need to add this for the replacement typechecker, uncomment this.
+      # - run: poetry add ansible --no-interaction
+
+      - name: Execute Python test suite
+        run: make test-pytest
+
+      # Commented out because we're planning on switching to a different static
+      # typechecker, and frankly whatever is taking pyright _minutes_ to run is
+      # a little excessive, for now.
+      # - run: make test-pyright
+
+  docs_build_test:
+    name: Run a test build of documentation
+    needs: workflow_entrypoint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Poetry, setup Python, and install the Poetry project
+        uses: ./.github/actions/poetry_project_setup
+
+      - name: Ensure documentation is able to build without errors
+        run: make docs

@@ -35,25 +35,22 @@ mkdir -p "$AUTO_GEN_DIR"
 mkdir -p "$AUTO_GEN_DIR/boardwalk"
 mkdir -p "$AUTO_GEN_DIR/boardwalkd"
 
+echo "[+] Beginning CLI help documentation generation..."
+STATUS=0
 for cmd in "${commands[@]}"; do
-    # Define regular expression patterns for 'boardwalk' and 'boardwalkd', so we
-    # can sort them into the correct subdirectories. Note that we need to use
-    # POSIX-compliant EREs, here, since this is portable between MacOS/Linux.
-    # See: https://stackoverflow.com/a/12696899
-    # This is, effectively, '\bboardwalk\b' and '\bboardwalkd\b'
-    BOARDWALK_REGEX="^[[:<:]]boardwalk[[:>:]]"
-    BOARDWALKD_REGEX="^[[:<:]]boardwalkd[[:>:]]"
-    if [[ $cmd =~ $BOARDWALK_REGEX ]]; then
+    test="$(echo "$cmd" | cut -d ' ' -f 1)"
+    if [[ $test == "boardwalk" ]]; then
         SUBDIR=boardwalk
-    elif [[ $cmd =~ $BOARDWALKD_REGEX ]]; then
+    elif [[ $test == "boardwalkd" ]]; then
         SUBDIR=boardwalkd
     else
         # Don't assume if we cannot correctly parse the command being generated
-        echo "[!] Skipping generation for $cmd; is this a boardwalk or boardwalkd command?"
+        echo "[?] Skipping generation for $cmd; is this a boardwalk or boardwalkd command?"
+        STATUS=1
         continue
     fi
     FILENAME=$AUTO_GEN_DIR/$SUBDIR/$(echo "$cmd" | tr ' ' _).md
-    echo "[+] Generating doc page for $cmd"
+    echo "  [.] $cmd ..."
     touch "$FILENAME"
     {
         echo "# $(GET_PAGE_NAME "$cmd")"
@@ -66,4 +63,13 @@ for cmd in "${commands[@]}"; do
         echo '</div>'
         echo ''
     }  > "$FILENAME"
+    echo "    [>] saved @ $FILENAME"
 done
+
+if [[ $STATUS -eq 0 ]]; then
+    echo "[=] CLI help generation complete"
+else
+    echo "[x] Error during CLI help generation"
+fi
+
+exit $STATUS

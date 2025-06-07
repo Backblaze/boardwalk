@@ -265,12 +265,12 @@ def run_workflow(
     while i < len(hosts):
         host = hosts[i]
 
-        logger.info(f"{host.name}: Workflow iteration on host {i+1} of {len(hosts)}")
+        logger.info(f"{host.name}: Workflow iteration on host {i + 1} of {len(hosts)}")
         if boardwalkd_client:
             boardwalkd_client.queue_event(
                 WorkspaceEvent(
                     severity="info",
-                    message=f"{host.name}: Workflow iteration on host {i+1} of {len(hosts)}",
+                    message=f"{host.name}: Workflow iteration on host {i + 1} of {len(hosts)}",
                 ),
             )
 

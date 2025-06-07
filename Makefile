@@ -133,7 +133,8 @@ ifndef GITHUB_ACTIONS
 		--config "p/r2c-security-audit" \
 		--config "p/r2c-bug-scan" \
 		--config "p/secrets" \
-		--config "p/dockerfile"
+		--config "p/dockerfile" \
+		--metrics off
 else
 	echo Semgrep will run in its own GitHub Actions job.
 endif

@@ -35,3 +35,4 @@ jobs:
           --config "p/r2c-bug-scan"
           --config "p/secrets"
           --config "p/dockerfile"
+          --metrics off
