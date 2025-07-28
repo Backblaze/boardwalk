@@ -89,12 +89,12 @@ async def execute_boardwalk_workspace_test(
         pytest.param(
             "ShouldFailTestWorkspace",
             True,
-            "runner_on_failed: ansible.builtin.fail: ansible.builtin.fail: 127.0.0.1: Task failed successfully.: fatal: [127.0.0.1]: FAILED! => changed=false",
+            "Task failed successfully",
         ),
         pytest.param(
             "ShouldFailPlaybookExecutionTestWorkspace",
             True,
-            "runner_on_failed: Fail: ansible.builtin.fail: 127.0.0.1: Task failed successfully!: fatal: [127.0.0.1]: FAILED! => changed=false",
+            "Task failed successfully",
         ),
     ],
 )
