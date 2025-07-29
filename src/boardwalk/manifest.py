@@ -365,9 +365,11 @@ class Workspace(ABC):
         """Flush workspace state to disk"""
         # The statefile is first written to a temp file so that failures in flushing
         # will not corrupt an existing statefile
-        with Path(NamedTemporaryFile(mode="wb", delete=False, dir=self.path, prefix="statefile.json.").name) as tf:
-            tf.write_text(self.state.json())
-            tf.rename(self.path.joinpath("statefile.json"))
+        tf = NamedTemporaryFile(mode="wb", delete=False, dir=self.path, prefix="statefile.json.").name
+        with open(tf, mode="w") as fd:
+            q = self.state.model_dump_json()
+            fd.write(q)
+        os.rename(src=tf, dst=self.path.joinpath("statefile.json"))
 
     def reset(self):
         """Resets active workspace. Configuration is retained but other state is lost"""

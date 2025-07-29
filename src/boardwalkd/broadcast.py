@@ -32,6 +32,14 @@ async def handle_slack_broadcast(
     else:
         raise ValueError(f"Event severity is invalid: {event.severity}")
 
+    MAX_PAYLOAD_LENGTH: int = 2000
+    msg = event.message
+    if len(msg) > MAX_PAYLOAD_LENGTH:
+        msg = (
+            msg[:MAX_PAYLOAD_LENGTH]
+            + f"\n[ ... message truncated at {MAX_PAYLOAD_LENGTH} characters; see log for {len(msg) - MAX_PAYLOAD_LENGTH} remaining character(s) ... ]"
+        )
+
     slack_message_blocks = [
         SectionBlock(
             fields=[
@@ -39,7 +47,7 @@ async def handle_slack_broadcast(
                 MarkdownTextObject(text=f"*<{server_url}#{workspace}|{workspace}>*"),
             ]
         ),
-        SectionBlock(text=MarkdownTextObject(text=f"```\n{event.message}\n```")),
+        SectionBlock(text=MarkdownTextObject(text=f"```\n{msg}\n```")),
     ]
 
     if error_webhook_url and event.severity == "error":

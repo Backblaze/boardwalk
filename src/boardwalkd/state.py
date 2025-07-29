@@ -78,7 +78,8 @@ def load_state() -> State:
     """If the statefile exists, then returns the State object, else creates
     a statefile and returns an empty State object"""
     try:
-        return State().parse_file(statefile_path)
+        with open(statefile_path) as fd:
+            return State().model_validate_json(fd.read())
     except FileNotFoundError:
         statefile_dir_path.mkdir(parents=True, exist_ok=True)
         state = State()

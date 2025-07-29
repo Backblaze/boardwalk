@@ -3,5 +3,5 @@
 ## How was this tested?
 
 ## Checklist
-- [ ] Have you updated the `version` in the `[tool.poetry]` section of
+- [ ] Have you updated the `version` in the `[project]` section of
 the `pyproject.toml` file (if applicable)?
