@@ -60,7 +60,7 @@ include = [
 ]
 
 [tool.poetry.group.dev.dependencies]
-anyio = "^4.7.0"
+anyio = "^4.10.0"
 pyright = "==1.1.350"
 pytest = "^8.3.4"
 ruff = "^0.11.13"
