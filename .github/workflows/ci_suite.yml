@@ -31,7 +31,7 @@ jobs:
 
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Proceed to run linters
         id: linter-setup
@@ -63,7 +63,7 @@ jobs:
         python-version: ['3.11', '3.12', '3.13']
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install Poetry, setup Python, and install the Poetry project
         uses: ./.github/actions/poetry_project_setup/
@@ -87,7 +87,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install Poetry, setup Python, and install the Poetry project
         uses: ./.github/actions/poetry_project_setup
