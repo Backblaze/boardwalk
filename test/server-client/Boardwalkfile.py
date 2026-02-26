@@ -18,6 +18,14 @@ boardwalkd_url = "http://localhost:8888/"
 os.environ["ANSIBLE_CONFIG"] = os.path.abspath("ansible.cfg")
 
 
+class DumpHostvarsWorkspace(Workspace):
+    def config(self):
+        return WorkspaceConfig(
+            host_pattern="localhost",
+            workflow=DumpHostvarsWorkflow(),
+        )
+
+
 class ShouldSucceedTestWorkspace(Workspace):
     def config(self):
         return WorkspaceConfig(
@@ -122,6 +130,16 @@ class ShouldSucceedMixedJobTypesWorkflow(Workflow):
 
     def exit_jobs(self):
         return TestJob()
+
+
+class DumpHostvarsWorkflow(Workflow):
+    def jobs(self):
+        return DumpHostvarsJob()
+
+
+class DumpHostvarsJob(TaskJob):
+    def tasks(self) -> AnsibleTasksType:
+        return [{"ansible.builtin.debug": {"var": "hostvars[inventory_hostname]"}}]
 
 
 class TestJob(TaskJob):

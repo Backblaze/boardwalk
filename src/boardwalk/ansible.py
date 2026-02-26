@@ -157,13 +157,14 @@ def ansible_runner_run_tasks(
             "gather_facts": gather_facts,
             "become": become,
             "tasks": tasks,
-            "vars": {"boardwalk_operation": True},
         }
     if job_type == boardwalk.manifest.JobTypes.PLAYBOOK:
         # Executing a (list of) playbook(s) requires some different settings
         runner_kwargs["limit"] = hosts
-        runner_kwargs["extravars"] = {"boardwalk_operation": True} | extra_vars
         runner_kwargs["playbook"] = tasks
+
+    # Load extra_vars into the runner kwargs
+    runner_kwargs["extravars"] = {"boardwalk_operation": True} | extra_vars
 
     output_msg_prefix = f"{hosts}: ansible_runner invocation"
     if limit:
