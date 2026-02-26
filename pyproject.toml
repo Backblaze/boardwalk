@@ -6,7 +6,7 @@ build-backend = "poetry.core.masonry.api"
 name = "boardwalk"
 description = "Boardwalk is a linear Ansible workflow engine"
 readme = "README.md"
-version = "0.8.26"
+version = "0.8.27"
 requires-python = ">=3.11,<4"
 authors = [
     {name="Mat Hornbeek", email="84995001+m4wh6k@users.noreply.github.com"},
