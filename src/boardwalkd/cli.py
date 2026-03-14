@@ -37,6 +37,18 @@ def cli():
     show_default=True,
 )
 @click.option(
+    "--service-token",
+    help=(
+        "A static API token for machine-to-machine integrations."
+        " When set, requests with this value in the boardwalk-api-token"
+        " header are authenticated without expiry as a service account."
+        " Generate with: openssl rand -hex 32"
+    ),
+    type=str,
+    default=None,
+    show_envvar=True,
+)
+@click.option(
     "--auth-method",
     help=(
         "Enables an authentication method for the web UI. The API always requires"
@@ -172,6 +184,7 @@ def cli():
 )
 def serve(
     auth_expire_days: float,
+    service_token: str | None,
     auth_method: str,
     develop: bool,
     host_header_pattern: str,
@@ -233,6 +246,7 @@ def serve(
             host_header_pattern=host_header_regex,
             owner=owner,
             port_number=port,
+            service_token=service_token,
             slack_app_token=slack_app_token,
             slack_bot_token=slack_bot_token,
             slack_error_webhook_url=slack_error_webhook_url,

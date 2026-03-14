@@ -506,6 +506,8 @@ class APIBaseHandler(tornado.web.RequestHandler):
         # somehow they don't exist in the server state
         cur_user = self.current_user
         if isinstance(cur_user, bytes):
+            if getattr(self, "_is_service_auth", False):
+                return
             username = cur_user.decode()
             try:
                 if not state.users[username].enabled:
@@ -518,10 +520,22 @@ class APIBaseHandler(tornado.web.RequestHandler):
         pass
 
     def get_current_user(self) -> bytes | None:
-        """Decodes the API token to return the current logged in user"""
+        """Decodes the API token to return the current logged in user.
+        If a service token is configured and matches, authenticates as a
+        service account without expiry."""
+        api_token = self.request.headers.get("boardwalk-api-token")
+        if not api_token:
+            return None
+
+        service_token = self.settings.get("service_token")
+        if service_token and api_token == service_token:
+            self._is_service_auth = True
+            return b"service@boardwalk"
+
+        self._is_service_auth = False
         return self.get_secure_cookie(
             "boardwalk_api_token",
-            value=self.request.headers["boardwalk-api-token"],
+            value=api_token,
             max_age_days=self.settings["auth_expire_days"],
             min_version=2,
         )
@@ -611,6 +625,29 @@ class AuthApiDenied(APIBaseHandler):
     # nosemgrep: test.boardwalk.python.security.handler-method-missing-authentication
     def get(self):
         return self.send_error(403)
+
+
+class WorkspacesStatusApiHandler(APIBaseHandler):
+    """Returns a read-only summary of all workspaces for monitoring integrations"""
+
+    @tornado.web.authenticated
+    def get(self):
+        result = []
+        for name, ws in state.workspaces.items():
+            entry: dict[str, Any] = {
+                "name": name,
+                "semaphores": ws.semaphores.dict(),
+            }
+            if ws.details:
+                entry["details"] = {
+                    "workflow": ws.details.workflow,
+                    "worker_hostname": ws.details.worker_hostname,
+                    "host_pattern": ws.details.host_pattern,
+                }
+            if ws.last_seen:
+                entry["last_seen"] = ws.last_seen.isoformat()
+            result.append(entry)
+        self.write({"workspaces": result})
 
 
 class WorkspaceCatchApiHandler(APIBaseHandler):
@@ -814,6 +851,7 @@ def make_app(
     develop: bool,
     host_header_pattern: re.Pattern[str],
     owner: str,
+    service_token: str | None,
     slack_error_webhook_url: str,
     slack_webhook_url: str,
     url: str,
@@ -836,6 +874,7 @@ def make_app(
             "server_version": ui_method_server_version,
             "sort_events_by_date": ui_method_sort_events_by_date,
         },
+        "service_token": service_token,
         "url": urlparse(url),
         "websocket_ping_interval": 10,
         "xsrf_cookies": True,
@@ -902,6 +941,10 @@ def make_app(
                 AuthLoginApiWebsocketHandler,
             ),
             (
+                r"/api/workspaces/status",
+                WorkspacesStatusApiHandler,
+            ),
+            (
                 r"/api/workspace/(\w+)/details",
                 WorkspaceDetailsApiHandler,
             ),
@@ -946,6 +989,7 @@ async def run(
     host_header_pattern: re.Pattern[str],
     owner: str,
     port_number: int | None,
+    service_token: str | None,
     tls_crt_path: str | None,
     tls_key_path: str | None,
     slack_app_token: str | None,
@@ -966,6 +1010,7 @@ async def run(
         develop=develop,
         host_header_pattern=host_header_pattern,
         owner=owner,
+        service_token=service_token,
         slack_error_webhook_url=slack_error_webhook_url,
         slack_webhook_url=slack_webhook_url,
         url=url,
