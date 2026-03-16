@@ -619,6 +619,9 @@ class WorkspacesStatusApiHandler(APIBaseHandler):
 
     # nosemgrep: test.boardwalk.python.security.handler-method-missing-authentication
     def get(self):
+        if not self.settings.get("workspace_status_json"):
+            return self.send_error(404)
+
         result = []
         for name, ws in state.workspaces.items():
             entry: dict[str, Any] = {
