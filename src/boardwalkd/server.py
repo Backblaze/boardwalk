@@ -36,6 +36,7 @@ from boardwalk.utils import strtobool
 from boardwalkd.broadcast import handle_slack_broadcast
 from boardwalkd.protocol import ApiLoginMessage, WorkspaceDetails, WorkspaceEvent
 from boardwalkd.state import User, WorkspaceState, load_state, valid_user_roles
+from boardwalkd.utils import is_workspace_active
 
 module_dir = Path(__file__).resolve().parent
 state = load_state()
@@ -506,8 +507,6 @@ class APIBaseHandler(tornado.web.RequestHandler):
         # somehow they don't exist in the server state
         cur_user = self.current_user
         if isinstance(cur_user, bytes):
-            if getattr(self, "_is_service_auth", False):
-                return
             username = cur_user.decode()
             try:
                 if not state.users[username].enabled:
@@ -520,22 +519,10 @@ class APIBaseHandler(tornado.web.RequestHandler):
         pass
 
     def get_current_user(self) -> bytes | None:
-        """Decodes the API token to return the current logged in user.
-        If a service token is configured and matches, authenticates as a
-        service account without expiry."""
-        api_token = self.request.headers.get("boardwalk-api-token")
-        if not api_token:
-            return None
-
-        service_token = self.settings.get("service_token")
-        if service_token and api_token == service_token:
-            self._is_service_auth = True
-            return b"service@boardwalk"
-
-        self._is_service_auth = False
+        """Decodes the API token to return the current logged in user."""
         return self.get_secure_cookie(
             "boardwalk_api_token",
-            value=api_token,
+            value=self.request.headers.get("boardwalk-api-token"),
             max_age_days=self.settings["auth_expire_days"],
             min_version=2,
         )
@@ -628,21 +615,24 @@ class AuthApiDenied(APIBaseHandler):
 
 
 class WorkspacesStatusApiHandler(APIBaseHandler):
-    """Returns a read-only summary of all workspaces for monitoring integrations"""
+    """Returns an unauthenticated, read-only summary of all workspaces for monitoring integrations"""
 
-    @tornado.web.authenticated
+    # nosemgrep: test.boardwalk.python.security.handler-method-missing-authentication
     def get(self):
         result = []
         for name, ws in state.workspaces.items():
             entry: dict[str, Any] = {
                 "name": name,
-                "semaphores": ws.semaphores.dict(),
+                "semaphores": ws.semaphores.model_dump(),
             }
             if ws.details:
                 entry["details"] = {
                     "workflow": ws.details.workflow,
-                    "worker_hostname": ws.details.worker_hostname,
+                    "worker": f"{ws.details.worker_username}@{ws.details.worker_hostname}",
+                    "worker_connected": is_workspace_active(workspace_name=name),
                     "host_pattern": ws.details.host_pattern,
+                    "limit_pattern": "<unknown>" if ws.details.worker_limit == "" else ws.details.worker_limit,
+                    "command": ws.details.worker_command,
                 }
             if ws.last_seen:
                 entry["last_seen"] = ws.last_seen.isoformat()
@@ -851,10 +841,10 @@ def make_app(
     develop: bool,
     host_header_pattern: re.Pattern[str],
     owner: str,
-    service_token: str | None,
     slack_error_webhook_url: str,
     slack_webhook_url: str,
     url: str,
+    workspace_status_json: bool,
 ) -> tornado.web.Application:
     """Builds the tornado application object"""
     handlers: list[tornado.web.OutputTransform] = []
@@ -874,7 +864,7 @@ def make_app(
             "server_version": ui_method_server_version,
             "sort_events_by_date": ui_method_sort_events_by_date,
         },
-        "service_token": service_token,
+        "workspace_status_json": workspace_status_json,
         "url": urlparse(url),
         "websocket_ping_interval": 10,
         "xsrf_cookies": True,
@@ -989,7 +979,6 @@ async def run(
     host_header_pattern: re.Pattern[str],
     owner: str,
     port_number: int | None,
-    service_token: str | None,
     tls_crt_path: str | None,
     tls_key_path: str | None,
     slack_app_token: str | None,
@@ -999,6 +988,7 @@ async def run(
     slack_webhook_url: str,
     slack_slash_command_prefix: str,
     url: str,
+    workspace_status_json: bool,
 ):
     """Starts the tornado server and IO loop"""
     global state
@@ -1010,10 +1000,10 @@ async def run(
         develop=develop,
         host_header_pattern=host_header_pattern,
         owner=owner,
-        service_token=service_token,
         slack_error_webhook_url=slack_error_webhook_url,
         slack_webhook_url=slack_webhook_url,
         url=url,
+        workspace_status_json=workspace_status_json,
     )
 
     if port_number is not None:
