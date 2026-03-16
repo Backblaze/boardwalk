@@ -39,42 +39,9 @@ from boardwalk.app_exceptions import BoardwalkException
 from boardwalkd.protocol import WorkspaceEvent
 from boardwalkd.server import SERVER_URL, SLACK_SLASH_COMMAND_PREFIX, SLACK_TOKENS, internal_workspace_event
 from boardwalkd.server import state as STATE
+from boardwalkd.utils import count_of_workspaces_caught, list_active_workspaces, list_inactive_workspaces
 
 app = AsyncApp(token=SLACK_TOKENS.get("bot"))
-
-
-# Possibly move this elsewhere if these functions are useful in other locations?
-def _count_of_workspaces_caught() -> int:
-    """
-    Returns the number of workspaces which are caught
-    """
-    return len([k for k, v in STATE.workspaces.items() if v.semaphores.caught])
-
-
-def _list_active_workspaces(last_seen_seconds: int = 10, _sorted: bool = True) -> list[str]:
-    """
-    Returns a sorted list[str] of currently active workspaces. Takes
-    `last_seen_seconds`, which corresponds to how long ago the worker connected
-    to the workspace was last seen. Defaults to 10.
-    """
-    workspaces: list[str] = []
-    for name, workspace in STATE.workspaces.items():
-        if (datetime.now(UTC) - workspace.last_seen.replace(tzinfo=UTC)).total_seconds() < last_seen_seconds:  # type: ignore
-            workspaces.append(name)
-    if _sorted:
-        return sorted(workspaces)
-    else:
-        return workspaces
-
-
-def _list_inactive_workspaces(last_seen_seconds: int = 10) -> list[str]:
-    """
-    Returns a sorted list[str] of inactive workspaces. Takes
-    `last_seen_seconds`, which corresponds to the time at which the last
-    connected worker was seen before the workspace is considered inactive.
-    Defaults to 10.
-    """
-    return sorted([name for name in STATE.workspaces.keys() if name not in _list_active_workspaces(last_seen_seconds)])
 
 
 @app.command(f"/{SLACK_SLASH_COMMAND_PREFIX}-version")
@@ -273,7 +240,7 @@ async def command_list_active_workspaces(ack: AsyncAck, body: dict[str, Any], cl
     message_blocks = [
         SectionBlock(text=MarkdownTextObject(text="The following workspaces have an active worker connected:"))
     ]
-    active_workspaces = _list_active_workspaces()
+    active_workspaces = list_active_workspaces()
 
     if len(active_workspaces) > 0:
         message_blocks.append(SectionBlock(text=MarkdownTextObject(text=", ".join(active_workspaces))))
@@ -341,8 +308,8 @@ async def app_home_opened(ack: AsyncAck, client: AsyncWebClient, logger: Logger,
         SectionBlock(
             text=" ".join(  # semgrep avoidance https://sg.run/Kl07 -- string-concat-in-list
                 [
-                    f"There are {len(STATE.workspaces)} workspaces in total, of which {_count_of_workspaces_caught()} are",
-                    f"caught, with {len(_list_active_workspaces())} active CLI workers.",
+                    f"There are {len(STATE.workspaces)} workspaces in total, of which {count_of_workspaces_caught()} are",
+                    f"caught, with {len(list_active_workspaces())} active CLI workers.",
                 ]
             )
         ),
@@ -351,7 +318,7 @@ async def app_home_opened(ack: AsyncAck, client: AsyncWebClient, logger: Logger,
 
     _active: list[str] = []
     _inactive: list[str] = []
-    for _list, _workspaces in [(_active, _list_active_workspaces()), (_inactive, _list_inactive_workspaces())]:
+    for _list, _workspaces in [(_active, list_active_workspaces()), (_inactive, list_inactive_workspaces())]:
         for _workspace in _workspaces:
             _list.append(
                 f"{'🕵️‍♀️' if STATE.workspaces[_workspace].details.worker_command == 'check' else '👟'}"

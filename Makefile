@@ -37,12 +37,14 @@ develop-server: develop
 ifdef BOARDWALKD_SLACK_WEBHOOK_URL
 	poetry run boardwalkd serve \
 		--develop \
+		--workspace-status-json \
 		--host-header-pattern="(localhost|127\.0\.0\.1)" \
 		--port=8888 \
 		--url='http://localhost:8888'
 else
 	poetry run boardwalkd serve \
 		--develop \
+		--workspace-status-json \
 		--host-header-pattern="(localhost|127\.0\.0\.1)" \
 		--port=8888 \
 		--url='http://localhost:8888'

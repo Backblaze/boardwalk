@@ -170,6 +170,13 @@ def cli():
     type=str,
     required=True,
 )
+@click.option(
+    "--workspace-status-json/--no-workspace-status-json",
+    help=("Exposed an unauthenticated JSON object of the status of all workspaces at /api/workspaces/status"),
+    type=bool,
+    default=False,
+    show_envvar=True,
+)
 def serve(
     auth_expire_days: float,
     auth_method: str,
@@ -186,6 +193,7 @@ def serve(
     tls_key: str | None,
     tls_port: int | None,
     url: str,
+    workspace_status_json: bool,
 ):
     """Runs the server"""
     # Validate host_header_pattern
@@ -242,6 +250,7 @@ def serve(
             tls_key_path=tls_key,
             tls_port_number=tls_port,
             url=url,
+            workspace_status_json=workspace_status_json,
         )
     )
 
