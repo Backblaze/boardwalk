@@ -33,8 +33,16 @@ from tornado.routing import HostMatches
 
 from boardwalk.app_exceptions import BoardwalkException
 from boardwalk.utils import strtobool
-from boardwalkd.broadcast import handle_slack_broadcast
-from boardwalkd.protocol import ApiLoginMessage, WorkspaceDetails, WorkspaceEvent
+from boardwalkd.auth_prompts import (
+    active_auth_prompts,
+    clear_auth_prompt,
+    orphan_auth_prompts,
+    prompts_by_workspace,
+    set_auth_prompt,
+)
+from boardwalkd.broadcast import handle_auth_login_broadcast, handle_slack_broadcast, slack_user_mention_for_email
+from boardwalkd.protocol import AUTH_LOGIN_CONTEXT_FIELDS, ApiLoginMessage, WorkspaceDetails, WorkspaceEvent
+from boardwalkd.slack_error_advice import SlackErrorAdviceRule, matching_error_advice
 from boardwalkd.state import User, WorkspaceState, load_state, valid_user_roles
 from boardwalkd.utils import is_workspace_active
 
@@ -411,6 +419,66 @@ class WorkspaceCatchHandler(UIBaseHandler):
         return self.render("index_workspace_catch.html", workspace_name=workspace)
 
 
+class WorkspaceRemoteStateClearHandler(UIBaseHandler):
+    """Handles UI requests for a worker to clear a host's remote state fact."""
+
+    @tornado.web.authenticated
+    def post(self, workspace: str):
+        try:
+            workspace_state = state.workspaces[workspace]
+        except KeyError:
+            return self.send_error(404)
+
+        if not workspace_state.semaphores.caught:
+            return self.send_error(409)
+        if not is_workspace_active(workspace):
+            return self.send_error(412)
+
+        workspace_state.semaphores.clear_remote_state_requested = True
+        cur_user = self.current_user.decode()
+        event = WorkspaceEvent(
+            severity="info",
+            message=f"Remote Boardwalk state cleanup requested by {cur_user}",
+        )
+        internal_workspace_event(workspace, event)
+
+        return self.render(
+            "index_workspace_remote_state_clear.html",
+            workspace_name=workspace,
+            workspace=workspace_state,
+        )
+
+
+class WorkspaceRemoteMutexClearHandler(UIBaseHandler):
+    """Handles UI requests for a worker to clear a host's remote mutex."""
+
+    @tornado.web.authenticated
+    def post(self, workspace: str):
+        try:
+            workspace_state = state.workspaces[workspace]
+        except KeyError:
+            return self.send_error(404)
+
+        if not workspace_state.semaphores.caught:
+            return self.send_error(409)
+        if not is_workspace_active(workspace):
+            return self.send_error(412)
+
+        workspace_state.semaphores.clear_remote_mutex_requested = True
+        cur_user = self.current_user.decode()
+        event = WorkspaceEvent(
+            severity="info",
+            message=f"Remote Boardwalk mutex cleanup requested by {cur_user}",
+        )
+        internal_workspace_event(workspace, event)
+
+        return self.render(
+            "index_workspace_remote_mutex_clear.html",
+            workspace_name=workspace,
+            workspace=workspace_state,
+        )
+
+
 class WorkspaceEventsHandler(UIBaseHandler):
     """Handles serving workspace events in the UI"""
 
@@ -481,7 +549,14 @@ class WorkspacesHandler(UIBaseHandler):
             edit = strtobool(edit)  # type: ignore
         except (AttributeError, ValueError):
             edit = 0
-        return self.render("index_workspace.html", workspaces=state.workspaces, edit=edit)
+        return self.render(
+            "index_workspace.html",
+            workspaces=state.workspaces,
+            edit=edit,
+            auth_prompts=list(active_auth_prompts.values()),
+            auth_prompts_by_workspace=prompts_by_workspace(),
+            orphan_auth_prompts=orphan_auth_prompts(state.workspaces.keys()),
+        )
 
 
 """
@@ -538,6 +613,30 @@ class AuthLoginApiWebsocketIDNotFound(Exception):
     """The auth login client socket was not found"""
 
 
+def auth_login_context_from_request(handler: tornado.web.RequestHandler) -> dict[str, str]:
+    """Gets worker context from the auth login websocket query arguments."""
+    auth_context: dict[str, str] = {}
+    for field in AUTH_LOGIN_CONTEXT_FIELDS:
+        value = handler.get_query_argument(field, default="")
+        if value:
+            auth_context[field] = value
+    return auth_context
+
+
+async def notify_auth_login(login_url: str, auth_context: dict[str, str], settings: dict[str, Any]):
+    """Posts an auth-login notification without interrupting the websocket flow."""
+    try:
+        await handle_auth_login_broadcast(
+            login_url=login_url,
+            auth_context=auth_context,
+            webhook_url=settings.get("slack_webhook_url"),
+            error_webhook_url=settings.get("slack_error_webhook_url"),
+            server_url=settings["url"].geturl(),
+        )
+    except Exception as e:
+        app_log.error(f"Could not send auth login Slack notification: {e}")
+
+
 class AuthLoginApiHandler(UIBaseHandler):
     """Handles authenticating a user to the API and sending back a token to the
     a client with an open login socket. This handler uses the UIBaseHandler
@@ -586,10 +685,24 @@ class AuthLoginApiWebsocketHandler(tornado.websocket.WebSocketHandler):
         this_client_id = id_client()
         app_log.info(f"Login client ID {this_client_id} opened")
         login_url = urljoin(self.settings["url"].geturl(), f"/api/auth/login?id={this_client_id}")
+        auth_context = auth_login_context_from_request(self)
+        set_auth_prompt(client_id=this_client_id, login_url=login_url, auth_context=auth_context)
+        if self.settings.get("auth_login_slack_notify") and (
+            self.settings.get("slack_error_webhook_url") or self.settings.get("slack_webhook_url")
+        ):
+            asyncio.create_task(
+                notify_auth_login(
+                    login_url=login_url,
+                    auth_context=auth_context,
+                    settings=self.settings,
+                )
+            )
         return self.write_message(ApiLoginMessage(login_url=login_url).dict())
 
     def on_close(self):
-        app_log.info(f"Login client ID {self.clients[self]} closed")
+        client_id = self.clients[self]
+        app_log.info(f"Login client ID {client_id} closed")
+        clear_auth_prompt(client_id)
         del self.clients[self]
 
     def on_pong(self, data: bytes):
@@ -651,6 +764,68 @@ class WorkspaceCatchApiHandler(APIBaseHandler):
         try:
             state.workspaces[workspace].semaphores.caught = True
             state.flush()
+        except KeyError:
+            return self.send_error(404)
+
+
+class WorkspaceRemoteStateClearApiHandler(APIBaseHandler):
+    """Handles worker/API requests to clear pending remote state cleanup."""
+
+    @tornado.web.authenticated
+    def post(self, workspace: str):
+        try:
+            workspace_state = state.workspaces[workspace]
+        except KeyError:
+            return self.send_error(404)
+
+        if not workspace_state.semaphores.caught:
+            return self.send_error(409)
+        if not is_workspace_active(workspace):
+            return self.send_error(412)
+
+        workspace_state.semaphores.clear_remote_state_requested = True
+        state.flush()
+        self.set_status(204)
+        return self.finish()
+
+    @tornado.web.authenticated
+    def delete(self, workspace: str):
+        try:
+            state.workspaces[workspace].semaphores.clear_remote_state_requested = False
+            state.flush()
+            self.set_status(204)
+            return self.finish()
+        except KeyError:
+            return self.send_error(404)
+
+
+class WorkspaceRemoteMutexClearApiHandler(APIBaseHandler):
+    """Handles worker/API requests to clear pending remote mutex cleanup."""
+
+    @tornado.web.authenticated
+    def post(self, workspace: str):
+        try:
+            workspace_state = state.workspaces[workspace]
+        except KeyError:
+            return self.send_error(404)
+
+        if not workspace_state.semaphores.caught:
+            return self.send_error(409)
+        if not is_workspace_active(workspace):
+            return self.send_error(412)
+
+        workspace_state.semaphores.clear_remote_mutex_requested = True
+        state.flush()
+        self.set_status(204)
+        return self.finish()
+
+    @tornado.web.authenticated
+    def delete(self, workspace: str):
+        try:
+            state.workspaces[workspace].semaphores.clear_remote_mutex_requested = False
+            state.flush()
+            self.set_status(204)
+            return self.finish()
         except KeyError:
             return self.send_error(404)
 
@@ -750,12 +925,21 @@ class WorkspaceEventApiHandler(APIBaseHandler):
 
         if broadcast:
             if self.settings["slack_webhook_url"] or self.settings["slack_error_webhook_url"]:
+                workspace_details = state.workspaces[workspace].details
+                slack_user_mention = None
+                if event.severity == "error":
+                    slack_user_mention = await slack_user_mention_for_email(
+                        workspace_details.jenkins_build_user_email,
+                        self.settings.get("slack_bot_token"),
+                    )
                 await handle_slack_broadcast(
                     event,
                     workspace,
                     self.settings["slack_webhook_url"],
                     self.settings["slack_error_webhook_url"],
                     self.settings["url"].geturl(),
+                    error_advice=matching_error_advice(event, self.settings["slack_error_advice_rules"]),
+                    slack_user_mention=slack_user_mention,
                 )
 
         state.flush()
@@ -840,10 +1024,13 @@ def internal_workspace_event(workspace: str, event: WorkspaceEvent):
 
 def make_app(
     auth_expire_days: float,
+    auth_login_slack_notify: bool,
     auth_method: str,
     develop: bool,
     host_header_pattern: re.Pattern[str],
     owner: str,
+    slack_bot_token: str | None,
+    slack_error_advice_rules: list[SlackErrorAdviceRule],
     slack_error_webhook_url: str,
     slack_webhook_url: str,
     url: str,
@@ -854,9 +1041,12 @@ def make_app(
     settings = {
         "api_access_denied_url": urljoin(url, "/api/auth/denied"),
         "auth_expire_days": auth_expire_days,
+        "auth_login_slack_notify": auth_login_slack_notify,
         "login_url": urljoin(url, "/auth/login"),
         "log_function": log_request,
         "owner": owner,
+        "slack_bot_token": slack_bot_token,
+        "slack_error_advice_rules": slack_error_advice_rules,
         "slack_webhook_url": slack_webhook_url,
         "slack_error_webhook_url": slack_error_webhook_url,
         "static_path": module_dir.joinpath("static"),
@@ -917,6 +1107,8 @@ def make_app(
             (r"/workspace/(\w+)/delete", WorkspaceDeleteHandler),
             (r"/workspace/(\w+)/events", WorkspaceEventsHandler),
             (r"/workspace/(\w+)/events/table", WorkspaceEventsTableHandler),
+            (r"/workspace/(\w+)/remote_mutex/clear", WorkspaceRemoteMutexClearHandler),
+            (r"/workspace/(\w+)/remote_state/clear", WorkspaceRemoteStateClearHandler),
             (r"/workspace/(\w+)/semaphores/caught", WorkspaceCatchHandler),
             (r"/workspace/(\w+)/semaphores/has_mutex", WorkspaceMutexHandler),
             (r"/workspaces", WorkspacesHandler),
@@ -958,6 +1150,14 @@ def make_app(
                 WorkspaceCatchApiHandler,
             ),
             (
+                r"/api/workspace/(\w+)/remote_state/clear",
+                WorkspaceRemoteStateClearApiHandler,
+            ),
+            (
+                r"/api/workspace/(\w+)/remote_mutex/clear",
+                WorkspaceRemoteMutexClearApiHandler,
+            ),
+            (
                 r"/api/workspace/(\w+)/semaphores/has_mutex",
                 WorkspaceMutexApiHandler,
             ),
@@ -977,6 +1177,7 @@ def make_app(
 
 async def run(
     auth_expire_days: float,
+    auth_login_slack_notify: bool,
     auth_method: str,
     develop: bool,
     host_header_pattern: re.Pattern[str],
@@ -986,6 +1187,7 @@ async def run(
     tls_key_path: str | None,
     slack_app_token: str | None,
     slack_bot_token: str | None,
+    slack_error_advice_rules: list[SlackErrorAdviceRule],
     tls_port_number: int | None,
     slack_error_webhook_url: str,
     slack_webhook_url: str,
@@ -999,10 +1201,13 @@ async def run(
 
     app = make_app(
         auth_expire_days=auth_expire_days,
+        auth_login_slack_notify=auth_login_slack_notify,
         auth_method=auth_method,
         develop=develop,
         host_header_pattern=host_header_pattern,
         owner=owner,
+        slack_bot_token=slack_bot_token,
+        slack_error_advice_rules=slack_error_advice_rules,
         slack_error_webhook_url=slack_error_webhook_url,
         slack_webhook_url=slack_webhook_url,
         url=url,

@@ -13,7 +13,7 @@ import webbrowser
 from collections import deque
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlencode, urljoin, urlparse
 
 from loguru import logger
 from pydantic import BaseModel, field_validator
@@ -26,6 +26,21 @@ from tornado.httpclient import (
 )
 from tornado.simple_httpclient import HTTPTimeoutError
 from tornado.websocket import websocket_connect
+
+AUTH_LOGIN_CONTEXT_FIELDS = (
+    "workspace",
+    "worker_command",
+    "worker_hostname",
+    "worker_limit",
+    "worker_username",
+    "jenkins_build_url",
+    "jenkins_build_tag",
+    "jenkins_job_name",
+    "jenkins_build_number",
+    "jenkins_build_user",
+    "jenkins_build_user_id",
+    "jenkins_build_user_email",
+)
 
 
 class ProtocolBaseModel(BaseModel, extra="forbid"):
@@ -44,6 +59,12 @@ class WorkspaceDetails(ProtocolBaseModel):
     """Model for basic workspace details from workers"""
 
     host_pattern: str = ""
+    jenkins_build_url: str = ""
+    jenkins_job_name: str = ""
+    jenkins_build_number: str = ""
+    jenkins_build_user: str = ""
+    jenkins_build_user_id: str = ""
+    jenkins_build_user_email: str = ""
     workflow: str = ""
     worker_command: str = ""
     worker_hostname: str = ""
@@ -76,6 +97,8 @@ class WorkspaceSemaphores(ProtocolBaseModel):
     """Model for server-side workspace semaphores"""
 
     caught: bool = False
+    clear_remote_mutex_requested: bool = False
+    clear_remote_state_requested: bool = False
     has_mutex: bool = False
 
 
@@ -92,8 +115,18 @@ class Client:
 
     def __init__(self, url: str):
         self.api_token_file = Path.cwd().joinpath(".boardwalk/api_token.txt")
+        self.auth_login_context: dict[str, str] = {}
         self.event_queue = deque([])
         self.url = urlparse(url)
+
+    def set_auth_login_context(self, **context: str | None):
+        """Stores context to include when an API auth login prompt is needed."""
+        for key, value in context.items():
+            if key not in AUTH_LOGIN_CONTEXT_FIELDS or value is None:
+                continue
+            value = str(value)
+            if value:
+                self.auth_login_context[key] = value
 
     def get_api_token(self) -> str:
         """Retrieves the API token from disk"""
@@ -111,6 +144,8 @@ class Client:
                 raise ValueError(f"{self.url.scheme} is not a valid url scheme")
 
         websocket_url = urljoin(websocket_url.geturl(), "/api/auth/login/socket")
+        if self.auth_login_context:
+            websocket_url = f"{websocket_url}?{urlencode(self.auth_login_context)}"
         conn = await websocket_connect(websocket_url)
         while True:
             msg = await conn.read_message()
@@ -220,6 +255,60 @@ class Client:
                 path=f"/api/workspace/{workspace_name}/semaphores/caught",
                 method="POST",
                 body="catch",
+            )
+        except HTTPError as e:
+            if e.code == 404:
+                raise WorkspaceNotFound
+            else:
+                raise e
+
+    def workspace_post_clear_remote_state_request(self, workspace_name: str):
+        """Requests that a worker remove the host's remote Boardwalk state fact."""
+        try:
+            self.authenticated_request(
+                path=f"/api/workspace/{workspace_name}/remote_state/clear",
+                method="POST",
+                body="clear_remote_state",
+            )
+        except HTTPError as e:
+            if e.code == 404:
+                raise WorkspaceNotFound
+            else:
+                raise e
+
+    def workspace_post_clear_remote_mutex_request(self, workspace_name: str):
+        """Requests that a worker remove the host's remote Boardwalk mutex."""
+        try:
+            self.authenticated_request(
+                path=f"/api/workspace/{workspace_name}/remote_mutex/clear",
+                method="POST",
+                body="clear_remote_mutex",
+            )
+        except HTTPError as e:
+            if e.code == 404:
+                raise WorkspaceNotFound
+            else:
+                raise e
+
+    def workspace_delete_clear_remote_mutex_request(self, workspace_name: str):
+        """Clears a pending remote mutex cleanup request."""
+        try:
+            self.authenticated_request(
+                path=f"/api/workspace/{workspace_name}/remote_mutex/clear",
+                method="DELETE",
+            )
+        except HTTPError as e:
+            if e.code == 404:
+                raise WorkspaceNotFound
+            else:
+                raise e
+
+    def workspace_delete_clear_remote_state_request(self, workspace_name: str):
+        """Clears a pending remote state cleanup request."""
+        try:
+            self.authenticated_request(
+                path=f"/api/workspace/{workspace_name}/remote_state/clear",
+                method="DELETE",
             )
         except HTTPError as e:
             if e.code == 404:
@@ -376,6 +465,7 @@ class WorkspaceClient(Client):
     def __init__(self, url: str, workspace_name: str):
         super().__init__(url)
         self.workspace_name = workspace_name
+        self.set_auth_login_context(workspace=workspace_name)
 
     def get_semaphores(self) -> WorkspaceSemaphores:
         return self.workspace_get_semaphores(self.workspace_name)
@@ -388,6 +478,18 @@ class WorkspaceClient(Client):
 
     def post_catch(self):
         self.workspace_post_catch(self.workspace_name)
+
+    def post_clear_remote_state_request(self):
+        self.workspace_post_clear_remote_state_request(self.workspace_name)
+
+    def post_clear_remote_mutex_request(self):
+        self.workspace_post_clear_remote_mutex_request(self.workspace_name)
+
+    def delete_clear_remote_mutex_request(self):
+        self.workspace_delete_clear_remote_mutex_request(self.workspace_name)
+
+    def delete_clear_remote_state_request(self):
+        self.workspace_delete_clear_remote_state_request(self.workspace_name)
 
     def caught(self) -> bool:
         return self.workspace_get_semaphores(self.workspace_name).caught

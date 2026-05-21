@@ -12,6 +12,56 @@
         {% end %}
     </div>
 </div>
+{% if orphan_auth_prompts %}
+<div class="row pb-2">
+    <div class="container bg-warning-subtle border border-warning rounded">
+        <div class="row pt-2 pb-2">
+            <div class="col">
+                <h3 class="h5">Active authentication prompts</h3>
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        {% for prompt in orphan_auth_prompts %}
+                        <tr title="{{ prompt.created_time }}">
+                            <td>
+                                {% if prompt.workspace %}
+                                {{ prompt.workspace }}
+                                {% else %}
+                                &lt;unknown workspace&gt;
+                                {% end %}
+                            </td>
+                            <td>
+                                {% if prompt.auth_context.get('worker_command') %}
+                                {{ prompt.auth_context.get('worker_command') }}
+                                {% else %}
+                                &lt;unknown command&gt;
+                                {% end %}
+                            </td>
+                            <td>
+                                {% if prompt.auth_context.get('worker_limit') %}
+                                {{ prompt.auth_context.get('worker_limit') }}
+                                {% else %}
+                                &lt;unknown limit&gt;
+                                {% end %}
+                            </td>
+                            <td>
+                                {% if prompt.auth_context.get('jenkins_build_url') %}
+                                <a href="{{ prompt.auth_context.get('jenkins_build_url') }}">Jenkins build</a>
+                                {% else %}
+                                Jenkins build unavailable
+                                {% end %}
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ prompt.login_url }}" class="btn btn-sm btn-warning">Open login</a>
+                            </td>
+                        </tr>
+                        {% end %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% end %}
 {% for workspace_name, workspace in sorted(workspaces.items()) %}
 <div class="row pb-2">
     <div class="container bg-light border border-dark rounded">
@@ -28,9 +78,9 @@
                     <span title="Worker is connected to this workspace">🟢</span>
                     {% end %}
                     {% if workspace.semaphores.has_mutex %}
-                    <span title="Worker has mutex on this workspace">🔒</span>
+                    <span title="Worker has boardwalkd's server-side workspace mutex">🔒</span>
                     {% else %}
-                    <span title="No worker has a mutex on this workspace">🔓</span>
+                    <span title="No worker has boardwalkd's server-side workspace mutex">🔓</span>
                     {% end %}
                 </span>
             </div>
@@ -42,6 +92,30 @@
                 {% end %}
             </div>
         </div>
+        {% if workspace_name in auth_prompts_by_workspace %}
+        <div class="row border-bottom border-warning bg-warning-subtle">
+            <div class="col pt-2 pb-2">
+                {% for prompt in auth_prompts_by_workspace[workspace_name] %}
+                <div class="d-flex flex-wrap gap-2 align-items-center" title="{{ prompt.created_time }}">
+                    <strong>Auth required</strong>
+                    {% if prompt.auth_context.get('worker_command') %}
+                    <span>Command: {{ prompt.auth_context.get('worker_command') }}</span>
+                    {% end %}
+                    {% if prompt.auth_context.get('worker_limit') %}
+                    <span>Limit: {{ prompt.auth_context.get('worker_limit') }}</span>
+                    {% end %}
+                    {% if prompt.auth_context.get('jenkins_build_user') %}
+                    <span>User: {{ prompt.auth_context.get('jenkins_build_user') }}</span>
+                    {% end %}
+                    {% if prompt.auth_context.get('jenkins_build_url') %}
+                    <a href="{{ prompt.auth_context.get('jenkins_build_url') }}">Jenkins build</a>
+                    {% end %}
+                    <a href="{{ prompt.login_url }}" class="btn btn-sm btn-warning">Open login</a>
+                </div>
+                {% end %}
+            </div>
+        </div>
+        {% end %}
         <div class="row">
             <div class="col-xxl-4 col-xl-5">
                 <table class="table workspace-details-table">
@@ -74,6 +148,24 @@
                             <th scope="row">Command</th>
                             <td>{{ workspace.details.worker_command }}</td>
                         </tr>
+                        {% if workspace.semaphores.caught %}
+                        <tr>
+                            <th scope="row" title="Request that the connected worker removes /etc/ansible/facts.d/boardwalk_state.fact from the current host">
+                                <span class="context-underline">Remote State</span>
+                            </th>
+                            <td>
+                                {% include "index_workspace_remote_state_clear.html" %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row" title="Request that the connected worker removes /opt/boardwalk.mutex from the current target host">
+                                <span class="context-underline">Host Mutex</span>
+                            </th>
+                            <td>
+                                {% include "index_workspace_remote_mutex_clear.html" %}
+                            </td>
+                        </tr>
+                        {% end %}
                     </tbody>
                 </table>
             </div>
@@ -113,15 +205,19 @@
         <div class="row pt-2 pb-2 border-top border-dark">
             <div class="btn-group btn-group-sm" role="edit group" aria-label="edit button group">
                 {% if secondsdelta(workspace.last_seen) < 10 %} <button type="button" class="btn btn-danger"
-                    title="Clears the worker mutex" disabled>Clear
+                    title="Clears boardwalkd's server-side workspace mutex. Does not remove /opt/boardwalk.mutex from target hosts. Disabled while a worker is connected."
+                    disabled>Clear workspace
                     mutex</button>
                     {% elif workspace.semaphores.has_mutex %}
-                    <button type="button" class="btn btn-danger" title="Clears the worker mutex"
+                    <button type="button" class="btn btn-danger"
+                        title="Clears boardwalkd's server-side workspace mutex. Does not remove /opt/boardwalk.mutex from target hosts."
                         hx-delete="/workspace/{{ workspace_name }}/semaphores/has_mutex" hx-trigger="click"
-                        hx-confirm="Are you sure you want to clear the mutex on workspace &quot;{{ workspace_name }}&quot;?">Clear
+                        hx-confirm="Clear boardwalkd's server-side workspace mutex for &quot;{{ workspace_name }}&quot;? This does not remove /opt/boardwalk.mutex from target hosts.">Clear workspace
                         mutex</button>
                     {% else %}
-                    <button type="button" class="btn btn-danger" title="Clears the worker mutex" disabled>Clear
+                    <button type="button" class="btn btn-danger"
+                        title="Clears boardwalkd's server-side workspace mutex. Does not remove /opt/boardwalk.mutex from target hosts."
+                        disabled>Clear workspace
                         mutex</button>
                     {% end %}
                     {% if workspace.semaphores.has_mutex or secondsdelta(workspace.last_seen) < 10 %} <button

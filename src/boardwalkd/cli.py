@@ -11,6 +11,7 @@ from email_validator import EmailNotValidError, validate_email
 
 from boardwalk.app_exceptions import BoardwalkException
 from boardwalkd.server import run
+from boardwalkd.slack_error_advice import SlackErrorAdviceConfigError, parse_slack_error_advice_config
 
 CONTEXT_SETTINGS: dict = dict(
     auto_envvar_prefix="BOARDWALKD",
@@ -29,6 +30,14 @@ def cli():
 
 
 @cli.command(context_settings=CONTEXT_SETTINGS)
+@click.option(
+    "--auth-login-slack-notify/--no-auth-login-slack-notify",
+    help="Post a Slack message when a worker is waiting for an API auth login",
+    type=bool,
+    default=False,
+    show_default=True,
+    show_envvar=True,
+)
 @click.option(
     "--auth-expire-days",
     help=("The number of days login tokens and user API keys are valid before they expire"),
@@ -130,6 +139,13 @@ def cli():
     show_envvar=True,
 )
 @click.option(
+    "--slack-error-advice-json",
+    help="JSON config with error advice rules to append to matching Slack error notifications",
+    type=str,
+    default=None,
+    show_envvar=True,
+)
+@click.option(
     "--slack-slash-command-prefix",
     help=(
         "The prefix to use in front of Boardwalk slash commands in Slack (e.g., /PREFIX-version). Needs to match the prefix supplied in the Slack App configuration."
@@ -178,6 +194,7 @@ def cli():
     show_envvar=True,
 )
 def serve(
+    auth_login_slack_notify: bool,
     auth_expire_days: float,
     auth_method: str,
     develop: bool,
@@ -188,6 +205,7 @@ def serve(
     slack_webhook_url: str,
     slack_app_token: str | None,
     slack_bot_token: str | None,
+    slack_error_advice_json: str | None,
     slack_slash_command_prefix: str,
     tls_crt: str | None,
     tls_key: str | None,
@@ -233,9 +251,15 @@ def serve(
     if (not slack_bot_token) and slack_app_token:
         raise BoardwalkException("If --slack-app-token is supplied, --slack-bot-token must also be supplied")
 
+    try:
+        slack_error_advice_rules = parse_slack_error_advice_config(slack_error_advice_json)
+    except SlackErrorAdviceConfigError as e:
+        raise BoardwalkException(str(e))
+
     asyncio.run(
         run(
             auth_expire_days=auth_expire_days,
+            auth_login_slack_notify=auth_login_slack_notify,
             auth_method=auth_method,
             develop=develop,
             host_header_pattern=host_header_regex,
@@ -243,6 +267,7 @@ def serve(
             port_number=port,
             slack_app_token=slack_app_token,
             slack_bot_token=slack_bot_token,
+            slack_error_advice_rules=slack_error_advice_rules,
             slack_error_webhook_url=slack_error_webhook_url,
             slack_webhook_url=slack_webhook_url,
             slack_slash_command_prefix=slack_slash_command_prefix,

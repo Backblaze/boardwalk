@@ -289,6 +289,77 @@ class Host(BaseModel, extra="forbid"):
             self.ansible_facts["ansible_local"]["boardwalk_state"] = remote_state_obj.dict()
             workspace.flush()
 
+    def clear_remote_state_fact(
+        self,
+        become_password: str | None = None,
+        check: bool = False,
+    ):
+        """Removes Boardwalk's remote state fact from the remote and local state."""
+        tasks: AnsibleTasksType = [
+            {"name": "get_ansible_system", "setup": {"filter": ["ansible_system"]}},
+            {
+                "name": "set_linux_facts",
+                "ansible.builtin.set_fact": {"admin_group": "root"},
+                "when": "ansible_system == 'Linux'",
+            },
+            {
+                "name": "set_darwin_facts",
+                "ansible.builtin.set_fact": {"admin_group": "wheel"},
+                "when": "ansible_system == 'Darwin'",
+            },
+            {
+                "name": "clear_remote_state_fact",
+                "ansible.builtin.file": {
+                    "path": "/etc/ansible/facts.d/boardwalk_state.fact",
+                    "state": "absent",
+                },
+            },
+        ]
+        self.ansible_run(
+            become=True,
+            become_password=become_password,
+            check=check,
+            gather_facts=False,
+            invocation_msg="clear_remote_state_fact",
+            tasks=tasks,
+            job_type=boardwalk.manifest.JobTypes.TASK,
+        )
+        if not check:
+            self.ansible_facts.get("ansible_local", {}).pop("boardwalk_state", None)
+            boardwalk.manifest.get_ws().flush()
+
+    def clear_remote_mutex(
+        self,
+        become_password: str | None = None,
+        check: bool = False,
+    ):
+        """Removes Boardwalk's remote host mutex and alert banner."""
+        tasks: AnsibleTasksType = [
+            {
+                "name": "clear_remote_mutex",
+                "ansible.builtin.file": {
+                    "path": self.remote_mutex_path,
+                    "state": "absent",
+                },
+            },
+            {
+                "name": "delete_motd_banner",
+                "ansible.builtin.file": {
+                    "path": self.remote_alert_motd_path,
+                    "state": "absent",
+                },
+            },
+        ]
+        self.ansible_run(
+            become=True,
+            become_password=become_password,
+            check=check,
+            gather_facts=False,
+            invocation_msg="clear_remote_mutex",
+            tasks=tasks,
+            job_type=boardwalk.manifest.JobTypes.TASK,
+        )
+
 
 class RemoteHostLocked(BoardwalkException):
     """The remote host is locked by another job"""

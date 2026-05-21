@@ -274,7 +274,7 @@ def run_workflow(
                 ),
             )
 
-        handle_workflow_catch(workspace=workspace, hostname=host.name)
+        handle_workflow_catch(workspace=workspace, host=host)
 
         # Connect to the remote host
         # Wrap everything in try/except so we can handle failures
@@ -340,7 +340,7 @@ def run_failure_mode_handler(
     """
     if boardwalkd_client:
         if isinstance(exception, AnsibleRunnerBaseException):
-            runner_errors = ansible_runner_errors_to_output(runner=exception.runner, include_msg=False)
+            runner_errors = ansible_runner_errors_to_output(runner=exception.runner, include_msg=True)
             msg = f"{exception.runner_msg}: {runner_errors}"
         else:
             try:
@@ -462,8 +462,9 @@ def check_host_preconditions_locally(
     return hosts_meeting_preconditions
 
 
-def handle_workflow_catch(workspace: Workspace, hostname: str):
+def handle_workflow_catch(workspace: Workspace, host: Host):
     """Handles local and remote workspace catches. Blocks under caught conditions"""
+    hostname = host.name
     if workspace.caught():
         logger.info(
             f"{hostname}: The {workspace.name} workspace is locally caught. Waiting for release before continuing..."
@@ -512,7 +513,81 @@ def handle_workflow_catch(workspace: Workspace, hostname: str):
             )
         )
         while check_boardwalkd_catch(boardwalkd_client):
+            maybe_clear_remote_state_fact(
+                host=host,
+                client=boardwalkd_client,
+                become_password=become_password,
+                check=_check_mode,
+            )
+            maybe_clear_remote_mutex(
+                host=host,
+                client=boardwalkd_client,
+                become_password=become_password,
+                check=_check_mode,
+            )
             time.sleep(5)  # nosemgrep: python.lang.best-practice.sleep.arbitrary-sleep
+
+
+def maybe_clear_remote_state_fact(
+    host: Host,
+    client: WorkspaceClient,
+    become_password: str | None,
+    check: bool,
+) -> bool:
+    """Clears a host's remote state fact when boardwalkd has a pending request."""
+    if not client.get_semaphores().clear_remote_state_requested:
+        return False
+
+    try:
+        host.clear_remote_state_fact(become_password=become_password, check=check)
+        client.queue_event(
+            WorkspaceEvent(
+                severity="success",
+                message=f"{host.name}: Removed remote Boardwalk state fact",
+            )
+        )
+        return True
+    except Exception as e:
+        client.queue_event(
+            WorkspaceEvent(
+                severity="error",
+                message=f"{host.name}: Could not remove remote Boardwalk state fact: {e}",
+            )
+        )
+        return False
+    finally:
+        client.delete_clear_remote_state_request()
+
+
+def maybe_clear_remote_mutex(
+    host: Host,
+    client: WorkspaceClient,
+    become_password: str | None,
+    check: bool,
+) -> bool:
+    """Clears a host's remote mutex when boardwalkd has a pending request."""
+    if not client.get_semaphores().clear_remote_mutex_requested:
+        return False
+
+    try:
+        host.clear_remote_mutex(become_password=become_password, check=check)
+        client.queue_event(
+            WorkspaceEvent(
+                severity="success",
+                message=f"{host.name}: Removed remote Boardwalk mutex",
+            )
+        )
+        return True
+    except Exception as e:
+        client.queue_event(
+            WorkspaceEvent(
+                severity="error",
+                message=f"{host.name}: Could not remove remote Boardwalk mutex: {e}",
+            )
+        )
+        return False
+    finally:
+        client.delete_clear_remote_mutex_request()
 
 
 def lock_remote_host(host: Host):
@@ -536,6 +611,22 @@ def bootstrap_with_server(workspace: Workspace, ctx: click.Context):
     if not boardwalkd_client:
         raise BoardwalkException("bootstrap_with_server called but no boardwalkd_client exists")
     boardwalkd_url = boardwalkd_client.url.geturl()
+    worker_limit = ctx.params.get("limit")
+    auth_login_context: dict[str, str | None] = {
+        "workspace": workspace.name,
+        "worker_command": "check" if _check_mode else "run",
+        "worker_hostname": socket.gethostname(),
+        "worker_limit": str(worker_limit) if worker_limit else None,
+        "worker_username": getpass.getuser(),
+        "jenkins_build_url": os.environ.get("BUILD_URL") or os.environ.get("RUN_DISPLAY_URL"),
+        "jenkins_build_tag": os.environ.get("BUILD_TAG"),
+        "jenkins_job_name": os.environ.get("JOB_NAME"),
+        "jenkins_build_number": os.environ.get("BUILD_NUMBER"),
+        "jenkins_build_user": os.environ.get("BUILD_USER"),
+        "jenkins_build_user_id": os.environ.get("BUILD_USER_ID"),
+        "jenkins_build_user_email": os.environ.get("BUILD_USER_EMAIL"),
+    }
+    boardwalkd_client.set_auth_login_context(**{key: value for key, value in auth_login_context.items() if value})
     # Check if the if the Workspace is locked. We don't want to conflict with another worker
     try:
         if boardwalkd_client.has_mutex():
@@ -554,6 +645,12 @@ def bootstrap_with_server(workspace: Workspace, ctx: click.Context):
         boardwalkd_client.post_details(
             WorkspaceDetails(
                 host_pattern=workspace.cfg.host_pattern,
+                jenkins_build_url=auth_login_context.get("jenkins_build_url") or "",
+                jenkins_job_name=auth_login_context.get("jenkins_job_name") or "",
+                jenkins_build_number=auth_login_context.get("jenkins_build_number") or "",
+                jenkins_build_user=auth_login_context.get("jenkins_build_user") or "",
+                jenkins_build_user_id=auth_login_context.get("jenkins_build_user_id") or "",
+                jenkins_build_user_email=auth_login_context.get("jenkins_build_user_email") or "",
                 workflow=workspace.cfg.workflow.__class__.__qualname__,
                 worker_command="check" if _check_mode else "run",
                 worker_hostname=socket.gethostname(),
