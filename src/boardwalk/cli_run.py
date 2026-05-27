@@ -618,13 +618,13 @@ def bootstrap_with_server(workspace: Workspace, ctx: click.Context):
         "worker_hostname": socket.gethostname(),
         "worker_limit": str(worker_limit) if worker_limit else None,
         "worker_username": getpass.getuser(),
-        "jenkins_build_url": os.environ.get("BUILD_URL") or os.environ.get("RUN_DISPLAY_URL"),
-        "jenkins_build_tag": os.environ.get("BUILD_TAG"),
-        "jenkins_job_name": os.environ.get("JOB_NAME"),
-        "jenkins_build_number": os.environ.get("BUILD_NUMBER"),
-        "jenkins_build_user": os.environ.get("BUILD_USER"),
-        "jenkins_build_user_id": os.environ.get("BUILD_USER_ID"),
-        "jenkins_build_user_email": os.environ.get("BUILD_USER_EMAIL"),
+        "deployment_url": os.environ.get("BUILD_URL") or os.environ.get("RUN_DISPLAY_URL"),
+        "deployment_tag": os.environ.get("BUILD_TAG"),
+        "deployment_name": os.environ.get("JOB_NAME"),
+        "deployment_number": os.environ.get("BUILD_NUMBER"),
+        "deployment_user": os.environ.get("BUILD_USER"),
+        "deployment_user_id": os.environ.get("BUILD_USER_ID"),
+        "deployment_user_email": os.environ.get("BUILD_USER_EMAIL"),
     }
     boardwalkd_client.set_auth_login_context(**{key: value for key, value in auth_login_context.items() if value})
     # Check if the if the Workspace is locked. We don't want to conflict with another worker
@@ -644,13 +644,14 @@ def bootstrap_with_server(workspace: Workspace, ctx: click.Context):
     try:
         boardwalkd_client.post_details(
             WorkspaceDetails(
+                deployment_url=auth_login_context.get("deployment_url") or "",
+                deployment_name=auth_login_context.get("deployment_name") or "",
+                deployment_number=auth_login_context.get("deployment_number") or "",
+                deployment_tag=auth_login_context.get("deployment_tag") or "",
+                deployment_user=auth_login_context.get("deployment_user") or "",
+                deployment_user_id=auth_login_context.get("deployment_user_id") or "",
+                deployment_user_email=auth_login_context.get("deployment_user_email") or "",
                 host_pattern=workspace.cfg.host_pattern,
-                jenkins_build_url=auth_login_context.get("jenkins_build_url") or "",
-                jenkins_job_name=auth_login_context.get("jenkins_job_name") or "",
-                jenkins_build_number=auth_login_context.get("jenkins_build_number") or "",
-                jenkins_build_user=auth_login_context.get("jenkins_build_user") or "",
-                jenkins_build_user_id=auth_login_context.get("jenkins_build_user_id") or "",
-                jenkins_build_user_email=auth_login_context.get("jenkins_build_user_email") or "",
                 workflow=workspace.cfg.workflow.__class__.__qualname__,
                 worker_command="check" if _check_mode else "run",
                 worker_hostname=socket.gethostname(),

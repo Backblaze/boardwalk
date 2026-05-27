@@ -929,7 +929,7 @@ class WorkspaceEventApiHandler(APIBaseHandler):
                 slack_user_mention = None
                 if event.severity == "error":
                     slack_user_mention = await slack_user_mention_for_email(
-                        workspace_details.jenkins_build_user_email,
+                        workspace_details.deployment_user_email,
                         self.settings.get("slack_bot_token"),
                     )
                 await handle_slack_broadcast(

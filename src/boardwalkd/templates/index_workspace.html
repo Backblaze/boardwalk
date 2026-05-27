@@ -44,10 +44,10 @@
                                 {% end %}
                             </td>
                             <td>
-                                {% if prompt.auth_context.get('jenkins_build_url') %}
-                                <a href="{{ prompt.auth_context.get('jenkins_build_url') }}">Jenkins build</a>
+                                {% if prompt.auth_context.get('deployment_url') %}
+                                <a href="{{ prompt.auth_context.get('deployment_url') }}">Deployment</a>
                                 {% else %}
-                                Jenkins build unavailable
+                                Deployment unavailable
                                 {% end %}
                             </td>
                             <td class="text-end">
@@ -104,11 +104,11 @@
                     {% if prompt.auth_context.get('worker_limit') %}
                     <span>Limit: {{ prompt.auth_context.get('worker_limit') }}</span>
                     {% end %}
-                    {% if prompt.auth_context.get('jenkins_build_user') %}
-                    <span>User: {{ prompt.auth_context.get('jenkins_build_user') }}</span>
+                    {% if prompt.auth_context.get('deployment_user') %}
+                    <span>User: {{ prompt.auth_context.get('deployment_user') }}</span>
                     {% end %}
-                    {% if prompt.auth_context.get('jenkins_build_url') %}
-                    <a href="{{ prompt.auth_context.get('jenkins_build_url') }}">Jenkins build</a>
+                    {% if prompt.auth_context.get('deployment_url') %}
+                    <a href="{{ prompt.auth_context.get('deployment_url') }}">Deployment</a>
                     {% end %}
                     <a href="{{ prompt.login_url }}" class="btn btn-sm btn-warning">Open login</a>
                 </div>

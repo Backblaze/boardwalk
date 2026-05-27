@@ -33,13 +33,13 @@ AUTH_LOGIN_CONTEXT_FIELDS = (
     "worker_hostname",
     "worker_limit",
     "worker_username",
-    "jenkins_build_url",
-    "jenkins_build_tag",
-    "jenkins_job_name",
-    "jenkins_build_number",
-    "jenkins_build_user",
-    "jenkins_build_user_id",
-    "jenkins_build_user_email",
+    "deployment_url",
+    "deployment_tag",
+    "deployment_name",
+    "deployment_number",
+    "deployment_user",
+    "deployment_user_id",
+    "deployment_user_email",
 )
 
 
@@ -58,13 +58,14 @@ class ApiLoginMessage(ProtocolBaseModel):
 class WorkspaceDetails(ProtocolBaseModel):
     """Model for basic workspace details from workers"""
 
+    deployment_name: str = ""
+    deployment_number: str = ""
+    deployment_tag: str = ""
+    deployment_url: str = ""
+    deployment_user: str = ""
+    deployment_user_email: str = ""
+    deployment_user_id: str = ""
     host_pattern: str = ""
-    jenkins_build_url: str = ""
-    jenkins_job_name: str = ""
-    jenkins_build_number: str = ""
-    jenkins_build_user: str = ""
-    jenkins_build_user_id: str = ""
-    jenkins_build_user_email: str = ""
     workflow: str = ""
     worker_command: str = ""
     worker_hostname: str = ""

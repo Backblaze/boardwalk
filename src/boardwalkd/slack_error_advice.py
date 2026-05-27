@@ -4,8 +4,9 @@ Configurable Slack advice for recognized error messages.
 
 from __future__ import annotations
 
-import json
 import re
+import tomllib
+from pathlib import Path
 from typing import Any
 
 from pydantic import PrivateAttr, ValidationError, field_validator
@@ -50,16 +51,18 @@ class SlackErrorAdviceConfigError(ValueError):
     """Raised when Slack advice configuration cannot be loaded."""
 
 
-def parse_slack_error_advice_config(raw_config: str | None) -> list[SlackErrorAdviceRule]:
-    """Parses Slack error advice rules from JSON config."""
-    if not raw_config:
+def parse_slack_error_advice_config(config_path: str | Path | None) -> list[SlackErrorAdviceRule]:
+    """Parses Slack error advice rules from a TOML config file."""
+    if not config_path:
         return []
 
+    path = Path(config_path)
     try:
-        parsed = json.loads(raw_config)
+        with path.open("rb") as config_file:
+            parsed = tomllib.load(config_file)
         return SlackErrorAdviceConfig.model_validate(parsed).rules
-    except (json.JSONDecodeError, ValidationError) as e:
-        raise SlackErrorAdviceConfigError(f"Invalid Slack error advice configuration: {e}") from e
+    except (OSError, tomllib.TOMLDecodeError, ValidationError) as e:
+        raise SlackErrorAdviceConfigError(f"Invalid Slack error advice configuration in {path}: {e}") from e
 
 
 def matching_error_advice(event: WorkspaceEvent, rules: list[SlackErrorAdviceRule]) -> list[SlackErrorAdviceRule]:

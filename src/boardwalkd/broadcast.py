@@ -23,13 +23,13 @@ AUTH_CONTEXT_LABELS = {
     "worker_limit": "Limit",
     "worker_username": "User",
     "worker_hostname": "Worker host",
-    "jenkins_build_url": "Jenkins build",
-    "jenkins_job_name": "Jenkins job",
-    "jenkins_build_number": "Jenkins build number",
-    "jenkins_build_tag": "Jenkins build tag",
-    "jenkins_build_user": "Jenkins user",
-    "jenkins_build_user_id": "Jenkins user ID",
-    "jenkins_build_user_email": "Jenkins user email",
+    "deployment_url": "Deployment link",
+    "deployment_name": "Deployment name",
+    "deployment_number": "Deployment number",
+    "deployment_tag": "Deployment tag",
+    "deployment_user": "Deployment user",
+    "deployment_user_id": "Deployment user ID",
+    "deployment_user_email": "Deployment user email",
 }
 
 SLACK_USER_LOOKUP_TIMEOUT_SECONDS = 3.0
@@ -54,7 +54,7 @@ def _auth_login_context_fields(auth_context: dict[str, str], server_url: str) ->
             continue
         if key == "workspace":
             value = f"<{server_url}#{value}|{value}>"
-        elif key == "jenkins_build_url":
+        elif key == "deployment_url":
             value = f"<{value}|{value}>"
         fields.append(MarkdownTextObject(text=f"*{label}:*\n{value}"))
     return fields

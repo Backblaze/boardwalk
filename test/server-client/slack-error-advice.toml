@@ -1,0 +1,6 @@
+[[rules]]
+name = "Expected test failure"
+patterns = [
+  "Task failed successfully!",
+]
+message = "Successful test, this may be ignored."

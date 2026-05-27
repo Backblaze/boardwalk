@@ -139,9 +139,9 @@ def cli():
     show_envvar=True,
 )
 @click.option(
-    "--slack-error-advice-json",
-    help="JSON config with error advice rules to append to matching Slack error notifications",
-    type=str,
+    "--slack-error-advice-config",
+    help="Path to a TOML config file with advice rules to append to matching Slack error notifications",
+    type=click.Path(exists=True, readable=True, dir_okay=False),
     default=None,
     show_envvar=True,
 )
@@ -205,7 +205,7 @@ def serve(
     slack_webhook_url: str,
     slack_app_token: str | None,
     slack_bot_token: str | None,
-    slack_error_advice_json: str | None,
+    slack_error_advice_config: str | None,
     slack_slash_command_prefix: str,
     tls_crt: str | None,
     tls_key: str | None,
@@ -252,7 +252,7 @@ def serve(
         raise BoardwalkException("If --slack-app-token is supplied, --slack-bot-token must also be supplied")
 
     try:
-        slack_error_advice_rules = parse_slack_error_advice_config(slack_error_advice_json)
+        slack_error_advice_rules = parse_slack_error_advice_config(slack_error_advice_config)
     except SlackErrorAdviceConfigError as e:
         raise BoardwalkException(str(e))
 
