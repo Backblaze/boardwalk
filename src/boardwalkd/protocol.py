@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlencode, urljoin, urlparse
 
+import click
 from loguru import logger
 from pydantic import BaseModel, field_validator
 from tornado.httpclient import (
@@ -71,6 +72,17 @@ class WorkspaceDetails(ProtocolBaseModel):
     worker_hostname: str = ""
     worker_limit: str = ""
     worker_username: str = ""
+
+    def __init__(self, **kwargs: str):
+        super().__init__(**kwargs)
+
+    @field_validator("deployment_url")
+    @classmethod
+    def validate_url(cls, url: str):
+        valid_url_schemes: list[str] = ["http", "https"]
+        if url and urlparse(url).scheme not in valid_url_schemes:
+            raise ValueError(f"Invalid URL scheme for deployment_url; must be one of {valid_url_schemes}")
+        return url
 
 
 class WorkspaceEvent(ProtocolBaseModel):
@@ -155,11 +167,12 @@ class Client:
                 raise ConnectionAbortedError("Server closed login websocket")
 
             msg = json.loads(str(msg))
-            msg = ApiLoginMessage.parse_obj(msg)
+            msg = ApiLoginMessage.model_validate(msg)
 
             if msg.login_url:
+                click_context = click.get_current_context()
                 print(f"---\nPlease visit to login:\n{msg.login_url}")
-                if webbrowser.open_new_tab(msg.login_url):
+                if click_context.params.get("open_browser_for_api_login") and webbrowser.open_new_tab(msg.login_url):
                     print("---\nOpened browser to login URL")
             elif msg.token:
                 conn.close()

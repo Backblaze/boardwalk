@@ -9,7 +9,7 @@ exclude_paths:
   - semgrep-rules.yml
   - server-client/playbooks/malformed_playbook.yml
 # parseable: true
-quiet: true
+# quiet: true
 # strict: true
 # verbosity: 1
 

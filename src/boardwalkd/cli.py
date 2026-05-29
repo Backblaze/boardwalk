@@ -4,10 +4,12 @@ This file contains the boardwalkd CLI code
 
 import asyncio
 import re
+import sys
 from importlib.metadata import version as lib_version
 
 import click
 from email_validator import EmailNotValidError, validate_email
+from loguru import logger
 
 from boardwalk.app_exceptions import BoardwalkException
 from boardwalkd.server import run
@@ -140,7 +142,7 @@ def cli():
 )
 @click.option(
     "--slack-error-advice-config",
-    help="Path to a TOML config file with advice rules to append to matching Slack error notifications",
+    help="Path to a TOML config file with advice rules to append to matching Slack error notifications.",
     type=click.Path(exists=True, readable=True, dir_okay=False),
     default=None,
     show_envvar=True,
@@ -187,8 +189,18 @@ def cli():
     required=True,
 )
 @click.option(
+    "-v",
+    "--verbose",
+    count=True,
+    default=0,
+    help="Whether or not output messages should be verbose. Additional -v's increases the verbosity",
+    show_default=True,
+    show_envvar=True,
+    type=click.IntRange(min=0, max=2, clamp=True),
+)
+@click.option(
     "--workspace-status-json/--no-workspace-status-json",
-    help=("Exposed an unauthenticated JSON object of the status of all workspaces at /api/workspaces/status"),
+    help="Provides the status of all workspaces at /api/workspaces/status via a JSON object. This endpoint does not require authentication.",
     type=bool,
     default=False,
     show_envvar=True,
@@ -211,9 +223,18 @@ def serve(
     tls_key: str | None,
     tls_port: int | None,
     url: str,
+    verbose: int,
     workspace_status_json: bool,
 ):
     """Runs the server"""
+    logger.enable("boardwalkd")
+    logger.remove()
+    loglevel = "INFO" if verbose == 0 else "DEBUG" if verbose == 1 else "TRACE"
+    logger.add(sys.stdout, level=loglevel)
+    logger.info(f"Log level is {loglevel}")
+
+    logger.warning("boardwalkd is running in development mode, which should not be used in a production environment")
+
     # Validate host_header_pattern
     try:
         host_header_regex = re.compile(host_header_pattern)
@@ -253,6 +274,9 @@ def serve(
 
     try:
         slack_error_advice_rules = parse_slack_error_advice_config(slack_error_advice_config)
+        logger.info(
+            f"{len(slack_error_advice_rules)} error advice rule(s) were loaded from {slack_error_advice_config}"
+        )
     except SlackErrorAdviceConfigError as e:
         raise BoardwalkException(str(e))
 

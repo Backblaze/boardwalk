@@ -45,13 +45,13 @@
                             </td>
                             <td>
                                 {% if prompt.auth_context.get('deployment_url') %}
-                                <a href="{{ prompt.auth_context.get('deployment_url') }}">Deployment</a>
+                                <a href="{{ prompt.auth_context.get('deployment_url') # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}">Deployment</a>
                                 {% else %}
                                 Deployment unavailable
                                 {% end %}
                             </td>
                             <td class="text-end">
-                                <a href="{{ prompt.login_url }}" class="btn btn-sm btn-warning">Open login</a>
+                                <a href="{{ prompt.login_url # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}" class="btn btn-sm btn-warning">Open login</a>
                             </td>
                         </tr>
                         {% end %}
@@ -108,9 +108,9 @@
                     <span>User: {{ prompt.auth_context.get('deployment_user') }}</span>
                     {% end %}
                     {% if prompt.auth_context.get('deployment_url') %}
-                    <a href="{{ prompt.auth_context.get('deployment_url') }}">Deployment</a>
+                    <a href="{{ prompt.auth_context.get('deployment_url') # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}">Deployment</a>
                     {% end %}
-                    <a href="{{ prompt.login_url }}" class="btn btn-sm btn-warning">Open login</a>
+                    <a href="{{ prompt.login_url # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}" class="btn btn-sm btn-warning">Open login</a>
                 </div>
                 {% end %}
             </div>

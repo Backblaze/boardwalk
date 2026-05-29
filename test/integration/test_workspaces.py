@@ -123,6 +123,12 @@ async def test_ensure_remote_workflow_success_state_false_during_workflow_execut
     failure_expected: bool = False,
     failure_msg: str = "",
 ):
+    # TODO: We really should try to see if we can get the tests running properly
+    # in the context of pytest; right now this test is twice as long as it needs
+    # to be -- given that we need to ensure the remote state is correctly set up
+    # -- since if we could override boardwalk.host.Host.remote_state_path to a
+    # temp file, we could give it a minified state already pre-configured, like:
+    # {"workspaces":{"RemoteStateShouldHaveWorkflowSucceededValueSetAsFalseDuringExecutionWorkspace":{"workflow":{"started":true,"succeeded":true}}}}
     # This first execution ensures the Workspace completes at least once (ensuring the state is set)
     await execute_boardwalk_workspace_test(
         workspace_name=workspace_name,

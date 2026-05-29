@@ -77,6 +77,12 @@ _stomp_locks: bool = False
     default="",
 )
 @click.option(
+    "--open-browser-for-api-login/--no-open-browser-for-api-login",
+    help="Attempt to open a web browser, if required, to log into the boardwalkd API",
+    default=True,
+    show_default=True,
+)
+@click.option(
     "--server-connect/--no-server-connect",
     "-sc/-nsc",
     help=(
@@ -108,6 +114,7 @@ def run(
     server_connect: bool,
     sort_hosts: str,
     stomp_locks: bool,
+    open_browser_for_api_login: bool,
 ):
     """
     Runs workflow jobs defined in the Boardwalkfile.py
@@ -433,7 +440,9 @@ def check_host_preconditions_locally(
         if workspace.cfg.workflow.cfg.always_retry_failed_hosts:
             # If the workflow was started but never finished, ignore preconditions
             try:
-                boardwalk_state = RemoteStateModel.parse_obj(host.ansible_facts["ansible_local"]["boardwalk_state"])
+                boardwalk_state = RemoteStateModel.model_validate(
+                    host.ansible_facts["ansible_local"]["boardwalk_state"]
+                )
                 if (
                     boardwalk_state.workspaces[workspace.name].workflow.started
                     and not boardwalk_state.workspaces[workspace.name].workflow.succeeded
@@ -538,22 +547,26 @@ def maybe_clear_remote_state_fact(
     if not client.get_semaphores().clear_remote_state_requested:
         return False
 
+    logger.trace(f"Processing boardwalkd requested removal of remote state for {host.name}")
     try:
-        host.clear_remote_state_fact(become_password=become_password, check=check)
+        runner = host.clear_remote_state_fact(become_password=become_password, check=check)
         client.queue_event(
             WorkspaceEvent(
                 severity="success",
                 message=f"{host.name}: Removed remote Boardwalk state fact",
             )
         )
+        logger.success(f"{host.name}: Removed remote Boardwalk state fact @ {host.remote_state_path}")
         return True
-    except Exception as e:
+    except AnsibleRunnerBaseException as e:
         client.queue_event(
             WorkspaceEvent(
                 severity="error",
                 message=f"{host.name}: Could not remove remote Boardwalk state fact: {e}",
             )
         )
+        logger.error(f"{host.name}: Unable to remove remote Boardwalk state fact @ {host.remote_state_path}")
+        logger.error(f"Runner output: {ansible_runner_errors_to_output(runner=runner)}")
         return False
     finally:
         client.delete_clear_remote_state_request()
@@ -569,22 +582,26 @@ def maybe_clear_remote_mutex(
     if not client.get_semaphores().clear_remote_mutex_requested:
         return False
 
+    logger.trace(f"Processing boardwalkd requested removal of remote mutex for {host.name}")
     try:
-        host.clear_remote_mutex(become_password=become_password, check=check)
+        runner = host.clear_remote_mutex(become_password=become_password, check=check)
         client.queue_event(
             WorkspaceEvent(
                 severity="success",
                 message=f"{host.name}: Removed remote Boardwalk mutex",
             )
         )
+        logger.success(f"{host.name}: Removed remote Boardwalk mutex @ {host.remote_mutex_path}")
         return True
-    except Exception as e:
+    except AnsibleRunnerBaseException as e:
         client.queue_event(
             WorkspaceEvent(
                 severity="error",
                 message=f"{host.name}: Could not remove remote Boardwalk mutex: {e}",
             )
         )
+        logger.error(f"{host.name}: Unable to remove remote Boardwalk mutex @ {host.remote_mutex_path}")
+        logger.error(f"Runner output: {ansible_runner_errors_to_output(runner=runner)}")
         return False
     finally:
         client.delete_clear_remote_mutex_request()
@@ -720,7 +737,7 @@ def directly_confirm_host_preconditions(host: Host, inventory_vars: InventoryHos
     if workspace.cfg.workflow.cfg.always_retry_failed_hosts:
         # If the workflow was started but never finished, ignore preconditions
         try:
-            boardwalk_state = RemoteStateModel.parse_obj(host.ansible_facts["ansible_local"]["boardwalk_state"])
+            boardwalk_state = RemoteStateModel.model_validate(host.ansible_facts["ansible_local"]["boardwalk_state"])
             if (
                 boardwalk_state.workspaces[workspace.name].workflow.started
                 and not boardwalk_state.workspaces[workspace.name].workflow.succeeded

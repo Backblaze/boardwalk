@@ -40,14 +40,17 @@ ifdef BOARDWALKD_SLACK_WEBHOOK_URL
 		--workspace-status-json \
 		--host-header-pattern="(localhost|127\.0\.0\.1)" \
 		--port=8888 \
-		--url='http://localhost:8888'
+		--url='http://localhost:8888' \
+		--slack-error-advice-config test/server-client/slack-error-advice.toml
+		--workspace-status-json
 else
 	poetry run boardwalkd serve \
 		--develop \
 		--workspace-status-json \
 		--host-header-pattern="(localhost|127\.0\.0\.1)" \
 		--port=8888 \
-		--url='http://localhost:8888'
+		--url='http://localhost:8888' \
+		--workspace-status-json
 endif
 
 dist: clean
@@ -94,8 +97,8 @@ render-d2:
 test: test-pytest test-ruff test-pyright test-semgrep test-ansible-lint
 
 .PHONY: test-ansible-lint
-test-ansible-lint: develop
-	-cd test && poetry run ansible-lint --config-file ansible-lint.yaml
+test-ansible-lint:
+	uvx --directory test ansible-lint --config-file ansible-lint.yaml z.dummy_playbook_for_ansible_lint.yml server-client/playbooks/
 
 # Run pytest verbosely if we're running manually, but normally if we're in a CI environment.
 .PHONY: test-pytest

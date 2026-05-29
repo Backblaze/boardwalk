@@ -11,6 +11,7 @@ from base64 import b64decode
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from ansible_runner.runner import Runner
 from pydantic import BaseModel
 
 import boardwalk
@@ -18,8 +19,6 @@ from boardwalk.ansible import ansible_runner_run_tasks
 from boardwalk.app_exceptions import BoardwalkException
 
 if TYPE_CHECKING:
-    from ansible_runner import Runner
-
     from boardwalk.ansible import AnsibleTasksType
 
 
@@ -30,6 +29,7 @@ class Host(BaseModel, extra="forbid"):
     name: str
     meta: dict[str, str | int | bool] = {}
     remote_mutex_path: str = "/opt/boardwalk.mutex"
+    remote_state_path: str = "/etc/ansible/facts.d/boardwalk_state.fact"
     remote_alert_msg: str = "ALERT: Boardwalk is running a workflow against this host. Services may be interrupted"
     remote_alert_string_formatted: str = (
         f"$(tput -T xterm bold)$(tput -T xterm setaf 1)'{remote_alert_msg}'$(tput -T xterm sgr0)"
@@ -230,7 +230,7 @@ class Host(BaseModel, extra="forbid"):
         for event in runner.events:
             if event["event"] == "runner_on_ok" and event["event_data"]["task"] == "setup":
                 try:
-                    return boardwalk.RemoteStateModel.parse_obj(
+                    return boardwalk.RemoteStateModel.model_validate(
                         event["event_data"]["res"]["ansible_facts"]["ansible_local"]["boardwalk_state"]
                     )
                 except KeyError:
@@ -268,8 +268,8 @@ class Host(BaseModel, extra="forbid"):
             {
                 "name": "update_remote_state",
                 "ansible.builtin.copy": {
-                    "content": remote_state_obj.json(),
-                    "dest": "/etc/ansible/facts.d/boardwalk_state.fact",
+                    "content": remote_state_obj.model_dump_json(),
+                    "dest": self.remote_state_path,
                     "mode": "0644",
                     "owner": "root",
                     "group": "{{ admin_group }}",
@@ -286,14 +286,14 @@ class Host(BaseModel, extra="forbid"):
             job_type=boardwalk.manifest.JobTypes.TASK,
         )
         if not check:
-            self.ansible_facts["ansible_local"]["boardwalk_state"] = remote_state_obj.dict()
+            self.ansible_facts["ansible_local"]["boardwalk_state"] = remote_state_obj.model_dump()
             workspace.flush()
 
     def clear_remote_state_fact(
         self,
         become_password: str | None = None,
         check: bool = False,
-    ):
+    ) -> Runner:
         """Removes Boardwalk's remote state fact from the remote and local state."""
         tasks: AnsibleTasksType = [
             {"name": "get_ansible_system", "setup": {"filter": ["ansible_system"]}},
@@ -310,12 +310,12 @@ class Host(BaseModel, extra="forbid"):
             {
                 "name": "clear_remote_state_fact",
                 "ansible.builtin.file": {
-                    "path": "/etc/ansible/facts.d/boardwalk_state.fact",
+                    "path": self.remote_state_path,
                     "state": "absent",
                 },
             },
         ]
-        self.ansible_run(
+        runner: Runner = self.ansible_run(
             become=True,
             become_password=become_password,
             check=check,
@@ -327,6 +327,7 @@ class Host(BaseModel, extra="forbid"):
         if not check:
             self.ansible_facts.get("ansible_local", {}).pop("boardwalk_state", None)
             boardwalk.manifest.get_ws().flush()
+        return runner
 
     def clear_remote_mutex(
         self,
@@ -350,7 +351,7 @@ class Host(BaseModel, extra="forbid"):
                 },
             },
         ]
-        self.ansible_run(
+        return self.ansible_run(
             become=True,
             become_password=become_password,
             check=check,

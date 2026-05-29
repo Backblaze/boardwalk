@@ -26,6 +26,7 @@ import tornado.httpclient
 import tornado.web
 import tornado.websocket
 from cryptography.fernet import Fernet
+from loguru import logger
 from pydantic import ValidationError
 from tornado.escape import url_escape, url_unescape
 from tornado.log import access_log, app_log
@@ -98,12 +99,6 @@ class UIBaseHandler(tornado.web.RequestHandler):
         )
 
 
-def ui_method_sha256(handler: UIBaseHandler, value: str) -> str:
-    """Custom UI templating method. Accepts a string value and returns an sha256
-    digest of the string as a string"""
-    return hashlib.sha256(value.encode()).hexdigest()
-
-
 def ui_method_secondsdelta(handler: UIBaseHandler, time: datetime) -> float:
     """Custom UI templating method. Accepts a datetime and returns the delta
     between time given and now in number of seconds"""
@@ -114,6 +109,12 @@ def ui_method_secondsdelta(handler: UIBaseHandler, time: datetime) -> float:
 def ui_method_server_version(handler: UIBaseHandler) -> str:
     """Returns the version number of the server"""
     return lib_version("boardwalk")
+
+
+def ui_method_sha256(handler: UIBaseHandler, value: str) -> str:
+    """Custom UI templating method. Accepts a string value and returns an sha256
+    digest of the string as a string"""
+    return hashlib.sha256(value.encode()).hexdigest()
 
 
 def ui_method_sort_events_by_date(handler: UIBaseHandler, events: deque[WorkspaceEvent]) -> list[WorkspaceEvent]:
@@ -727,6 +728,31 @@ class AuthApiDenied(APIBaseHandler):
         return self.send_error(403)
 
 
+class DevelopmentClearAllWorkspaces(APIBaseHandler):
+    """When run in development mode, allows clearing all workspaces"""
+
+    # nosemgrep: test.boardwalk.python.security.handler-method-missing-authentication
+    def get(self):
+        if self.settings.get("development_features_enabled", False):
+            return self.send_error(405)
+        else:
+            return self.send_error(403)
+
+    # nosemgrep: test.boardwalk.python.security.handler-method-missing-authentication
+    def post(self):
+        if self.settings.get("development_features_enabled", False):
+            ws_names = [name for name, _ in state.workspaces.items()]
+            logger.info(f"Resetting development server workspace state by clearing {len(ws_names)} workspace(s)")
+            for name in ws_names:
+                # If there is a mutex on the workspace we will not delete it
+                if state.workspaces[name].semaphores.has_mutex:
+                    continue
+                del state.workspaces[name]
+            state.flush()
+        else:
+            return self.send_error(403)
+
+
 class WorkspacesStatusApiHandler(APIBaseHandler):
     """Returns an unauthenticated, read-only summary of all workspaces for monitoring integrations"""
 
@@ -742,14 +768,9 @@ class WorkspacesStatusApiHandler(APIBaseHandler):
                 "semaphores": ws.semaphores.model_dump(),
             }
             if ws.details:
-                entry["details"] = {
-                    "workflow": ws.details.workflow,
-                    "worker": f"{ws.details.worker_username}@{ws.details.worker_hostname}",
-                    "worker_connected": is_workspace_active(workspace_name=name),
-                    "host_pattern": ws.details.host_pattern,
-                    "limit_pattern": "<unknown>" if ws.details.worker_limit == "" else ws.details.worker_limit,
-                    "command": ws.details.worker_command,
-                }
+                entry["details"] = {key: value for key, value in ws.details}
+                entry["details"]["worker"] = f"{ws.details.worker_username}@{ws.details.worker_hostname}"
+                entry["details"]["worker_connected"] = is_workspace_active(workspace_name=name)
             if ws.last_seen:
                 entry["last_seen"] = ws.last_seen.isoformat()
             result.append(entry)
@@ -848,7 +869,7 @@ class WorkspaceDetailsApiHandler(APIBaseHandler):
             return self.send_error(415)
 
         try:
-            new_details = WorkspaceDetails().parse_obj(payload)
+            new_details = WorkspaceDetails().model_validate(payload)
         except ValidationError as e:
             app_log.error(e)
             return self.send_error(422)
@@ -909,7 +930,7 @@ class WorkspaceEventApiHandler(APIBaseHandler):
             return self.send_error(415)
 
         try:
-            event = WorkspaceEvent.parse_obj(payload)
+            event = WorkspaceEvent.model_validate(payload)
         except ValidationError as e:
             app_log.error(e)
             return self.send_error(422)
@@ -1045,6 +1066,7 @@ def make_app(
         "login_url": urljoin(url, "/auth/login"),
         "log_function": log_request,
         "owner": owner,
+        "development_features_enabled": develop,
         "slack_bot_token": slack_bot_token,
         "slack_error_advice_rules": slack_error_advice_rules,
         "slack_webhook_url": slack_webhook_url,
@@ -1052,9 +1074,9 @@ def make_app(
         "static_path": module_dir.joinpath("static"),
         "template_path": module_dir.joinpath("templates"),
         "ui_methods": {
-            "sha256": ui_method_sha256,
             "secondsdelta": ui_method_secondsdelta,
             "server_version": ui_method_server_version,
+            "sha256": ui_method_sha256,
             "sort_events_by_date": ui_method_sort_events_by_date,
         },
         "workspace_status_json": workspace_status_json,
@@ -1112,6 +1134,8 @@ def make_app(
             (r"/workspace/(\w+)/semaphores/caught", WorkspaceCatchHandler),
             (r"/workspace/(\w+)/semaphores/has_mutex", WorkspaceMutexHandler),
             (r"/workspaces", WorkspacesHandler),
+            # Routes that are gated behind the --develop flag
+            (r"/develop/clear_all_workspaces", DevelopmentClearAllWorkspaces),
             # API handlers
             (
                 r"/api/auth/denied",
