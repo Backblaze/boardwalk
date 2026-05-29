@@ -13,7 +13,8 @@ boardwalkd_url = "http://localhost:8888"
 @pytest.fixture(scope="session", autouse=True)
 def clear_workspaces_before_running_tests():
     """Fixture to clear the boardwalkd workspace state before execution of the pytest run."""
-    requests.post(url=boardwalkd_url + "/develop/clear_all_workspaces")
+    if not os.environ.get("CI"):
+        requests.post(url=boardwalkd_url + "/develop/clear_all_workspaces", timeout=2)
     yield
 
 
