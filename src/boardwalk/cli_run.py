@@ -549,7 +549,7 @@ def maybe_clear_remote_state_fact(
 
     logger.trace(f"Processing boardwalkd requested removal of remote state for {host.name}")
     try:
-        runner = host.clear_remote_state_fact(become_password=become_password, check=check)
+        host.clear_remote_state_fact(become_password=become_password, check=check)
         client.queue_event(
             WorkspaceEvent(
                 severity="success",
@@ -566,7 +566,7 @@ def maybe_clear_remote_state_fact(
             )
         )
         logger.error(f"{host.name}: Unable to remove remote Boardwalk state fact @ {host.remote_state_path}")
-        logger.error(f"Runner output: {ansible_runner_errors_to_output(runner=runner)}")
+        logger.error(f"Runner output: {ansible_runner_errors_to_output(runner=e.runner)}")
         return False
     finally:
         client.delete_clear_remote_state_request()
@@ -584,7 +584,7 @@ def maybe_clear_remote_mutex(
 
     logger.trace(f"Processing boardwalkd requested removal of remote mutex for {host.name}")
     try:
-        runner = host.clear_remote_mutex(become_password=become_password, check=check)
+        host.clear_remote_mutex(become_password=become_password, check=check)
         client.queue_event(
             WorkspaceEvent(
                 severity="success",
@@ -601,7 +601,7 @@ def maybe_clear_remote_mutex(
             )
         )
         logger.error(f"{host.name}: Unable to remove remote Boardwalk mutex @ {host.remote_mutex_path}")
-        logger.error(f"Runner output: {ansible_runner_errors_to_output(runner=runner)}")
+        logger.error(f"Runner output: {ansible_runner_errors_to_output(runner=e.runner)}")
         return False
     finally:
         client.delete_clear_remote_mutex_request()
