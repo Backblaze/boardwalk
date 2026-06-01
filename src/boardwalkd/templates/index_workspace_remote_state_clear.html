@@ -1,0 +1,18 @@
+<div id="remote-state-clear-{{ sha256(workspace_name) }}" class="d-flex flex-wrap gap-2 align-items-center">
+    {% if workspace.semaphores.clear_remote_state_requested %}
+    <span class="badge text-bg-warning">Cleanup requested</span>
+    {% elif secondsdelta(workspace.last_seen) > 10 %}
+    <button type="button" class="btn btn-sm btn-outline-danger"
+        title="A connected worker is required to remove the remote state fact" disabled>
+        Clear state fact
+    </button>
+    {% else %}
+    <button type="button" class="btn btn-sm btn-outline-danger"
+        title="Request that the connected worker removes /etc/ansible/facts.d/boardwalk_state.fact from the current host"
+        hx-post="/workspace/{{ workspace_name }}/remote_state/clear" hx-trigger="click"
+        hx-target="#remote-state-clear-{{ sha256(workspace_name) }}" hx-swap="outerHTML"
+        hx-confirm="Request the connected worker to remove /etc/ansible/facts.d/boardwalk_state.fact from the current host?">
+        Clear state fact
+    </button>
+    {% end %}
+</div>

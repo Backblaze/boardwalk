@@ -1,0 +1,21 @@
+[[rules]]
+# The title/name for this advice rule
+name = "Expected test failure"
+
+# When an error is evaluated, the pattern(s) here are checked against the
+# output. These are Python-type regular expressions, with the following flags
+# set: re.IGNORECASE | re.DOTALL
+patterns = [
+  "Task failed successfully\\.",
+]
+
+# The snippet of advice for resolving this error.
+message = "Successful test, this may be ignored."
+
+[[rules]]
+# The title/name for this advice rule
+name = "Another expected failure"
+patterns = [
+  "Task also failed successfully\\.",
+]
+message = "Yet another successful test, this may be ignored."

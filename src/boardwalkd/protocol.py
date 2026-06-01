@@ -13,8 +13,9 @@ import webbrowser
 from collections import deque
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlencode, urljoin, urlparse
 
+import click
 from loguru import logger
 from pydantic import BaseModel, field_validator
 from tornado.httpclient import (
@@ -26,6 +27,21 @@ from tornado.httpclient import (
 )
 from tornado.simple_httpclient import HTTPTimeoutError
 from tornado.websocket import websocket_connect
+
+AUTH_LOGIN_CONTEXT_FIELDS = (
+    "workspace",
+    "worker_command",
+    "worker_hostname",
+    "worker_limit",
+    "worker_username",
+    "deployment_url",
+    "deployment_tag",
+    "deployment_name",
+    "deployment_number",
+    "deployment_user",
+    "deployment_user_id",
+    "deployment_user_email",
+)
 
 
 class ProtocolBaseModel(BaseModel, extra="forbid"):
@@ -43,12 +59,30 @@ class ApiLoginMessage(ProtocolBaseModel):
 class WorkspaceDetails(ProtocolBaseModel):
     """Model for basic workspace details from workers"""
 
+    deployment_name: str = ""
+    deployment_number: str = ""
+    deployment_tag: str = ""
+    deployment_url: str = ""
+    deployment_user: str = ""
+    deployment_user_email: str = ""
+    deployment_user_id: str = ""
     host_pattern: str = ""
     workflow: str = ""
     worker_command: str = ""
     worker_hostname: str = ""
     worker_limit: str = ""
     worker_username: str = ""
+
+    def __init__(self, **kwargs: str):
+        super().__init__(**kwargs)
+
+    @field_validator("deployment_url")
+    @classmethod
+    def validate_url(cls, url: str):
+        valid_url_schemes: list[str] = ["http", "https"]
+        if url and urlparse(url).scheme not in valid_url_schemes:
+            raise ValueError(f"Invalid URL scheme for deployment_url; must be one of {valid_url_schemes}")
+        return url
 
 
 class WorkspaceEvent(ProtocolBaseModel):
@@ -76,6 +110,8 @@ class WorkspaceSemaphores(ProtocolBaseModel):
     """Model for server-side workspace semaphores"""
 
     caught: bool = False
+    clear_remote_mutex_requested: bool = False
+    clear_remote_state_requested: bool = False
     has_mutex: bool = False
 
 
@@ -92,8 +128,18 @@ class Client:
 
     def __init__(self, url: str):
         self.api_token_file = Path.cwd().joinpath(".boardwalk/api_token.txt")
+        self.auth_login_context: dict[str, str] = {}
         self.event_queue = deque([])
         self.url = urlparse(url)
+
+    def set_auth_login_context(self, **context: str | None):
+        """Stores context to include when an API auth login prompt is needed."""
+        for key, value in context.items():
+            if key not in AUTH_LOGIN_CONTEXT_FIELDS or value is None:
+                continue
+            value = str(value)
+            if value:
+                self.auth_login_context[key] = value
 
     def get_api_token(self) -> str:
         """Retrieves the API token from disk"""
@@ -111,6 +157,8 @@ class Client:
                 raise ValueError(f"{self.url.scheme} is not a valid url scheme")
 
         websocket_url = urljoin(websocket_url.geturl(), "/api/auth/login/socket")
+        if self.auth_login_context:
+            websocket_url = f"{websocket_url}?{urlencode(self.auth_login_context)}"
         conn = await websocket_connect(websocket_url)
         while True:
             msg = await conn.read_message()
@@ -119,11 +167,12 @@ class Client:
                 raise ConnectionAbortedError("Server closed login websocket")
 
             msg = json.loads(str(msg))
-            msg = ApiLoginMessage.parse_obj(msg)
+            msg = ApiLoginMessage.model_validate(msg)
 
             if msg.login_url:
+                click_context = click.get_current_context()
                 print(f"---\nPlease visit to login:\n{msg.login_url}")
-                if webbrowser.open_new_tab(msg.login_url):
+                if click_context.params.get("open_browser_for_api_login") and webbrowser.open_new_tab(msg.login_url):
                     print("---\nOpened browser to login URL")
             elif msg.token:
                 conn.close()
@@ -220,6 +269,60 @@ class Client:
                 path=f"/api/workspace/{workspace_name}/semaphores/caught",
                 method="POST",
                 body="catch",
+            )
+        except HTTPError as e:
+            if e.code == 404:
+                raise WorkspaceNotFound
+            else:
+                raise e
+
+    def workspace_post_clear_remote_state_request(self, workspace_name: str):
+        """Requests that a worker remove the host's remote Boardwalk state fact."""
+        try:
+            self.authenticated_request(
+                path=f"/api/workspace/{workspace_name}/remote_state/clear",
+                method="POST",
+                body="clear_remote_state",
+            )
+        except HTTPError as e:
+            if e.code == 404:
+                raise WorkspaceNotFound
+            else:
+                raise e
+
+    def workspace_post_clear_remote_mutex_request(self, workspace_name: str):
+        """Requests that a worker remove the host's remote Boardwalk mutex."""
+        try:
+            self.authenticated_request(
+                path=f"/api/workspace/{workspace_name}/remote_mutex/clear",
+                method="POST",
+                body="clear_remote_mutex",
+            )
+        except HTTPError as e:
+            if e.code == 404:
+                raise WorkspaceNotFound
+            else:
+                raise e
+
+    def workspace_delete_clear_remote_mutex_request(self, workspace_name: str):
+        """Clears a pending remote mutex cleanup request."""
+        try:
+            self.authenticated_request(
+                path=f"/api/workspace/{workspace_name}/remote_mutex/clear",
+                method="DELETE",
+            )
+        except HTTPError as e:
+            if e.code == 404:
+                raise WorkspaceNotFound
+            else:
+                raise e
+
+    def workspace_delete_clear_remote_state_request(self, workspace_name: str):
+        """Clears a pending remote state cleanup request."""
+        try:
+            self.authenticated_request(
+                path=f"/api/workspace/{workspace_name}/remote_state/clear",
+                method="DELETE",
             )
         except HTTPError as e:
             if e.code == 404:
@@ -376,6 +479,7 @@ class WorkspaceClient(Client):
     def __init__(self, url: str, workspace_name: str):
         super().__init__(url)
         self.workspace_name = workspace_name
+        self.set_auth_login_context(workspace=workspace_name)
 
     def get_semaphores(self) -> WorkspaceSemaphores:
         return self.workspace_get_semaphores(self.workspace_name)
@@ -388,6 +492,18 @@ class WorkspaceClient(Client):
 
     def post_catch(self):
         self.workspace_post_catch(self.workspace_name)
+
+    def post_clear_remote_state_request(self):
+        self.workspace_post_clear_remote_state_request(self.workspace_name)
+
+    def post_clear_remote_mutex_request(self):
+        self.workspace_post_clear_remote_mutex_request(self.workspace_name)
+
+    def delete_clear_remote_mutex_request(self):
+        self.workspace_delete_clear_remote_mutex_request(self.workspace_name)
+
+    def delete_clear_remote_state_request(self):
+        self.workspace_delete_clear_remote_state_request(self.workspace_name)
 
     def caught(self) -> bool:
         return self.workspace_get_semaphores(self.workspace_name).caught

@@ -6,7 +6,7 @@ build-backend = "poetry.core.masonry.api"
 name = "boardwalk"
 description = "Boardwalk is a linear Ansible workflow engine"
 readme = "README.md"
-version = "0.8.29"
+version = "0.9.0"
 requires-python = ">=3.11,<4"
 authors = [
     {name="Mat Hornbeek", email="84995001+m4wh6k@users.noreply.github.com"},
@@ -64,7 +64,7 @@ anyio = "^4.7.0"
 pyright = "==1.1.350"
 pytest = "^8.3.4"
 ruff = "^0.11.13"
-semgrep = ">=1.92.0"
+semgrep = "^1.164.0"
 
 [tool.poetry.group.docs]
 optional = true
@@ -105,6 +105,9 @@ exclude = [
     "build/",
     "dist/",
     "typings/",
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.*",
 ]
 pythonPlatform = "All"
 reportImportCycles = false

@@ -4,13 +4,16 @@ This file contains the boardwalkd CLI code
 
 import asyncio
 import re
+import sys
 from importlib.metadata import version as lib_version
 
 import click
 from email_validator import EmailNotValidError, validate_email
+from loguru import logger
 
 from boardwalk.app_exceptions import BoardwalkException
 from boardwalkd.server import run
+from boardwalkd.slack_error_advice import SlackErrorAdviceConfigError, parse_slack_error_advice_config
 
 CONTEXT_SETTINGS: dict = dict(
     auto_envvar_prefix="BOARDWALKD",
@@ -29,6 +32,14 @@ def cli():
 
 
 @cli.command(context_settings=CONTEXT_SETTINGS)
+@click.option(
+    "--auth-login-slack-notify/--no-auth-login-slack-notify",
+    help="Post a Slack message when a worker is waiting for an API auth login",
+    type=bool,
+    default=False,
+    show_default=True,
+    show_envvar=True,
+)
 @click.option(
     "--auth-expire-days",
     help=("The number of days login tokens and user API keys are valid before they expire"),
@@ -130,6 +141,13 @@ def cli():
     show_envvar=True,
 )
 @click.option(
+    "--slack-error-advice-config",
+    help="Path to a TOML config file with advice rules to append to matching Slack error notifications.",
+    type=click.Path(exists=True, readable=True, dir_okay=False),
+    default=None,
+    show_envvar=True,
+)
+@click.option(
     "--slack-slash-command-prefix",
     help=(
         "The prefix to use in front of Boardwalk slash commands in Slack (e.g., /PREFIX-version). Needs to match the prefix supplied in the Slack App configuration."
@@ -171,13 +189,24 @@ def cli():
     required=True,
 )
 @click.option(
+    "-v",
+    "--verbose",
+    count=True,
+    default=0,
+    help="Whether or not output messages should be verbose. Additional -v's increases the verbosity",
+    show_default=True,
+    show_envvar=True,
+    type=click.IntRange(min=0, max=2, clamp=True),
+)
+@click.option(
     "--workspace-status-json/--no-workspace-status-json",
-    help=("Exposed an unauthenticated JSON object of the status of all workspaces at /api/workspaces/status"),
+    help="Provides the status of all workspaces at /api/workspaces/status via a JSON object. This endpoint does not require authentication.",
     type=bool,
     default=False,
     show_envvar=True,
 )
 def serve(
+    auth_login_slack_notify: bool,
     auth_expire_days: float,
     auth_method: str,
     develop: bool,
@@ -188,14 +217,24 @@ def serve(
     slack_webhook_url: str,
     slack_app_token: str | None,
     slack_bot_token: str | None,
+    slack_error_advice_config: str | None,
     slack_slash_command_prefix: str,
     tls_crt: str | None,
     tls_key: str | None,
     tls_port: int | None,
     url: str,
+    verbose: int,
     workspace_status_json: bool,
 ):
     """Runs the server"""
+    logger.enable("boardwalkd")
+    logger.remove()
+    loglevel = "INFO" if verbose == 0 else "DEBUG" if verbose == 1 else "TRACE"
+    logger.add(sys.stdout, level=loglevel)
+    logger.info(f"Log level is {loglevel}")
+
+    logger.warning("boardwalkd is running in development mode, which should not be used in a production environment")
+
     # Validate host_header_pattern
     try:
         host_header_regex = re.compile(host_header_pattern)
@@ -233,9 +272,18 @@ def serve(
     if (not slack_bot_token) and slack_app_token:
         raise BoardwalkException("If --slack-app-token is supplied, --slack-bot-token must also be supplied")
 
+    try:
+        slack_error_advice_rules = parse_slack_error_advice_config(slack_error_advice_config)
+        logger.info(
+            f"{len(slack_error_advice_rules)} error advice rule(s) were loaded from {slack_error_advice_config}"
+        )
+    except SlackErrorAdviceConfigError as e:
+        raise BoardwalkException(str(e))
+
     asyncio.run(
         run(
             auth_expire_days=auth_expire_days,
+            auth_login_slack_notify=auth_login_slack_notify,
             auth_method=auth_method,
             develop=develop,
             host_header_pattern=host_header_regex,
@@ -243,6 +291,7 @@ def serve(
             port_number=port,
             slack_app_token=slack_app_token,
             slack_bot_token=slack_bot_token,
+            slack_error_advice_rules=slack_error_advice_rules,
             slack_error_webhook_url=slack_error_webhook_url,
             slack_webhook_url=slack_webhook_url,
             slack_slash_command_prefix=slack_slash_command_prefix,

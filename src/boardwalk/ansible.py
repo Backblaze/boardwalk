@@ -6,9 +6,10 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Mapping
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import ansible_runner
 from loguru import logger
@@ -17,7 +18,7 @@ import boardwalk
 from boardwalk.app_exceptions import BoardwalkException
 
 if TYPE_CHECKING:
-    from typing import Any, TypedDict
+    from typing import TypedDict
 
     from ansible_runner import Runner
 
@@ -76,34 +77,83 @@ def ansible_runner_cancel_callback(ws: Workspace):
         return True
 
 
+FAILED_RUNNER_EVENTS = {
+    "runner_on_failed",
+    "runner_item_on_failed",
+    "runner_on_async_failed",
+    "runner_on_unreachable",
+}
+
+
+def _event_ignored(event_data: Mapping[str, Any]) -> bool:
+    return bool(event_data.get("ignore_errors"))
+
+
+def _event_result_hidden(event_data: Mapping[str, Any]) -> bool:
+    res = event_data.get("res", {})
+    if not isinstance(res, dict):
+        return False
+    return bool(res.get("_ansible_no_log"))
+
+
+def _append_if_present(parts: list[str], value: Any) -> None:
+    if value is None:
+        return
+    value_str = str(value).strip()
+    if value_str:
+        parts.append(value_str)
+
+
 def ansible_runner_errors_to_output(runner: Runner, include_msg: bool = True) -> str:
-    """Collects error messages from a Runner into a multiline string"""
+    """Collects useful error messages from a Runner into a de-duplicated multiline string."""
     output: list[str] = []
+    seen: set[str] = set()
+
     for event in runner.events:
-        if (
-            event["event"] == "runner_on_failed"
-            or event["event"] == "runner_item_on_failed"
-            or event["event"] == "runner_on_async_failed"
-            or event["event"] == "runner_on_unreachable"
-        ) and not ("ignore_errors" in event["event_data"] and event["event_data"]["ignore_errors"]):
-            msg: list[str] = [
-                event["event"],
-                event["event_data"]["task"],
-                event["event_data"]["task_action"],
-                event["event_data"]["host"],
-            ]
-            if include_msg and not (
-                "_ansible_no_log" in event["event_data"]["res"] and event["event_data"]["res"]["_ansible_no_log"]
-            ):
-                try:
-                    msg.append(event["event_data"]["res"]["msg"])
-                except KeyError:
-                    logger.warning("Event error did not contain msg")
-                try:
-                    msg.append(event["stdout"])
-                except KeyError:
-                    logger.warning("Event error did not contain stdout")
-            output.append(": ".join(msg))
+        if event.get("event") not in FAILED_RUNNER_EVENTS:
+            continue
+
+        event_data = event.get("event_data", {})
+        if _event_ignored(event_data):
+            continue
+
+        parts: list[str] = []
+        _append_if_present(parts, event_data.get("host"))
+        _append_if_present(parts, event_data.get("task"))
+        _append_if_present(parts, event_data.get("task_action"))
+
+        if include_msg and not _event_result_hidden(event_data):
+            detail_parts: list[str] = []
+            has_result_message = False
+            res = event_data.get("res", {})
+            if isinstance(res, dict):
+                result_message = res.get("msg")
+                _append_if_present(detail_parts, result_message)
+                has_result_message = result_message is not None and str(result_message).strip() != ""
+                if "assertion" in res:
+                    _append_if_present(detail_parts, f"assertion: {res.get('assertion')}")
+                if "evaluated_to" in res:
+                    _append_if_present(detail_parts, f"evaluated_to: {res.get('evaluated_to')}")
+                if "status" in res:
+                    _append_if_present(detail_parts, f"status: {res.get('status')}")
+                if "url" in res:
+                    _append_if_present(detail_parts, f"url: {res.get('url')}")
+                result_json = res.get("json")
+                if isinstance(result_json, dict):
+                    errors = result_json.get("errors")
+                    if isinstance(errors, list):
+                        _append_if_present(detail_parts, "errors: " + "; ".join(str(error) for error in errors))
+
+            if detail_parts:
+                parts.extend(detail_parts)
+            if not has_result_message:
+                _append_if_present(parts, event.get("stdout"))
+
+        line = ": ".join(parts)
+        if line and line not in seen:
+            seen.add(line)
+            output.append(line)
+
     return "\n".join(output)
 
 

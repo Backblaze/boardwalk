@@ -77,6 +77,12 @@ _stomp_locks: bool = False
     default="",
 )
 @click.option(
+    "--open-browser-for-api-login/--no-open-browser-for-api-login",
+    help="Attempt to open a web browser, if required, to log into the boardwalkd API",
+    default=True,
+    show_default=True,
+)
+@click.option(
     "--server-connect/--no-server-connect",
     "-sc/-nsc",
     help=(
@@ -108,6 +114,7 @@ def run(
     server_connect: bool,
     sort_hosts: str,
     stomp_locks: bool,
+    open_browser_for_api_login: bool,
 ):
     """
     Runs workflow jobs defined in the Boardwalkfile.py
@@ -274,7 +281,7 @@ def run_workflow(
                 ),
             )
 
-        handle_workflow_catch(workspace=workspace, hostname=host.name)
+        handle_workflow_catch(workspace=workspace, host=host)
 
         # Connect to the remote host
         # Wrap everything in try/except so we can handle failures
@@ -340,7 +347,7 @@ def run_failure_mode_handler(
     """
     if boardwalkd_client:
         if isinstance(exception, AnsibleRunnerBaseException):
-            runner_errors = ansible_runner_errors_to_output(runner=exception.runner, include_msg=False)
+            runner_errors = ansible_runner_errors_to_output(runner=exception.runner, include_msg=True)
             msg = f"{exception.runner_msg}: {runner_errors}"
         else:
             try:
@@ -433,7 +440,9 @@ def check_host_preconditions_locally(
         if workspace.cfg.workflow.cfg.always_retry_failed_hosts:
             # If the workflow was started but never finished, ignore preconditions
             try:
-                boardwalk_state = RemoteStateModel.parse_obj(host.ansible_facts["ansible_local"]["boardwalk_state"])
+                boardwalk_state = RemoteStateModel.model_validate(
+                    host.ansible_facts["ansible_local"]["boardwalk_state"]
+                )
                 if (
                     boardwalk_state.workspaces[workspace.name].workflow.started
                     and not boardwalk_state.workspaces[workspace.name].workflow.succeeded
@@ -462,8 +471,9 @@ def check_host_preconditions_locally(
     return hosts_meeting_preconditions
 
 
-def handle_workflow_catch(workspace: Workspace, hostname: str):
+def handle_workflow_catch(workspace: Workspace, host: Host):
     """Handles local and remote workspace catches. Blocks under caught conditions"""
+    hostname = host.name
     if workspace.caught():
         logger.info(
             f"{hostname}: The {workspace.name} workspace is locally caught. Waiting for release before continuing..."
@@ -512,7 +522,89 @@ def handle_workflow_catch(workspace: Workspace, hostname: str):
             )
         )
         while check_boardwalkd_catch(boardwalkd_client):
+            maybe_clear_remote_state_fact(
+                host=host,
+                client=boardwalkd_client,
+                become_password=become_password,
+                check=_check_mode,
+            )
+            maybe_clear_remote_mutex(
+                host=host,
+                client=boardwalkd_client,
+                become_password=become_password,
+                check=_check_mode,
+            )
             time.sleep(5)  # nosemgrep: python.lang.best-practice.sleep.arbitrary-sleep
+
+
+def maybe_clear_remote_state_fact(
+    host: Host,
+    client: WorkspaceClient,
+    become_password: str | None,
+    check: bool,
+) -> bool:
+    """Clears a host's remote state fact when boardwalkd has a pending request."""
+    if not client.get_semaphores().clear_remote_state_requested:
+        return False
+
+    logger.trace(f"Processing boardwalkd requested removal of remote state for {host.name}")
+    try:
+        host.clear_remote_state_fact(become_password=become_password, check=check)
+        client.queue_event(
+            WorkspaceEvent(
+                severity="success",
+                message=f"{host.name}: Removed remote Boardwalk state fact",
+            )
+        )
+        logger.success(f"{host.name}: Removed remote Boardwalk state fact @ {host.remote_state_path}")
+        return True
+    except AnsibleRunnerBaseException as e:
+        client.queue_event(
+            WorkspaceEvent(
+                severity="error",
+                message=f"{host.name}: Could not remove remote Boardwalk state fact: {e}",
+            )
+        )
+        logger.error(f"{host.name}: Unable to remove remote Boardwalk state fact @ {host.remote_state_path}")
+        logger.error(f"Runner output: {ansible_runner_errors_to_output(runner=e.runner)}")
+        return False
+    finally:
+        client.delete_clear_remote_state_request()
+
+
+def maybe_clear_remote_mutex(
+    host: Host,
+    client: WorkspaceClient,
+    become_password: str | None,
+    check: bool,
+) -> bool:
+    """Clears a host's remote mutex when boardwalkd has a pending request."""
+    if not client.get_semaphores().clear_remote_mutex_requested:
+        return False
+
+    logger.trace(f"Processing boardwalkd requested removal of remote mutex for {host.name}")
+    try:
+        host.clear_remote_mutex(become_password=become_password, check=check)
+        client.queue_event(
+            WorkspaceEvent(
+                severity="success",
+                message=f"{host.name}: Removed remote Boardwalk mutex",
+            )
+        )
+        logger.success(f"{host.name}: Removed remote Boardwalk mutex @ {host.remote_mutex_path}")
+        return True
+    except AnsibleRunnerBaseException as e:
+        client.queue_event(
+            WorkspaceEvent(
+                severity="error",
+                message=f"{host.name}: Could not remove remote Boardwalk mutex: {e}",
+            )
+        )
+        logger.error(f"{host.name}: Unable to remove remote Boardwalk mutex @ {host.remote_mutex_path}")
+        logger.error(f"Runner output: {ansible_runner_errors_to_output(runner=e.runner)}")
+        return False
+    finally:
+        client.delete_clear_remote_mutex_request()
 
 
 def lock_remote_host(host: Host):
@@ -536,6 +628,22 @@ def bootstrap_with_server(workspace: Workspace, ctx: click.Context):
     if not boardwalkd_client:
         raise BoardwalkException("bootstrap_with_server called but no boardwalkd_client exists")
     boardwalkd_url = boardwalkd_client.url.geturl()
+    worker_limit = ctx.params.get("limit")
+    auth_login_context: dict[str, str | None] = {
+        "workspace": workspace.name,
+        "worker_command": "check" if _check_mode else "run",
+        "worker_hostname": socket.gethostname(),
+        "worker_limit": str(worker_limit) if worker_limit else None,
+        "worker_username": getpass.getuser(),
+        "deployment_url": os.environ.get("BUILD_URL") or os.environ.get("RUN_DISPLAY_URL"),
+        "deployment_tag": os.environ.get("BUILD_TAG"),
+        "deployment_name": os.environ.get("JOB_NAME"),
+        "deployment_number": os.environ.get("BUILD_NUMBER"),
+        "deployment_user": os.environ.get("BUILD_USER"),
+        "deployment_user_id": os.environ.get("BUILD_USER_ID"),
+        "deployment_user_email": os.environ.get("BUILD_USER_EMAIL"),
+    }
+    boardwalkd_client.set_auth_login_context(**{key: value for key, value in auth_login_context.items() if value})
     # Check if the if the Workspace is locked. We don't want to conflict with another worker
     try:
         if boardwalkd_client.has_mutex():
@@ -553,6 +661,13 @@ def bootstrap_with_server(workspace: Workspace, ctx: click.Context):
     try:
         boardwalkd_client.post_details(
             WorkspaceDetails(
+                deployment_url=auth_login_context.get("deployment_url") or "",
+                deployment_name=auth_login_context.get("deployment_name") or "",
+                deployment_number=auth_login_context.get("deployment_number") or "",
+                deployment_tag=auth_login_context.get("deployment_tag") or "",
+                deployment_user=auth_login_context.get("deployment_user") or "",
+                deployment_user_id=auth_login_context.get("deployment_user_id") or "",
+                deployment_user_email=auth_login_context.get("deployment_user_email") or "",
                 host_pattern=workspace.cfg.host_pattern,
                 workflow=workspace.cfg.workflow.__class__.__qualname__,
                 worker_command="check" if _check_mode else "run",
@@ -622,7 +737,7 @@ def directly_confirm_host_preconditions(host: Host, inventory_vars: InventoryHos
     if workspace.cfg.workflow.cfg.always_retry_failed_hosts:
         # If the workflow was started but never finished, ignore preconditions
         try:
-            boardwalk_state = RemoteStateModel.parse_obj(host.ansible_facts["ansible_local"]["boardwalk_state"])
+            boardwalk_state = RemoteStateModel.model_validate(host.ansible_facts["ansible_local"]["boardwalk_state"])
             if (
                 boardwalk_state.workspaces[workspace.name].workflow.started
                 and not boardwalk_state.workspaces[workspace.name].workflow.succeeded
