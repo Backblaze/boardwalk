@@ -120,7 +120,7 @@ async def catch_release_workspaces(ack: AsyncAck, body: dict[str, Any], client: 
 
     # Construct the list of workspaces that we need to pass to the view (maximum of 100 items)
     workspaces: Sequence[Option] = [Option(value="**all_workspaces**", text="**ALL WORKSPACES**")]
-    workspaces.extend([Option(value=workspace, text=workspace) for workspace in sorted(STATE.workspaces.keys())][0:99])
+    workspaces.extend([Option(value=workspace, text=workspace[0:74]) for workspace in sorted(STATE.workspaces.keys())][0:99])
 
     modal_catch_release = View(
         type="modal",
@@ -190,7 +190,7 @@ async def catch_release_workspaces(ack: AsyncAck, body: dict[str, Any], client: 
     await client.views_open(trigger_id=body["trigger_id"], view=modal_catch_release)
 
 
-@app.view("modal_catch_release")
+@app.view("modal_catch_release", middleware=[middleware_verify_authorized_boardwalk_user])
 async def modal_catch_release_view_submission_event(
     ack: AsyncAck, client: AsyncWebClient, context: AsyncBoltContext, payload: dict[str, Any]
 ):
@@ -489,10 +489,10 @@ async def app_home_workspace_details(
                 StaticSelectElement(
                     action_id="action_display_workspace_details_app_home",
                     placeholder="Select a workspace...",
-                    initial_option=Option(value=_target_workspace, text=_target_workspace)
+                    initial_option=Option(value=_target_workspace, text=_target_workspace[0:74])
                     if _target_workspace
                     else None,
-                    options=[Option(value=name, text=name) for name in sorted(STATE.workspaces.keys())]
+                    options=[Option(value=name, text=name[0:74]) for name in sorted(STATE.workspaces.keys())]
                     if len(STATE.workspaces) >= 1
                     else [Option(value="__NO_WORKSPACES_AVAILABLE", text="--- No workspaces ---")],
                 ),
