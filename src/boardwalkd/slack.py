@@ -7,14 +7,16 @@ from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 from importlib.metadata import metadata as lib_metadata
 from importlib.metadata import version as lib_version
-from logging import Logger
 from typing import Any
 
+from loguru import logger
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.async_app import AsyncAck, AsyncApp, AsyncBoltContext
+from slack_bolt.response import BoltResponse
 from slack_sdk.errors import SlackApiError
 from slack_sdk.models.blocks import (
     ActionsBlock,
+    AlertBlock,
     ButtonElement,
     ContextBlock,
     ConversationSelectElement,
@@ -35,13 +37,67 @@ from slack_sdk.models.blocks import (
 from slack_sdk.models.views import View
 from slack_sdk.web.async_client import AsyncWebClient
 
-from boardwalk.app_exceptions import BoardwalkException
 from boardwalkd.protocol import WorkspaceEvent
 from boardwalkd.server import SERVER_URL, SLACK_SLASH_COMMAND_PREFIX, SLACK_TOKENS, internal_workspace_event
 from boardwalkd.server import state as STATE
 from boardwalkd.utils import count_of_workspaces_caught, list_active_workspaces, list_inactive_workspaces
 
 app = AsyncApp(token=SLACK_TOKENS.get("bot"))
+
+
+async def middleware_verify_authorized_boardwalk_user(
+    ack: AsyncAck,
+    action: dict[str, Any] | None,
+    command: dict[str, Any] | None,
+    body: dict[str, Any],
+    client: AsyncWebClient,
+    context: AsyncBoltContext,
+    next: Callable[[], Awaitable[BoltResponse]],
+    # payload: dict[str, Any],
+):
+    """Middleware for Slack app functions to verify if a given user has authenticated to Boardwalk.
+
+    Authentication depends on the user's email presented to Boardwalk and Slack to match.
+    """
+    slack_user_id = context.get("user_id", "")
+    trigger_id = body.get("trigger_id", "")
+    slack_user_profile = await client.users_info(user=slack_user_id)
+    slack_user_email = slack_user_profile.get("user", {}).get("profile", {}).get("email")
+    if slack_user_email in STATE.users.keys():
+        context["boardwalk_user_email"] = slack_user_email
+        return await next()
+    else:
+        await ack()
+        if command is not None and "command" in command:
+            attempted_action = {"type": "command", "command": command["command"]}
+        elif action is not None and "action_id" in action:
+            attempted_action = {"type": "action", "action_id": action["action_id"]}
+        failure_info = {
+            "attempted_action": attempted_action,
+            "slack_user_id": slack_user_id,
+            "slack_user_email": slack_user_email,
+        }
+        if trigger_id:
+            logger.warning(f"Not processing request from user due to missing authentication: {failure_info}")
+            auth_fail_msg = [
+                f"Apologies, <@{slack_user_id}>, however the email associated with your Slack account -- {slack_user_email} -- does not exist within the Boardwalk's user list, and thus, are not allowed to perform that action.",
+                f"You will need to visit the Boardwalk Dashboard at {SERVER_URL}, and log in to authenticate.",
+            ]
+            modal_view = View(
+                title="Authentication Required",
+                type="modal",
+                callback_id="action_dummy_slack_acknowledgement_handler",
+                close=PlainTextObject(text="Close"),
+                blocks=[
+                    AlertBlock(
+                        level="error",
+                        text=MarkdownTextObject(text="Boardwalk authentication required for this action"),
+                    ),
+                    SectionBlock(text=MarkdownTextObject(text="\n\n".join(auth_fail_msg))),
+                ],
+            )
+            await client.views_open(trigger_id=trigger_id, view=modal_view)
+        return BoltResponse(status=200, body="")
 
 
 @app.command(f"/{SLACK_SLASH_COMMAND_PREFIX}-version")
@@ -54,8 +110,8 @@ async def hello_command(ack: AsyncAck, body: dict[str, Any], client: AsyncWebCli
     )
 
 
-@app.command(f"/{SLACK_SLASH_COMMAND_PREFIX}-catch-release")
-@app.action("action_catch_or_release_workspace")
+@app.command(f"/{SLACK_SLASH_COMMAND_PREFIX}-catch-release", middleware=[middleware_verify_authorized_boardwalk_user])
+@app.action("action_catch_or_release_workspace", middleware=[middleware_verify_authorized_boardwalk_user])
 async def catch_release_workspaces(ack: AsyncAck, body: dict[str, Any], client: AsyncWebClient):
     """
     Opens a view prompting if the user wants to catch/release all, or a subset of workspaces.
@@ -136,7 +192,7 @@ async def catch_release_workspaces(ack: AsyncAck, body: dict[str, Any], client: 
 
 @app.view("modal_catch_release")
 async def modal_catch_release_view_submission_event(
-    ack: AsyncAck, client: AsyncWebClient, context: AsyncBoltContext, logger: Logger, payload: dict[str, Any]
+    ack: AsyncAck, client: AsyncWebClient, context: AsyncBoltContext, payload: dict[str, Any]
 ):
     """
     Process the user's response to the catch/release modal generated from catch_release_workspaces().
@@ -171,7 +227,7 @@ async def modal_catch_release_view_submission_event(
             _actioned_workspaces.append(workspace)
         else:
             logger.warning(
-                msg=f"Not processing {action} for workspace named {workspace} from {context['boardwalk_user_email']} as workspace does not exist"
+                f"Not processing {action} for workspace named {workspace} from {context['boardwalk_user_email']} as workspace does not exist"
             )
     STATE.flush()
 
@@ -221,7 +277,7 @@ async def modal_catch_release_view_submission_event(
         if e.response["error"] == "user_not_in_channel":  # User probably is on the Home tab of the App; send it in DM.
             _response = await client.conversations_open(users=context["user_id"])
             await client.chat_postMessage(
-                channel=_response["channel"]["id"],
+                channel=_response["channel"]["id"],  # pyright: ignore[reportOptionalSubscript]
                 user=context["user_id"],
                 blocks=message_blocks,
                 text=f"Workspace(s) {action} successfully!",
@@ -256,10 +312,9 @@ async def command_list_active_workspaces(ack: AsyncAck, body: dict[str, Any], cl
 @app.event("app_home_opened")
 @app.action("action_open_app_home")
 @app.action("action_refresh_workspaces")
-async def app_home_opened(ack: AsyncAck, client: AsyncWebClient, logger: Logger, context: AsyncBoltContext):
+async def app_home_opened(ack: AsyncAck, client: AsyncWebClient, context: AsyncBoltContext):
     await ack()
-
-    logger.info("App home opened")
+    logger.trace("App home opened")
 
     app_home_view = View(
         type="home",
@@ -369,12 +424,11 @@ async def app_home_opened(ack: AsyncAck, client: AsyncWebClient, logger: Logger,
 @app.action(re.compile("action_display_workspace_details_app_home(_refresh)?"))
 async def app_home_workspace_details(
     ack: AsyncAck,
-    logger: Logger,
     client: AsyncWebClient,
     context: AsyncBoltContext,
     payload: dict[str, Any],
 ) -> None:
-    logger.info("Entered app home workspace details")
+    logger.trace("Entered app home workspace details")
     await ack()
 
     _target_workspace: str | None = None
@@ -383,7 +437,8 @@ async def app_home_workspace_details(
     if payload is not None:
         # The user selected an item in the workspace dropdown
         if _target_workspace := payload.get("selected_option", {}).get("value", None) if not None else None:
-            pass
+            if not STATE.workspaces.get(_target_workspace):
+                _target_workspace = None
         # The user clicked the Refresh workspace details button
         elif _target_workspace := payload.get("value") if not None else None:
             pass
@@ -414,6 +469,7 @@ async def app_home_workspace_details(
                     "Worker": f"{_target_workspace_details.details.worker_username}@{_target_workspace_details.details.worker_hostname}",
                     "Host Pattern": _target_workspace_details.details.host_pattern,
                     "Command": _target_workspace_details.details.worker_command,
+                    "Last Seen": _target_workspace_details.last_seen,
                 }.items()
             ]
         )
@@ -436,7 +492,9 @@ async def app_home_workspace_details(
                     initial_option=Option(value=_target_workspace, text=_target_workspace)
                     if _target_workspace
                     else None,
-                    options=[Option(value=name, text=name) for name in sorted(STATE.workspaces.keys())],
+                    options=[Option(value=name, text=name) for name in sorted(STATE.workspaces.keys())]
+                    if len(STATE.workspaces) >= 1
+                    else [Option(value="__NO_WORKSPACES_AVAILABLE", text="--- No workspaces ---")],
                 ),
                 ButtonElement(
                     text="Refresh workspace details",
@@ -457,22 +515,27 @@ async def app_home_workspace_details(
     ]
     if _target_workspace:
         app_home_blocks.append(_workspace_details_rich_text_block)
+        _semaphores = STATE.workspaces.get(_target_workspace).semaphores  # pyright: ignore[reportOptionalMemberAccess]
         app_home_blocks.extend(
             [
                 SectionBlock(
-                    text=MarkdownTextObject(
-                        text=" ".join(  # semgrep avoidance https://sg.run/Kl07 -- string-concat-in-list
-                            [
-                                f"This workspace is {'*caught*' if _target_workspace_details.semaphores.caught else '*not caught*'}.",  # type: ignore
-                                f"A worker {'*does*' if _target_workspace_details.semaphores.has_mutex else '*does not*'} hold an active",  # type: ignore
-                                "mutex on this workspace.",
-                            ]
-                        )
-                    ),
-                )
+                    text=f"This workspace is {'*' if _semaphores.caught else '*not'} caught* on the `boardwalkd` server."
+                ),
+                SectionBlock(
+                    text=f"A `boardwalk` worker {'*does*' if _semaphores.has_mutex else '*does not*'} hold a server-side mutex for this workspace."
+                ),
             ]
         )
-        app_home_blocks.extend([SectionBlock(text="*Event Log*"), DividerBlock()])
+        if _target_workspace_details.details.deployment_url:  # pyright: ignore[reportOptionalMemberAccess]
+            app_home_blocks.extend(
+                [
+                    DividerBlock(),
+                    SectionBlock(
+                        text=f"The *`boardwalk` Worker Log* is available at: {_target_workspace_details.details.deployment_url}"  # pyright: ignore[reportOptionalMemberAccess]
+                    ),
+                ]
+            )
+        app_home_blocks.extend([SectionBlock(text="*Server Event Log*"), DividerBlock()])
 
     app_home_blocks.extend(
         [
@@ -502,7 +565,7 @@ async def _modal_about_boardwalk(trigger_id: str, client: AsyncWebClient):
         "Licensed under: The MIT License",
         "Developed at: <https://www.backblaze.com/|Backblaze, Inc.>",
         "Developed by: <https://github.com/m4wh6k|Mat Hornbeek>",
-        "Maintained by: Alex Sullivan",
+        "Maintained by: Kiera Phoenix",
     ]
     modal_view = View(
         type="modal",
@@ -524,7 +587,7 @@ async def _modal_about_boardwalk(trigger_id: str, client: AsyncWebClient):
 
 @app.action("action_app_home_overflow_menu_event_handler")
 async def action_app_home_overflow_menu_event_handler(
-    ack: AsyncAck, body: dict[str, Any], client: AsyncWebClient, payload
+    ack: AsyncAck, body: dict[str, Any], client: AsyncWebClient, payload: dict[str, Any]
 ) -> None:
     await ack()
     _option: str = payload["selected_option"].get("value")
@@ -542,36 +605,6 @@ async def dummy_slack_acknowledgement_handler(ack: AsyncAck):
     shouldn't require one. This is that dummy handler to appease Slack.
     """
     await ack()
-
-
-@app.use
-async def auth_boardwalk(
-    client: AsyncWebClient,
-    context: AsyncBoltContext,
-    payload: dict[str, Any],
-    next: Callable[[], Awaitable],
-) -> None:
-    slack_user_id = context["user_id"]
-
-    try:
-        # Retrieve the user's email address from their Slack profile
-        slack_user_profile = await client.users_info(user=slack_user_id)
-
-        if email := slack_user_profile["user"]["profile"]["email"] in STATE.users.keys():
-            context["boardwalk_user_email"] = slack_user_profile["user"]["profile"]["email"]
-        else:
-            raise BoardwalkException(
-                f"Not processing command from {slack_user_id}, as {email} is not in the list of authenticated users."
-            )
-    except BoardwalkException:
-        await client.chat_postEphemeral(
-            channel=payload["channel_id"],
-            user=slack_user_id,
-            text=f"Sorry <@{slack_user_id}>, you don't seem to have authenticated to Boardwalk yet. Visit {SERVER_URL} to authenticate.",
-        )
-
-    # Pass control to the next middleware
-    await next()
 
 
 async def connect() -> None:
