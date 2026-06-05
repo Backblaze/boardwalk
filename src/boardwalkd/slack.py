@@ -120,7 +120,9 @@ async def catch_release_workspaces(ack: AsyncAck, body: dict[str, Any], client: 
 
     # Construct the list of workspaces that we need to pass to the view (maximum of 100 items)
     workspaces: Sequence[Option] = [Option(value="**all_workspaces**", text="**ALL WORKSPACES**")]
-    workspaces.extend([Option(value=workspace, text=workspace[0:74]) for workspace in sorted(STATE.workspaces.keys())][0:99])
+    workspaces.extend(
+        [Option(value=workspace, text=workspace[0:74]) for workspace in sorted(STATE.workspaces.keys())][0:99]
+    )
 
     modal_catch_release = View(
         type="modal",
