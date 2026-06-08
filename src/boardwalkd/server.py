@@ -653,7 +653,7 @@ class AuthLoginApiHandler(UIBaseHandler):
         current_user = self.get_current_user()
         token = self.create_signed_value("boardwalk_api_token", current_user)  # type: ignore
 
-        message = ApiLoginMessage(token=token).dict()  # type: ignore
+        message = ApiLoginMessage(token=token).model_dump()  # type: ignore
         try:
             AuthLoginApiWebsocketHandler.write_to_client_by_id(id, message)
         except AuthLoginApiWebsocketIDNotFound:
@@ -698,7 +698,7 @@ class AuthLoginApiWebsocketHandler(tornado.websocket.WebSocketHandler):
                     settings=self.settings,
                 )
             )
-        return self.write_message(ApiLoginMessage(login_url=login_url).dict())
+        return self.write_message(ApiLoginMessage(login_url=login_url).model_dump())
 
     def on_close(self):
         client_id = self.clients[self]
@@ -857,7 +857,7 @@ class WorkspaceDetailsApiHandler(APIBaseHandler):
     @tornado.web.authenticated
     def get(self, workspace: str):
         try:
-            return self.write(state.workspaces[workspace].details.dict())  # pyright: ignore [reportUnknownMemberType]
+            return self.write(state.workspaces[workspace].details.model_dump())  # pyright: ignore [reportUnknownMemberType]
         except KeyError:
             return self.send_error(404)
 
@@ -995,7 +995,7 @@ class WorkspaceSemaphoresApiHandler(APIBaseHandler):
     @tornado.web.authenticated
     def get(self, workspace: str):
         try:
-            return self.write(state.workspaces[workspace].semaphores.dict())
+            return self.write(state.workspaces[workspace].semaphores.model_dump())
         except KeyError:
             return self.send_error(404)
 
@@ -1275,6 +1275,6 @@ async def run(
 
         from boardwalkd import slack
 
-        await slack.connect()
+        await slack.connect()  # pyright: ignore[reportAttributeAccessIssue]
 
     await asyncio.Event().wait()
