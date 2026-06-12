@@ -125,6 +125,9 @@ def run(
     global _stomp_locks
     _stomp_locks = stomp_locks
 
+    ctx.ensure_object(dict)
+    ctx.obj["OPEN_BROWSER_FOR_API_LOGIN"] = open_browser_for_api_login
+
     try:
         ws = get_ws()
     except NoActiveWorkspace as e:
@@ -729,7 +732,7 @@ def directly_confirm_host_preconditions(host: Host, inventory_vars: InventoryHos
         boardwalkd_client.queue_event(
             WorkspaceEvent(
                 severity="info",
-                message=f"{host.name}:  Checking Job preconditions on host",
+                message=f"{host.name}: Checking Job preconditions on host",
             ),
         )
     update_host_facts_in_local_state(host, workspace)
@@ -759,7 +762,7 @@ def directly_confirm_host_preconditions(host: Host, inventory_vars: InventoryHos
         boardwalkd_client.queue_event(
             WorkspaceEvent(
                 severity="info",
-                message=f"{host.name}:  Host didn't meet job preconditions",
+                message=f"{host.name}: Host didn't meet job preconditions",
             ),
         )
 

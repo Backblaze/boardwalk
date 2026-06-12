@@ -18,7 +18,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from importlib.metadata import version as lib_version
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import ParseResult, urljoin, urlparse
 
 import tornado.auth
@@ -46,6 +46,9 @@ from boardwalkd.protocol import AUTH_LOGIN_CONTEXT_FIELDS, ApiLoginMessage, Work
 from boardwalkd.slack_error_advice import SlackErrorAdviceRule, matching_error_advice
 from boardwalkd.state import User, WorkspaceState, load_state, valid_user_roles
 from boardwalkd.utils import is_workspace_active
+
+if TYPE_CHECKING:
+    from tornado.httpserver import HTTPServer
 
 module_dir = Path(__file__).resolve().parent
 state = load_state()
@@ -659,7 +662,15 @@ class AuthLoginApiHandler(UIBaseHandler):
         except AuthLoginApiWebsocketIDNotFound:
             return self.send_error(404)
 
-        return self.write("Authentication successful. You may close this window")
+        return self.write("""
+            Authentication to Boardwalk's API was successful. You may close this
+            window if it does not automatically close.
+            <script>
+            setTimeout(function() {
+                window.close()
+            }, 1000);
+            </script>
+        """)
 
 
 class AuthLoginApiWebsocketHandler(tornado.websocket.WebSocketHandler):
@@ -749,6 +760,7 @@ class DevelopmentClearAllWorkspaces(APIBaseHandler):
                     continue
                 del state.workspaces[name]
             state.flush()
+            return
         else:
             return self.send_error(403)
 
@@ -761,6 +773,7 @@ class WorkspacesStatusApiHandler(APIBaseHandler):
         if not self.settings.get("workspace_status_json"):
             return self.send_error(404)
 
+        payload: dict[str, Any] = {"boardwalkd_version": lib_version("boardwalk")}
         result = []
         for name, ws in state.workspaces.items():
             entry: dict[str, Any] = {
@@ -774,7 +787,8 @@ class WorkspacesStatusApiHandler(APIBaseHandler):
             if ws.last_seen:
                 entry["last_seen"] = ws.last_seen.isoformat()
             result.append(entry)
-        self.write({"workspaces": result})
+        payload["workspaces"] = result
+        self.write(payload)
 
 
 class WorkspaceCatchApiHandler(APIBaseHandler):
@@ -1218,7 +1232,7 @@ async def run(
     slack_slash_command_prefix: str,
     url: str,
     workspace_status_json: bool,
-):
+) -> tuple[tornado.web.Application, list[HTTPServer]]:
     """Starts the tornado server and IO loop"""
     global state
     global SLACK_SLASH_COMMAND_PREFIX
@@ -1238,8 +1252,9 @@ async def run(
         workspace_status_json=workspace_status_json,
     )
 
+    http_servers: list[HTTPServer] = []
     if port_number is not None:
-        app.listen(port_number)
+        http_servers.append(app.listen(port_number))
         # If port_number=0 a random open port will be selected and the log message
         # will not be accurate
         app_log.info(f"Server listening on non-TLS port: {port_number}")
@@ -1251,7 +1266,7 @@ async def run(
         ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_ctx.load_cert_chain(certfile=tls_crt_path, keyfile=tls_key_path)  # type: ignore
 
-        app.listen(tls_port_number, ssl_options=ssl_ctx)
+        http_servers.append(app.listen(tls_port_number, ssl_options=ssl_ctx))
         # If tls_port_number=0 a random open port will be selected and the log
         # message will not be accurate
         app_log.info(f"Server listening on TLS port: {tls_port_number}")
@@ -1277,4 +1292,4 @@ async def run(
 
         await slack.connect()  # pyright: ignore[reportAttributeAccessIssue]
 
-    await asyncio.Event().wait()
+    return (app, http_servers)

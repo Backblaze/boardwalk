@@ -172,7 +172,7 @@ class Client:
             if msg.login_url:
                 click_context = click.get_current_context()
                 print(f"---\nPlease visit to login:\n{msg.login_url}")
-                if click_context.params.get("open_browser_for_api_login") and webbrowser.open_new_tab(msg.login_url):
+                if click_context.obj.get("OPEN_BROWSER_FOR_API_LOGIN", True) and webbrowser.open_new_tab(msg.login_url):
                     print("---\nOpened browser to login URL")
             elif msg.token:
                 conn.close()
@@ -260,7 +260,7 @@ class Client:
                 raise e
 
         details = WorkspaceDetails()
-        return details.parse_raw(request.body)
+        return details.model_validate_json(request.body)
 
     def workspace_post_catch(self, workspace_name: str):
         """Posts a catch to the server"""

@@ -11,7 +11,8 @@ from boardwalk import PlaybookJob, TaskJob, Workflow, Workspace, WorkspaceConfig
 if TYPE_CHECKING:
     from boardwalk import AnsibleTasksType
 
-boardwalkd_url = "http://localhost:8888/"
+port = os.environ.get("BOARDWALK_PYTEST_PORT", "8888")
+boardwalkd_url = f"http://localhost:{port}/"
 
 # Ansible checks the envvar first for configuration; so override the location with one
 # we control so tests work.

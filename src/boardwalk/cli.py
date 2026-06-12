@@ -72,6 +72,7 @@ def cli(ctx: click.Context, verbose: int):
 
     loglevel = "INFO" if verbose == 0 else "DEBUG" if verbose == 1 else "TRACE"
     ctx.obj["VERBOSITY"] = verbose
+    ctx.auto_envvar_prefix = "BOARDWALK"
     logger.remove()
     logger.add(sys.stdout, level=loglevel)
     if verbose > 0:
@@ -87,6 +88,9 @@ def cli(ctx: click.Context, verbose: int):
         # exit if it's missing. The version subcommand is the only one that
         # doesn't need a Boardwalkfile.py
         if ctx.invoked_subcommand == "version":
+            return
+        elif "--help" in sys.argv:
+            # Allow any invocation with the `--help` flag in the argv to succeed, even without a Boardwalkfile.py
             return
         click.echo(cli.get_help(ctx))
         raise BoardwalkException("No Boardwalkfile.py found")

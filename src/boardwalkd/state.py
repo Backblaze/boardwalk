@@ -71,7 +71,7 @@ class State(StateBaseModel):
         Some items are excluded because they should only be set during runtime
         """
         # Write state to disk.
-        statefile_path.write_text(self.json())
+        statefile_path.write_text(self.model_dump_json())
 
 
 def load_state() -> State:

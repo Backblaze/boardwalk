@@ -2,6 +2,7 @@ import os
 import platform
 import re
 import signal
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -17,11 +18,13 @@ async def execute_boardwalk_workspace_test(
     get_become_password_file_path: Path,
     use_isolated_boardwalk_directory,
 ):
+    # API_LOGIN_URI_REGEX = re.compile(r"http://localhost:\d{1,5}/api/auth/login\?id=[a-z0-9]{16}")
     WORKSPACE_CAUGHT_REGEX = re.compile(
         rf"The {workspace_name} workspace is remotely caught on .+ Waiting for release before continuing"
     )
     envvars: dict[str, Any] = {
         "ANSIBLE_BECOME_PASSWORD_FILE": get_become_password_file_path,
+        # "BOARDWALK_RUN_OPEN_BROWSER_FOR_API_LOGIN": "False",
         "BOARDWALK_VERBOSITY": "2",
     }
     new_environ = os.environ | envvars
@@ -32,21 +35,22 @@ async def execute_boardwalk_workspace_test(
         "boardwalk run",
     )
     output_stdout = []
-    output_stderr = []
     os.chdir(use_isolated_boardwalk_directory)
     async with create_task_group():
         for command in commands:
             with fail_after(delay=90) as scope:
-                async with await open_process(command=command, env=new_environ) as process:
+                async with await open_process(command=command, env=new_environ, stderr=subprocess.STDOUT) as process:
                     async for text in TextReceiveStream(process.stdout):  # type:ignore
                         # To allow for reading what was received, if the test ends up failing.
-                        print(text)
+                        print(text, end="")
                         output_stdout.append(text)
+                        # TODO: Figure out how to get async API login working?
+                        # Or should we just have a flag to optionally disable
+                        # API authentication if (and only if) in development
+                        # mode altogether?
+                        # if match := re.search(API_LOGIN_URI_REGEX, text):
                         if re.search(WORKSPACE_CAUGHT_REGEX, text):
                             process.send_signal(signal.SIGINT)
-                    async for text in TextReceiveStream(process.stderr):  # type:ignore
-                        print(text)
-                        output_stderr.append(text)
         assert not scope.cancelled_caught
 
     if failure_expected:
@@ -98,6 +102,7 @@ async def execute_boardwalk_workspace_test(
         ),
     ],
 )
+@pytest.mark.usefixtures("spawn_boardwalkd_server_and_maybe_clear_workspaces")
 async def test_development_workspaces(
     workspace_name: str,
     failure_expected: bool,
@@ -115,6 +120,7 @@ async def test_development_workspaces(
 
 
 @pytest.mark.anyio
+@pytest.mark.usefixtures("spawn_boardwalkd_server_and_maybe_clear_workspaces")
 @pytest.mark.skipif(condition="CI" in os.environ, reason="Not yet able to execute non-interactively.")
 async def test_ensure_remote_workflow_success_state_false_during_workflow_execution(
     get_become_password_file_path: Path,
