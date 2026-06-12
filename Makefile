@@ -1,3 +1,6 @@
+# Set default build options
+PYTEST_BOARDWALKD_PERSIST_WORKSPACES_BETWEEN_TESTS ?= False
+
 # Builds module artifacts
 .PHONY: build
 build: dist
@@ -59,7 +62,7 @@ dist: clean
 # Builds the Sphinx HTML documentation -- Shortcut for `cd docs && make html`
 .PHONY: docs
 docs: develop
-	poetry install --with=docs --sync
+	poetry sync --with=docs
 	poetry run make --directory=./docs/ html
 
 # Applies fixable errors, and formats code
@@ -108,6 +111,12 @@ ifndef CI
 else
 	poetry run pytest
 endif
+
+# Same as `test-pytest`, but does not clear the boardwalkd server state between
+# test runs (so the workspace state can be inspected after execution)
+.PHONY: test-pytest-keep-workspace-state
+test-pytest-keep-workspace-state: develop
+	PYTEST_BOARDWALKD_PERSIST_WORKSPACES_BETWEEN_TESTS=True poetry run pytest  --verbose
 
 # Run all available Ruff checks
 .PHONY: test-ruff
