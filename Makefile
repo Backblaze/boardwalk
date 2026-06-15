@@ -40,7 +40,6 @@ develop-server: develop
 ifdef BOARDWALKD_SLACK_WEBHOOK_URL
 	poetry run boardwalkd serve \
 		--develop \
-		--demo \
 		--workspace-status-json \
 		--host-header-pattern="(localhost|127\.0\.0\.1)" \
 		--port=8888 \
@@ -50,13 +49,20 @@ ifdef BOARDWALKD_SLACK_WEBHOOK_URL
 else
 	poetry run boardwalkd serve \
 		--develop \
-		--demo \
 		--workspace-status-json \
 		--host-header-pattern="(localhost|127\.0\.0\.1)" \
 		--port=8888 \
 		--url='http://localhost:8888' \
 		--workspace-status-json
 endif
+
+# Also runs the server, but loads demo data for UI testing
+.PHONY: develop-server-demo
+develop-server-demo:
+	@echo '[.] Resetting .boardwalkd state ...'
+	find . -type d -name '.boardwalkd' | xargs rm -rf
+	@echo '[.] Launching boardwalkd with demo data loaded ...'
+	BOARDWALKD_DEMO=True $(MAKE) develop-server
 
 dist: clean
 	poetry build

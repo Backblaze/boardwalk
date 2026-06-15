@@ -23,7 +23,11 @@ from boardwalkd.dashboard import (
     worker_connected,
 )
 from boardwalkd.protocol import WorkspaceDetails, WorkspaceEvent, WorkspaceSemaphores
-from boardwalkd.server import workspace_has_recent_heartbeat
+from boardwalkd.server import (
+    workspace_client_details_event_message,
+    workspace_client_details_event_should_log,
+    workspace_has_recent_heartbeat,
+)
 from boardwalkd.slack_error_advice import SlackErrorAdviceRule
 from boardwalkd.state import WorkspaceState
 
@@ -84,6 +88,41 @@ def test_workspace_details_defaults_new_ui_fields_to_blank_strings():
 def test_workspace_details_still_rejects_unknown_fields():
     with pytest.raises(ValidationError):
         WorkspaceDetails.model_validate({"made_up": "nope"})
+
+
+def test_workspace_client_details_event_logs_initial_client_details():
+    details = WorkspaceDetails(
+        workflow="UpgradeWorkflow",
+        worker_username="operator",
+        worker_hostname="worker-01",
+        host_pattern="nodes",
+        worker_limit="node-alpha-a",
+        worker_command="run",
+    )
+
+    assert workspace_client_details_event_should_log(None, details) is True
+    assert workspace_client_details_event_message(details) == (
+        "Workspace client details:"
+        " Workflow: UpgradeWorkflow,"
+        " Worker: operator@worker-01,"
+        " Host Pattern: nodes,"
+        " Limit Pattern: node-alpha-a,"
+        " Command: run"
+    )
+
+
+def test_workspace_client_details_event_skips_current_host_only_update():
+    old_details = WorkspaceDetails(
+        workflow="UpgradeWorkflow",
+        worker_username="operator",
+        worker_hostname="worker-01",
+        host_pattern="nodes",
+        worker_limit="node-*",
+        worker_command="run",
+    )
+    new_details = old_details.model_copy(update={"current_host": "node-alpha-a", "ui_group": "alpha"})
+
+    assert workspace_client_details_event_should_log(old_details, new_details) is False
 
 
 def test_build_dashboard_groups_counts_and_default_rows_follow_lane_sorting():

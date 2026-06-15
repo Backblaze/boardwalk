@@ -923,6 +923,38 @@ class WorkspaceRemoteMutexClearApiHandler(APIBaseHandler):
             return self.send_error(404)
 
 
+WORKSPACE_CLIENT_DETAILS_EVENT_FIELDS = (
+    "workflow",
+    "worker_username",
+    "worker_hostname",
+    "host_pattern",
+    "worker_limit",
+    "worker_command",
+)
+
+
+def workspace_client_details_event_should_log(
+    old_details: WorkspaceDetails | None,
+    new_details: WorkspaceDetails,
+) -> bool:
+    if old_details is None:
+        return True
+    return any(
+        getattr(old_details, field) != getattr(new_details, field) for field in WORKSPACE_CLIENT_DETAILS_EVENT_FIELDS
+    )
+
+
+def workspace_client_details_event_message(workspace_details: WorkspaceDetails) -> str:
+    return (
+        "Workspace client details:"
+        f" Workflow: {workspace_details.workflow},"
+        f" Worker: {workspace_details.worker_username}@{workspace_details.worker_hostname},"
+        f" Host Pattern: {workspace_details.host_pattern},"
+        f" Limit Pattern: {workspace_details.worker_limit if workspace_details.worker_limit else '<unknown>'},"
+        f" Command: {workspace_details.worker_command}"
+    )
+
+
 class WorkspaceDetailsApiHandler(APIBaseHandler):
     """Handles getting and updating WorkspaceDetails for workspaces"""
 
@@ -946,6 +978,10 @@ class WorkspaceDetailsApiHandler(APIBaseHandler):
             app_log.error(e)
             return self.send_error(422)
 
+        existing_workspace = state.workspaces.get(workspace)
+        existing_details = existing_workspace.details if existing_workspace else None
+        log_client_details_event = workspace_client_details_event_should_log(existing_details, new_details)
+
         try:
             state.workspaces[workspace].details = new_details
         except KeyError:
@@ -954,18 +990,9 @@ class WorkspaceDetailsApiHandler(APIBaseHandler):
         state.workspaces[workspace].last_seen = datetime.now(UTC)
         state.flush()
 
-        # Log the updated details to the events table
-        workspace_details = state.workspaces[workspace].details
-        message = (
-            "Workspace client details:"
-            f" Workflow: {workspace_details.workflow},"
-            f" Worker: {workspace_details.worker_username}@{workspace_details.worker_hostname},"
-            f" Host Pattern: {workspace_details.host_pattern},"
-            f" Limit Pattern: {workspace_details.worker_limit if workspace_details.worker_limit else '<unknown>'},"
-            f" Command: {workspace_details.worker_command}"
-        )
-        event = WorkspaceEvent(severity="info", message=message)
-        internal_workspace_event(workspace, event)
+        if log_client_details_event:
+            event = WorkspaceEvent(severity="info", message=workspace_client_details_event_message(new_details))
+            internal_workspace_event(workspace, event)
 
 
 class WorkspaceHeartbeatApiHandler(APIBaseHandler):
