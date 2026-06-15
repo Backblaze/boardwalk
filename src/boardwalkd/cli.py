@@ -31,7 +31,7 @@ def cli():
     Boardwalkd is the server component of Boardwalk.
     See the README.md @ https://github.com/Backblaze/boardwalk for more info
 
-    To see more info about any subcommand, do `boardwalkd <subcommand> --help`
+    To see more info about any subcommand, execute `boardwalkd <subcommand> --help`
     """
     pass
 
@@ -255,7 +255,7 @@ def serve(
     verbose: int,
     workspace_status_json: bool,
 ):
-    """Runs the server"""
+    """Runs the `boardwalkd` server until terminated"""
     logger.enable("boardwalkd")
     logger.remove()
     loglevel = "INFO" if verbose == 0 else "DEBUG" if verbose == 1 else "TRACE"
@@ -312,8 +312,11 @@ def serve(
     except SlackErrorAdviceConfigError as e:
         raise BoardwalkException(str(e))
 
-    asyncio.run(
-        run(
+    # This pattern lets us keep the actual `run()` function able to be called by
+    # pytest without blocking the main thread. Here, we're fine with it, cause
+    # this command spawns and runs the server via the CLI
+    async def start_server_and_wait():
+        await run(
             auth_expire_days=auth_expire_days,
             auth_login_slack_notify=auth_login_slack_notify,
             auth_method=auth_method,
@@ -340,7 +343,10 @@ def serve(
             url=url,
             workspace_status_json=workspace_status_json,
         )
-    )
+        await asyncio.Event().wait()
+
+    # Spawn the server and run until terminated
+    asyncio.run(start_server_and_wait())
 
 
 @cli.command("sanitize-status-snapshot")
