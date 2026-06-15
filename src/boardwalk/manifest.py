@@ -93,11 +93,15 @@ def get_ws() -> Workspace:
 
 
 def get_boardwalkd_url() -> str:
+    if boardwalkd_url_override := os.environ.get("BOARDWALKD_URL"):
+        return boardwalkd_url_override
+
     try:
         sys.path.append(str(Path.cwd()))
-        from Boardwalkfile import boardwalkd_url  # type: ignore
-
-        sys.path.pop()
+        try:
+            from Boardwalkfile import boardwalkd_url  # type: ignore
+        finally:
+            sys.path.pop()
     except ModuleNotFoundError:
         raise ManifestNotFound
     except ImportError:
@@ -276,6 +280,9 @@ class WorkspaceConfig:
     option to be passed. This is useful for workspaces configured with a broad
     host pattern but workflows should be intentionally down-scoped to a specific
     pattern
+    :param ui_group: Optional static UI grouping label used by boardwalkd.
+    :param ui_group_inventory_var: Optional inventory hostvar name used to derive
+    the UI grouping label from the current host during a run.
     :param workflow: The workflow the workspace uses
     """
 
@@ -287,10 +294,14 @@ class WorkspaceConfig:
         workflow: Workflow,
         default_sort_order: str = "shuffle",
         require_limit: bool = False,
+        ui_group: str = "",
+        ui_group_inventory_var: str = "",
     ):
         self.default_sort_order = default_sort_order
         self.host_pattern = host_pattern
         self.require_limit = require_limit
+        self.ui_group = ui_group
+        self.ui_group_inventory_var = ui_group_inventory_var
         self.workflow = workflow
 
     @property

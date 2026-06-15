@@ -1,7 +1,12 @@
 import pytest
 
-from boardwalk import Job, PlaybookJob, TaskJob
-from boardwalk.manifest import JobTypes
+from boardwalk import Job, PlaybookJob, TaskJob, Workflow, WorkspaceConfig
+from boardwalk.manifest import JobTypes, get_boardwalkd_url
+
+
+class EmptyWorkflow(Workflow):
+    def jobs(self):
+        return ()
 
 
 @pytest.mark.parametrize(
@@ -47,3 +52,32 @@ def test_using_not_differentiated_Job_class_warns_about_deprecation():
                 return [{"ansible.builtin.debug": {"msg": "Hello, Boardwalk!"}}]
 
         TestJob()
+
+
+def test_workspace_config_accepts_explicit_ui_group():
+    cfg = WorkspaceConfig(
+        host_pattern="localhost",
+        workflow=EmptyWorkflow(),
+        ui_group="alpha",
+    )
+
+    assert cfg.ui_group == "alpha"
+    assert cfg.ui_group_inventory_var == ""
+
+
+def test_workspace_config_accepts_generic_inventory_var_grouping():
+    cfg = WorkspaceConfig(
+        host_pattern="localhost",
+        workflow=EmptyWorkflow(),
+        ui_group_inventory_var="site_group",
+    )
+
+    assert cfg.ui_group == ""
+    assert cfg.ui_group_inventory_var == "site_group"
+
+
+def test_get_boardwalkd_url_prefers_environment_override(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("BOARDWALKD_URL", "http://localhost:8888/")
+
+    assert get_boardwalkd_url() == "http://localhost:8888/"

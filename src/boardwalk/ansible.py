@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import sys
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -49,6 +49,7 @@ if TYPE_CHECKING:
         playbook: RunnerPlaybook | AnsibleTasksType
         verbosity: int
         extravars: dict[str, Any] | None
+        event_handler: Callable[[dict[str, Any]], bool]
 
     class RunnerKwargsEnvvars(TypedDict, total=False):
         ANSIBLE_BECOME_ASK_PASS: str
@@ -171,6 +172,7 @@ def ansible_runner_run_tasks(
     timeout: int | None = None,
     verbosity: int = 0,
     extra_vars: dict = {},
+    event_handler: Callable[[dict[str, Any]], bool] | None = None,
 ) -> ansible_runner.Runner:
     """
     Wraps ansible_runner.run to run Ansible tasks with some defaults for
@@ -199,6 +201,8 @@ def ansible_runner_run_tasks(
         runner_kwargs["limit"] = limit
     if timeout:
         runner_kwargs["envvars"]["ANSIBLE_TASK_TIMEOUT"] = str(timeout)
+    if event_handler:
+        runner_kwargs["event_handler"] = event_handler
 
     logger.trace(f"Constructing runner_kwargs for job type {job_type.name}")
     if job_type == boardwalk.manifest.JobTypes.TASK:

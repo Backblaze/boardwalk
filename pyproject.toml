@@ -55,8 +55,9 @@ packages = [
 include = [
     { path = "py.typed" },
     { path = "static/*.css" },
-    { path = "static/*.js"},
-    { path = "templates/*.html"}
+    { path = "static/*.js" },
+    { path = "static/*.svg" },
+    { path = "templates/*.html" }
 ]
 
 [tool.poetry.group.dev.dependencies]
