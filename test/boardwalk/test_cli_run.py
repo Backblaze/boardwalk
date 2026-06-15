@@ -1,5 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 
 from boardwalk import Workflow, WorkspaceConfig, cli_run
 from boardwalk.ansible import ansible_runner_run_tasks
@@ -36,11 +37,11 @@ class FakeHost:
         return None
 
 
-def context_with_limit(limit_value):
+def context_with_limit(limit_value) -> Any:
     return SimpleNamespace(params={"limit": limit_value})
 
 
-def workspace_with_config(cfg):
+def workspace_with_config(cfg) -> Any:
     return SimpleNamespace(
         name="UpgradeNodes",
         cfg=cfg,
@@ -196,7 +197,7 @@ def test_run_workflow_posts_current_host_details_when_each_host_starts(monkeypat
     }
 
     cli_run.run_workflow(
-        hosts=[FakeHost("node-alpha-a"), FakeHost("node-beta-a")],
+        hosts=cast(Any, [FakeHost("node-alpha-a"), FakeHost("node-beta-a")]),
         inventory_vars=inventory_vars,
         workspace=workspace,
         verbosity=0,

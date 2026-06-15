@@ -226,8 +226,10 @@ def test_sanitize_status_snapshot_marks_multi_group_when_inventory_ancestry_has_
 def test_load_inventory_context_reads_inventory_json(tmp_path):
     path = tmp_path / "inventory.json"
     path.write_text(json.dumps({"_meta": {"hostvars": {}}, "storage_alpha": {"children": []}}))
+    inventory = load_inventory_context(path)
 
-    assert load_inventory_context(path)["storage_alpha"]["children"] == []
+    assert inventory is not None
+    assert inventory["storage_alpha"]["children"] == []
 
 
 def test_seed_snapshot_workspaces_replays_sanitized_status_into_local_state(tmp_path):
@@ -245,6 +247,7 @@ def test_seed_snapshot_workspaces_replays_sanitized_status_into_local_state(tmp_
     assert set(state.workspaces) == {"snapshot_alpha_001", "snapshot_theta_002", "snapshot_multi_group_003"}
     assert state.workspaces["snapshot_alpha_001"].details.current_host == "snapshot-host-alpha-001"
     assert state.workspaces["snapshot_alpha_001"].semaphores.caught is True
+    assert state.workspaces["snapshot_alpha_001"].last_seen is not None
     assert state.workspaces["snapshot_alpha_001"].last_seen > replay_now
     assert state.workspaces["snapshot_theta_002"].last_seen == replay_now - timedelta(days=9)
     assert [(group.label, group.count) for group in dashboard.groups] == [
@@ -282,6 +285,51 @@ def test_seed_snapshot_workspaces_does_not_overwrite_existing_state(tmp_path):
     assert list(state.workspaces) == ["existing"]
 
 
+def test_development_server_does_not_seed_demo_without_demo_flag(monkeypatch):
+    state = State()
+    monkeypatch.setattr(server, "state", state)
+
+    server.make_app(
+        auth_expire_days=14,
+        auth_login_slack_notify=False,
+        auth_method="anonymous",
+        develop=True,
+        host_header_pattern=re.compile(r"localhost(:[0-9]+)?"),
+        owner="anonymous@example.com",
+        slack_bot_token=None,
+        slack_error_advice_rules=[],
+        slack_error_webhook_url="",
+        slack_webhook_url="",
+        url="http://localhost:8888",
+        workspace_status_json=True,
+    )
+
+    assert state.workspaces == {}
+
+
+def test_server_uses_demo_seed_when_requested(monkeypatch):
+    state = State()
+    monkeypatch.setattr(server, "state", state)
+
+    server.make_app(
+        auth_expire_days=14,
+        auth_login_slack_notify=False,
+        auth_method="anonymous",
+        develop=False,
+        demo=True,
+        host_header_pattern=re.compile(r"localhost(:[0-9]+)?"),
+        owner="anonymous@example.com",
+        slack_bot_token=None,
+        slack_error_advice_rules=[],
+        slack_error_webhook_url="",
+        slack_webhook_url="",
+        url="http://localhost:8888",
+        workspace_status_json=True,
+    )
+
+    assert "nodes_alpha_group_upgrade" in state.workspaces
+
+
 def test_development_server_uses_snapshot_seed_instead_of_synthetic_demo_seed(tmp_path, monkeypatch):
     now = datetime(2026, 6, 3, tzinfo=UTC)
     path = tmp_path / "snapshot.json"
@@ -299,8 +347,8 @@ def test_development_server_uses_snapshot_seed_instead_of_synthetic_demo_seed(tm
         owner="anonymous@example.com",
         slack_bot_token=None,
         slack_error_advice_rules=[],
-        slack_error_webhook_url=None,
-        slack_webhook_url=None,
+        slack_error_webhook_url="",
+        slack_webhook_url="",
         url="http://localhost:8888",
         workspace_status_json=True,
     )

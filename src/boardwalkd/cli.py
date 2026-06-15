@@ -84,6 +84,12 @@ def cli():
     show_default=True,
 )
 @click.option(
+    "--demo/--no-demo",
+    default=False,
+    help="Seed generic demo workspace rows when the state file is empty",
+    show_default=True,
+)
+@click.option(
     "--develop-snapshot",
     type=click.Path(exists=True, readable=True, dir_okay=False),
     default=None,
@@ -232,6 +238,7 @@ def serve(
     auth_expire_days: float,
     auth_method: str,
     develop: bool,
+    demo: bool,
     develop_snapshot: str | None,
     host_header_pattern: str,
     owner: str | None,
@@ -266,6 +273,8 @@ def serve(
 
     if develop_snapshot and not develop:
         raise BoardwalkException("--develop-snapshot requires --develop")
+    if develop_snapshot and demo:
+        raise BoardwalkException("--demo cannot be combined with --develop-snapshot")
 
     # Validate host_header_pattern
     try:
@@ -321,6 +330,7 @@ def serve(
             auth_login_slack_notify=auth_login_slack_notify,
             auth_method=auth_method,
             develop=develop,
+            demo=demo,
             develop_snapshot_path=develop_snapshot,
             host_header_pattern=host_header_regex,
             owner=owner,

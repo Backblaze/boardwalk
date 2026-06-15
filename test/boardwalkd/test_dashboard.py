@@ -1,4 +1,5 @@
 import hashlib
+from collections import deque
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -56,7 +57,7 @@ def ws(
             worker_username=worker_username,
             workflow="UpgradeWorkflow",
         ),
-        events=events or [],
+        events=deque(events or []),
         last_seen=last_seen,
         semaphores=WorkspaceSemaphores(caught=caught, has_mutex=has_mutex),
     )

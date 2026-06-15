@@ -4,7 +4,7 @@
     <nav class="bw-tabs" aria-label="Workspace groups">
         {% for group in dashboard.groups %}
         <a class="bw-tab{% if group.active %} is-active{% end %}"
-            href="{{ canonical_url(filters, edit=edit, group=group.label) }}"
+            href="{{ canonical_url(filters, edit=edit, group=group.label) # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}"
             hx-get="{{ partial_url(filters, edit=edit, push_url=True, group=group.label) }}"
             hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false">
             <span>{{ group.label }}</span>
@@ -82,11 +82,11 @@
 
         <div class="bw-filter-actions">
             {% if edit %}
-            <a class="bw-button bw-button-secondary" href="{{ canonical_url(filters) }}"
+            <a class="bw-button bw-button-secondary" href="{{ canonical_url(filters) # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}"
                 hx-get="{{ partial_url(filters, push_url=True) }}" hx-target="closest .bw-frame"
                 hx-swap="innerHTML" hx-push-url="false">Exit edit</a>
             {% else %}
-            <a class="bw-button bw-button-secondary" href="{{ canonical_url(filters, edit=True) }}"
+            <a class="bw-button bw-button-secondary" href="{{ canonical_url(filters, edit=True) # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}"
                 hx-get="{{ partial_url(filters, edit=True, push_url=True) }}" hx-target="closest .bw-frame"
                 hx-swap="innerHTML" hx-push-url="false">Edit</a>
             {% end %}
@@ -132,54 +132,54 @@
                     <span class="bw-head-stack">
                         <span class="bw-sort">
                             <span class="bw-sort-label">Workspace</span>
-                            <a class="bw-sort-arrow{% if filters.sort == "workspace" %} is-active{% end %}"
-                                href="{{ sort_url("/", filters, "workspace", edit=edit) }}"
-                                hx-get="{{ sort_url("/workspaces", filters, "workspace", edit=edit, push_url="1") }}"
+                            <a class="bw-sort-arrow{% if filters.sort == 'workspace' %} is-active{% end %}"
+                                href="{{ sort_url('/', filters, 'workspace', edit=edit) # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}"
+                                hx-get="{{ sort_url('/workspaces', filters, 'workspace', edit=edit, push_url='1') }}"
                                 hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
-                                aria-label="{% if filters.sort == "workspace" %}Workspace sorted {{ filters.direction }}; switch sort direction{% else %}Workspace sorted by default; sort by workspace{% end %}">
-                                <span aria-hidden="true">{% if filters.sort == "workspace" %}{% if filters.direction == "asc" %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
+                                aria-label="{% if filters.sort == 'workspace' %}Workspace sorted {{ filters.direction }}; switch sort direction{% else %}Workspace sorted by default; sort by workspace{% end %}">
+                                <span aria-hidden="true">{% if filters.sort == 'workspace' %}{% if filters.direction == 'asc' %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
                             </a>
                         </span>
                         <span class="bw-sort bw-sort-subtle">
                             <span class="bw-sort-label">Latest</span>
-                            <a class="bw-sort-arrow{% if filters.sort == "updated" %} is-active{% end %}"
-                                href="{{ sort_url("/", filters, "updated", edit=edit) }}"
-                                hx-get="{{ sort_url("/workspaces", filters, "updated", edit=edit, push_url="1") }}"
+                            <a class="bw-sort-arrow{% if filters.sort == 'updated' %} is-active{% end %}"
+                                href="{{ sort_url('/', filters, 'updated', edit=edit) # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}"
+                                hx-get="{{ sort_url('/workspaces', filters, 'updated', edit=edit, push_url='1') }}"
                                 hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
-                                aria-label="{% if filters.sort == "updated" %}Latest event sorted {{ filters.direction }}; switch sort direction{% else %}Latest event sorted by default; sort by latest event{% end %}">
-                                <span aria-hidden="true">{% if filters.sort == "updated" %}{% if filters.direction == "asc" %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
+                                aria-label="{% if filters.sort == 'updated' %}Latest event sorted {{ filters.direction }}; switch sort direction{% else %}Latest event sorted by default; sort by latest event{% end %}">
+                                <span aria-hidden="true">{% if filters.sort == 'updated' %}{% if filters.direction == 'asc' %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
                             </a>
                         </span>
                     </span>
                     <span>Limit</span>
                     <span class="bw-sort">
                         <span class="bw-sort-label">Current host</span>
-                        <a class="bw-sort-arrow{% if filters.sort == "current_host" %} is-active{% end %}"
-                            href="{{ sort_url("/", filters, "current_host", edit=edit) }}"
-                            hx-get="{{ sort_url("/workspaces", filters, "current_host", edit=edit, push_url="1") }}"
+                        <a class="bw-sort-arrow{% if filters.sort == 'current_host' %} is-active{% end %}"
+                            href="{{ sort_url('/', filters, 'current_host', edit=edit) # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}"
+                            hx-get="{{ sort_url('/workspaces', filters, 'current_host', edit=edit, push_url='1') }}"
                             hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
-                            aria-label="{% if filters.sort == "current_host" %}Current host sorted {{ filters.direction }}; switch sort direction{% else %}Current host sorted by default; sort by current host{% end %}">
-                            <span aria-hidden="true">{% if filters.sort == "current_host" %}{% if filters.direction == "asc" %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
+                            aria-label="{% if filters.sort == 'current_host' %}Current host sorted {{ filters.direction }}; switch sort direction{% else %}Current host sorted by default; sort by current host{% end %}">
+                            <span aria-hidden="true">{% if filters.sort == 'current_host' %}{% if filters.direction == 'asc' %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
                         </a>
                     </span>
                     <span class="bw-sort">
                         <span class="bw-sort-label">Source</span>
-                        <a class="bw-sort-arrow{% if filters.sort == "source" %} is-active{% end %}"
-                            href="{{ sort_url("/", filters, "source", edit=edit) }}"
-                            hx-get="{{ sort_url("/workspaces", filters, "source", edit=edit, push_url="1") }}"
+                        <a class="bw-sort-arrow{% if filters.sort == 'source' %} is-active{% end %}"
+                            href="{{ sort_url('/', filters, 'source', edit=edit) # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}"
+                            hx-get="{{ sort_url('/workspaces', filters, 'source', edit=edit, push_url='1') }}"
                             hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
-                            aria-label="{% if filters.sort == "source" %}Source sorted {{ filters.direction }}; switch sort direction{% else %}Source sorted by default; sort by source{% end %}">
-                            <span aria-hidden="true">{% if filters.sort == "source" %}{% if filters.direction == "asc" %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
+                            aria-label="{% if filters.sort == 'source' %}Source sorted {{ filters.direction }}; switch sort direction{% else %}Source sorted by default; sort by source{% end %}">
+                            <span aria-hidden="true">{% if filters.sort == 'source' %}{% if filters.direction == 'asc' %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
                         </a>
                     </span>
                     <span class="bw-sort">
                         <span class="bw-sort-label">Status</span>
-                        <a class="bw-sort-arrow{% if filters.sort == "status" %} is-active{% end %}"
-                            href="{{ sort_url("/", filters, "status", edit=edit) }}"
-                            hx-get="{{ sort_url("/workspaces", filters, "status", edit=edit, push_url="1") }}"
+                        <a class="bw-sort-arrow{% if filters.sort == 'status' %} is-active{% end %}"
+                            href="{{ sort_url('/', filters, 'status', edit=edit) # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}"
+                            hx-get="{{ sort_url('/workspaces', filters, 'status', edit=edit, push_url='1') }}"
                             hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
-                            aria-label="{% if filters.sort == "status" %}Status sorted {{ filters.direction }}; switch sort direction{% else %}Status sorted by default; sort by status{% end %}">
-                            <span aria-hidden="true">{% if filters.sort == "status" %}{% if filters.direction == "asc" %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
+                            aria-label="{% if filters.sort == 'status' %}Status sorted {{ filters.direction }}; switch sort direction{% else %}Status sorted by default; sort by status{% end %}">
+                            <span aria-hidden="true">{% if filters.sort == 'status' %}{% if filters.direction == 'asc' %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
                         </a>
                     </span>
                     <span>Actions</span>

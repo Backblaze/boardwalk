@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import deque
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -266,7 +267,7 @@ def seed_snapshot_workspaces(state: State, path: str | Path, now: datetime | Non
         )
         state.workspaces[name] = WorkspaceState(
             details=details,
-            events=[event],
+            events=deque([event]),
             last_seen=_snapshot_last_seen(entry, index, replay_now),
             semaphores=semaphores,
         )

@@ -1120,7 +1120,6 @@ def make_app(
     auth_login_slack_notify: bool,
     auth_method: str,
     develop: bool,
-    develop_snapshot_path: str | None,
     host_header_pattern: re.Pattern[str],
     owner: str,
     slack_bot_token: str | None,
@@ -1129,6 +1128,8 @@ def make_app(
     slack_webhook_url: str,
     url: str,
     workspace_status_json: bool,
+    develop_snapshot_path: str | None = None,
+    demo: bool = False,
     theme_static_path: str | None = None,
     theme_css_url: str = "",
     theme_logo_url: str = "",
@@ -1171,12 +1172,14 @@ def make_app(
     }
     if develop:
         settings["debug"] = True
-        if develop_snapshot_path:
-            seeded = seed_snapshot_workspaces(state, develop_snapshot_path)
-        else:
-            seeded = seed_development_workspaces(state)
-        if seeded:
-            state.flush()
+    if develop_snapshot_path:
+        seeded = seed_snapshot_workspaces(state, develop_snapshot_path)
+    elif demo:
+        seeded = seed_development_workspaces(state)
+    else:
+        seeded = False
+    if seeded:
+        state.flush()
 
     # Set-up authentication
     if auth_method != "anonymous":
@@ -1297,7 +1300,6 @@ async def run(
     auth_login_slack_notify: bool,
     auth_method: str,
     develop: bool,
-    develop_snapshot_path: str | None,
     host_header_pattern: re.Pattern[str],
     owner: str,
     port_number: int | None,
@@ -1312,6 +1314,8 @@ async def run(
     slack_slash_command_prefix: str,
     url: str,
     workspace_status_json: bool,
+    develop_snapshot_path: str | None = None,
+    demo: bool = False,
     theme_static_path: str | None = None,
     theme_css_url: str = "",
     theme_logo_url: str = "",
@@ -1328,7 +1332,6 @@ async def run(
         auth_login_slack_notify=auth_login_slack_notify,
         auth_method=auth_method,
         develop=develop,
-        develop_snapshot_path=develop_snapshot_path,
         host_header_pattern=host_header_pattern,
         owner=owner,
         slack_bot_token=slack_bot_token,
@@ -1337,6 +1340,8 @@ async def run(
         slack_webhook_url=slack_webhook_url,
         url=url,
         workspace_status_json=workspace_status_json,
+        develop_snapshot_path=develop_snapshot_path,
+        demo=demo,
         theme_static_path=theme_static_path,
         theme_css_url=theme_css_url,
         theme_logo_url=theme_logo_url,

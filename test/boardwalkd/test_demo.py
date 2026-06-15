@@ -80,6 +80,16 @@ def test_seed_development_workspaces_sorts_demo_rows_into_group_tabs():
         assert {row.group for row in group_dashboard.rows} == {group}
 
 
+def test_seed_development_workspaces_keeps_most_demo_rows_deletable_in_edit_mode():
+    state = State()
+
+    seed_development_workspaces(state)
+
+    assert state.workspaces["nodes_alpha_group_upgrade"].semaphores.has_mutex is False
+    assert state.workspaces["very_very_long_workspace_name_for_fit_testing_and_demo"].semaphores.has_mutex is False
+    assert state.workspaces["stale_mutexed_workspace"].semaphores.has_mutex is True
+
+
 def test_seed_development_workspaces_does_not_overwrite_existing_state():
     state = State(workspaces={"real": WorkspaceState()})
 

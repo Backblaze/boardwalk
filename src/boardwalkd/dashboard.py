@@ -191,7 +191,11 @@ def row_for_workspace(
     terminal_event = _latest_terminal_event(workspace)
     advice = [
         DashboardAdvice(name=rule.name, message=rule.message)
-        for rule in (matching_error_advice(terminal_event, list(error_advice_rules)) if status == "error" and terminal_event else [])
+        for rule in (
+            matching_error_advice(terminal_event, list(error_advice_rules))
+            if status == "error" and terminal_event
+            else []
+        )
     ]
     return DashboardRow(
         name=name,

@@ -8,6 +8,22 @@ from click.testing import CliRunner
 from boardwalkd import cli
 
 
+class ImmediateEvent:
+    async def wait(self):
+        return None
+
+
+def invoke_serve_with_run_mock(args: list[str], runner: CliRunner | None = None):
+    runner = runner or CliRunner()
+    with (
+        patch("boardwalkd.cli.run", new_callable=AsyncMock) as run_mock,
+        patch("boardwalkd.cli.asyncio.Event", return_value=ImmediateEvent()),
+    ):
+        run_mock.return_value = (object(), [])
+        result = runner.invoke(cli=cli.serve, args=args)
+    return result, run_mock
+
+
 def test_version():
     """Running `boardwalkd version` should return the version of `boardwalk`."""
     runner = CliRunner()
@@ -47,24 +63,24 @@ async def test_incomplete_serve_command(
 def test_serve_passes_theme_options_to_server_run():
     runner = CliRunner()
     with runner.isolated_filesystem():
-        with patch("boardwalkd.cli.run", new_callable=AsyncMock) as run_mock:
-            result = runner.invoke(
-                cli=cli.serve,
-                args=[
-                    "--host-header-pattern=(localhost|127\\.0\\.0\\.1)",
-                    "--port=8888",
-                    "--url=http://localhost:8888",
-                    "--theme-static-path=.",
-                    "--theme-css-url=/theme-static/boardwalkd-custom.css",
-                    "--theme-logo-url=/theme-static/custom-logo.svg",
-                    "--theme-logo-alt=Example",
-                    "--theme-brand-name=Boardwalk",
-                    "--jenkins-job-url=https://ci.example/job/boardwalk/",
-                ],
-            )
+        result, run_mock = invoke_serve_with_run_mock(
+            [
+                "--host-header-pattern=(localhost|127\\.0\\.0\\.1)",
+                "--port=8888",
+                "--url=http://localhost:8888",
+                "--theme-static-path=.",
+                "--theme-css-url=/theme-static/boardwalkd-custom.css",
+                "--theme-logo-url=/theme-static/custom-logo.svg",
+                "--theme-logo-alt=Example",
+                "--theme-brand-name=Boardwalk",
+                "--jenkins-job-url=https://ci.example/job/boardwalk/",
+            ],
+            runner=runner,
+        )
 
     assert result.exit_code == 0
     kwargs = run_mock.call_args.kwargs
+    assert kwargs["demo"] is False
     assert kwargs["theme_static_path"] == "."
     assert kwargs["theme_css_url"] == "/theme-static/boardwalkd-custom.css"
     assert kwargs["theme_logo_url"] == "/theme-static/custom-logo.svg"
@@ -73,23 +89,37 @@ def test_serve_passes_theme_options_to_server_run():
     assert kwargs["jenkins_job_url"] == "https://ci.example/job/boardwalk/"
 
 
+def test_serve_passes_demo_to_server_run():
+    result, run_mock = invoke_serve_with_run_mock(
+        [
+            "--demo",
+            "--host-header-pattern=(localhost|127\\.0\\.0\\.1)",
+            "--port=8888",
+            "--url=http://localhost:8888",
+        ]
+    )
+
+    assert result.exit_code == 0
+    assert run_mock.call_args.kwargs["demo"] is True
+
+
 def test_serve_passes_develop_snapshot_to_server_run():
     runner = CliRunner()
     with runner.isolated_filesystem():
         open("snapshot.json", "w").write('{"workspaces": []}')
-        with patch("boardwalkd.cli.run", new_callable=AsyncMock) as run_mock:
-            result = runner.invoke(
-                cli=cli.serve,
-                args=[
-                    "--develop",
-                    "--develop-snapshot=snapshot.json",
-                    "--host-header-pattern=(localhost|127\\.0\\.0\\.1)",
-                    "--port=8888",
-                    "--url=http://localhost:8888",
-                ],
-            )
+        result, run_mock = invoke_serve_with_run_mock(
+            [
+                "--develop",
+                "--develop-snapshot=snapshot.json",
+                "--host-header-pattern=(localhost|127\\.0\\.0\\.1)",
+                "--port=8888",
+                "--url=http://localhost:8888",
+            ],
+            runner=runner,
+        )
 
     assert result.exit_code == 0
+    assert run_mock.call_args.kwargs["demo"] is False
     assert run_mock.call_args.kwargs["develop_snapshot_path"] == "snapshot.json"
 
 
@@ -109,6 +139,26 @@ def test_serve_rejects_develop_snapshot_without_develop():
 
     assert result.exit_code != 0
     assert "--develop-snapshot requires --develop" in result.output
+
+
+def test_serve_rejects_demo_with_develop_snapshot():
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        open("snapshot.json", "w").write('{"workspaces": []}')
+        result = runner.invoke(
+            cli=cli.serve,
+            args=[
+                "--develop",
+                "--demo",
+                "--develop-snapshot=snapshot.json",
+                "--host-header-pattern=(localhost|127\\.0\\.0\\.1)",
+                "--port=8888",
+                "--url=http://localhost:8888",
+            ],
+        )
+
+    assert result.exit_code != 0
+    assert "--demo cannot be combined with --develop-snapshot" in result.output
 
 
 def test_sanitize_status_snapshot_command_writes_redacted_snapshot():

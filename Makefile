@@ -40,15 +40,17 @@ develop-server: develop
 ifdef BOARDWALKD_SLACK_WEBHOOK_URL
 	poetry run boardwalkd serve \
 		--develop \
+		--demo \
 		--workspace-status-json \
 		--host-header-pattern="(localhost|127\.0\.0\.1)" \
 		--port=8888 \
 		--url='http://localhost:8888' \
-		--slack-error-advice-config test/server-client/slack-error-advice.toml
+		--slack-error-advice-config test/server-client/slack-error-advice.toml \
 		--workspace-status-json
 else
 	poetry run boardwalkd serve \
 		--develop \
+		--demo \
 		--workspace-status-json \
 		--host-header-pattern="(localhost|127\.0\.0\.1)" \
 		--port=8888 \

@@ -13,6 +13,7 @@ import webbrowser
 from collections import deque
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlencode, urljoin, urlparse
 
 import click
@@ -75,7 +76,7 @@ class WorkspaceDetails(ProtocolBaseModel):
     worker_limit: str = ""
     worker_username: str = ""
 
-    def __init__(self, **kwargs: str):
+    def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
 
     @field_validator("deployment_url")
@@ -95,7 +96,7 @@ class WorkspaceEvent(ProtocolBaseModel):
     create_time: datetime | None = None
     received_time: datetime | None = None
 
-    def __init__(self, **kwargs: str):
+    def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
         if not self.create_time:
             self.create_time: datetime | None = datetime.now(UTC)

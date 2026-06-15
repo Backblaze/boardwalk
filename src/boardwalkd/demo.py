@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -17,7 +18,7 @@ class DemoWorkspace:
     caught: bool = False
     build: str = ""
     severity: str = "info"
-    has_mutex: bool = True
+    has_mutex: bool = False
     stale: bool = False
     extra_events: int = 0
     worker_command: str = "run"
@@ -144,6 +145,7 @@ DEMO_WORKSPACES = [
         host_pattern="nodes_theta",
         current_host="node-theta-b",
         latest_event="Server-side workspace mutex remains after stale worker",
+        has_mutex=True,
         stale=True,
         worker_command="run",
         worker_hostname="demo-worker-retired",
@@ -171,9 +173,7 @@ def seed_development_workspaces(state: State) -> bool:
     for index, example in enumerate(DEMO_WORKSPACES):
         worker_limit = example.worker_limit or example.current_host or "all"
         last_seen = (
-            now - timedelta(days=8, seconds=index)
-            if example.stale
-            else demo_connected_until - timedelta(seconds=index)
+            now - timedelta(days=8, seconds=index) if example.stale else demo_connected_until - timedelta(seconds=index)
         )
         events = [
             WorkspaceEvent(
@@ -183,9 +183,9 @@ def seed_development_workspaces(state: State) -> bool:
             ),
             WorkspaceEvent(
                 severity="info",
-                message=(
-                    f"Derived ui_group={example.ui_group or 'Ungrouped'} "
-                    f"from current_host={example.current_host or 'unknown'}"
+                message="Derived ui_group={} from current_host={}".format(
+                    example.ui_group or "Ungrouped",
+                    example.current_host or "unknown",
                 ),
                 create_time=now - timedelta(seconds=60 + index),
             ),
@@ -216,7 +216,7 @@ def seed_development_workspaces(state: State) -> bool:
                 worker_username="demo",
                 workflow=example.workflow,
             ),
-            events=events,
+            events=deque(events),
             last_seen=last_seen,
             semaphores=WorkspaceSemaphores(caught=example.caught, has_mutex=example.has_mutex),
         )
