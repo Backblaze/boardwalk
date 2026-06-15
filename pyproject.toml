@@ -1,13 +1,15 @@
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.11.21,<0.12"]
+build-backend = "uv_build"
 
 [project]
 name = "boardwalk"
 description = "Boardwalk is a linear Ansible workflow engine"
 readme = "README.md"
 version = "0.9.1"
-requires-python = ">=3.11,<4"
+requires-python = ">=3.13, <4"
+license = "MIT"
+license-files = ["LICENSE", "ATTRIBUTIONS.md"]
 authors = [
     {name="Mat Hornbeek", email="84995001+m4wh6k@users.noreply.github.com"},
 ]
@@ -15,13 +17,11 @@ maintainers = [
     {name="Kiera Phoenix", email="115666116+asullivan-blze@users.noreply.github.com"},
 ]
 classifiers = [
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS"
 ]
 
-#[project.dependencies]
 dependencies = [
     # Required by slack-bolt's AsyncApp
     "aiohttp>=3.12.12,<4",
@@ -44,44 +44,51 @@ boardwalkd = "boardwalkd.cli:cli"
 repository = "https://github.com/Backblaze/boardwalk"
 "Issues" = "https://github.com/Backblaze/boardwalk/issues"
 
-# -- Package and dependencies, configured with Poetry -------------------------
-# https://python-poetry.org/docs/
+# -- Package and dependencies, configured with uv -------------------------
+# https://docs.astral.sh/uv/
 
-[tool.poetry]
-packages = [
-    { include = "boardwalk", from = "src" },
-    { include = "boardwalkd", from = "src" }
+[tool.uv.build-backend]
+module-root = "src"
+module-name = [
+    "boardwalk",
+    "boardwalkd",
 ]
-include = [
-    { path = "py.typed" },
-    { path = "static/*.css" },
-    { path = "static/*.js" },
-    { path = "static/*.svg" },
-    { path = "templates/*.html" }
+source-include = [
+    "test/**",
+    "typings/**",
 ]
 
-[tool.poetry.group.dev.dependencies]
-anyio = "^4.7.0"
-pyright = "==1.1.350"
-pytest = "^8.3.4"
-ruff = "^0.11.13"
-semgrep = "^1.164.0"
-
-[tool.poetry.group.docs]
-optional = true
-
-[tool.poetry.group.docs.dependencies]
-rich-click = "^1.8.5"
-sphinx = "^8.1.3"
-sphinx-book-theme = "^1.1.3"
-myst-parser = {extras = ["linkify"], version = "^4.0.0"}
-sphinx-autobuild = "^2024.10.3"
-sphinx-autodoc2 = "^0.5.0"
-sphinx-copybutton = "^0.5.2"
+[dependency-groups]
+dev = [
+    "anyio >= 4.7.0, <5",
+    "pyright >= 1.1.350",
+    {include-group = "lint"},
+    {include-group = "test"},
+    {include-group = "security"},
+]
+lint = [
+    "ansible-lint >= v26.4.0",
+    "ruff >= 0.11.13, <0.12",
+]
+test = [
+    "pytest >= 9.0.3, <10",
+]
+security = [
+    "semgrep >= 1.164.0, <2",
+]
+docs = [
+    "myst-parser[linkify] >=4.0.0, <5",
+    "rich-click >=1.8.5, <2",
+    "sphinx >=8.1.3, <9",
+    "sphinx-book-theme >=1.1.3, <2",
+    "sphinx-autobuild >=2024.10.3, <2025",
+    "sphinx-autodoc2 >=0.5.0, <0.6",
+    "sphinx-copybutton >=0.5.2, <0.6",
+]
 
 [tool.pytest.ini_options]
 filterwarnings = [
-    # Not entirely concerned about Pydantic warnings at the moment.
+    # Not entirely concerned about Pydantic warnings at the moment
     'ignore:::pydantic.*:',
 ]
 
@@ -109,6 +116,7 @@ exclude = [
     "**/node_modules",
     "**/__pycache__",
     "**/.*",
+    ".venv",
 ]
 pythonPlatform = "All"
 reportImportCycles = false

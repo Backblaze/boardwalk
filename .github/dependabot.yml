@@ -3,7 +3,7 @@
 
 version: 2
 updates:
-  # To monitor pyproject.toml / Poetry.lock files
+  # To monitor pyproject.toml
   - package-ecosystem: "pip"
     directory: "/"
     schedule:

@@ -1,24 +1,18 @@
-FROM docker.io/python:3.12 AS build
+FROM docker.io/python:3.13-alpine3.24 AS build
 WORKDIR /build
 COPY . .
-RUN python3 -m pip install --user pipx \
-    && PATH=PATH:/root/.local/bin pipx install poetry \
-    && PATH=PATH:/root/.local/bin poetry build
+RUN apk update && \
+    apk upgrade && \
+    pip install --root-user-action ignore uv==0.11.21 && \
+    uv build
 
-FROM docker.io/python:3.12-slim
+FROM docker.io/python:3.13-alpine3.24
 COPY --from=build /build/dist ./dist
-ENV DEBIAN_FRONTEND=noninteractive
-RUN groupadd -g 1000 not_root && useradd -u 1000 -g 1000 not_root \
-    && apt-get -y update \
-    && apt-get -y install aptitude \
-    && apt-get -y dist-upgrade \
-    && apt-get -y autoremove \
-    && apt-get -y autoclean \
-    && apt-get -y clean \
-    && aptitude -y purge '~o' \
-    && apt-get -y remove --purge aptitude \
-    && python3 -m pip install ./dist/boardwalk-*.whl \
-    && rm -rf ./dist
+RUN adduser -D -u 1000 not-root && \
+    apk update && \
+    apk upgrade && \
+    pip install --root-user-action ignore ./dist/boardwalk-*.whl && \
+    rm -rf ./dist
 
 USER not_root
 WORKDIR /var/boardwalk
