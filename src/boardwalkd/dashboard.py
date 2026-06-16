@@ -284,21 +284,19 @@ def _normalized_filters(filters: DashboardFilters) -> DashboardFilters:
 
 
 ACTIVE_STATUS_PRIORITY = {
-    "caught": 0,
-    "running": 1,
+    "running": 0,
 }
 
-ATTENTION_STATUS_PRIORITY = {
-    "error": 1,
-    "caught": 2,
+CAUGHT_STATUS_PRIORITY = {
+    "caught": 0,
+}
+
+INACTIVE_STATUS_PRIORITY = {
+    "error": 0,
+    "caught": 1,
     "stale": 3,
     "idle": 4,
-}
-
-QUIET_STATUS_PRIORITY = {
-    "done": 0,
-    "idle": 1,
-    "stale": 2,
+    "done": 5,
 }
 
 COLUMN_STATUS_PRIORITY = {
@@ -312,29 +310,29 @@ COLUMN_STATUS_PRIORITY = {
 
 
 def _lane_key(row: DashboardRow) -> str:
+    if row.worker_connected and row.caught:
+        return "caught"
     if row.worker_connected:
         return "active"
-    if row.advice or row.status in {"error", "caught"} or row.has_mutex:
-        return "attention"
-    return "quiet"
+    return "inactive"
 
 
 def _default_lane_sort_key(lane_key: str):
     def active_key(row: DashboardRow) -> tuple[int, tuple[int, int, int], str]:
         return (ACTIVE_STATUS_PRIORITY.get(row.status, 99), _time_desc_key(row.latest_event_time), row.name.casefold())
 
-    def attention_key(row: DashboardRow) -> tuple[int, tuple[int, int, int], str]:
-        status_priority = 0 if row.advice else ATTENTION_STATUS_PRIORITY.get(row.status, 99)
-        return (status_priority, _time_asc_key(row.latest_event_time), row.name.casefold())
+    def caught_key(row: DashboardRow) -> tuple[int, tuple[int, int, int], str]:
+        return (CAUGHT_STATUS_PRIORITY.get(row.status, 99), _time_asc_key(row.latest_event_time), row.name.casefold())
 
-    def quiet_key(row: DashboardRow) -> tuple[int, tuple[int, int, int], str]:
-        return (QUIET_STATUS_PRIORITY.get(row.status, 99), _time_desc_key(row.latest_event_time), row.name.casefold())
+    def inactive_key(row: DashboardRow) -> tuple[int, tuple[int, int, int], str]:
+        status_priority = 0 if row.advice else 2 if row.has_mutex else INACTIVE_STATUS_PRIORITY.get(row.status, 99)
+        return (status_priority, _time_asc_key(row.latest_event_time), row.name.casefold())
 
     if lane_key == "active":
         return active_key
-    if lane_key == "attention":
-        return attention_key
-    return quiet_key
+    if lane_key == "caught":
+        return caught_key
+    return inactive_key
 
 
 def _column_sort_key(sort: str):
@@ -363,14 +361,14 @@ def _sort_lane_rows(rows: list[DashboardRow], filters: DashboardFilters, lane_ke
 
 
 def _build_lanes(rows: Sequence[DashboardRow], filters: DashboardFilters) -> list[DashboardLane]:
-    grouped_rows = {"active": [], "attention": [], "quiet": []}
+    grouped_rows = {"active": [], "caught": [], "inactive": []}
     for row in rows:
         grouped_rows[_lane_key(row)].append(row)
 
     lanes = [
-        ("active", "Active work"),
-        ("attention", "Needs attention"),
-        ("quiet", "Quiet work"),
+        ("active", "Active workspaces"),
+        ("caught", "Caught workspaces"),
+        ("inactive", "Inactive workspaces"),
     ]
     return [
         DashboardLane(key=key, label=label, rows=_sort_lane_rows(grouped_rows[key], filters, key))

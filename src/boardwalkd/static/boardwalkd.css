@@ -503,7 +503,7 @@ a {
     box-shadow: inset 3px 0 0 var(--bw-running);
 }
 
-.bw-lane-attention .bw-lane-header {
+.bw-lane-caught .bw-lane-header {
     box-shadow: inset 3px 0 0 var(--bw-caught);
 }
 

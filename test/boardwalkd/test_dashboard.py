@@ -296,41 +296,54 @@ def test_build_dashboard_classifies_rows_into_operational_lanes():
     now = datetime.now(UTC)
     rows = {
         "active_running": ws(last_seen=now, current_host="node-active-running"),
-        "active_caught": ws(caught=True, last_seen=now, current_host="node-active-caught"),
-        "attention_error": ws(
+        "active_previous_error": ws(
+            last_seen=now,
+            has_mutex=False,
+            events=[WorkspaceEvent(severity="error", message="failed earlier", create_time=now - timedelta(minutes=4))],
+        ),
+        "caught_connected": ws(caught=True, last_seen=now, current_host="node-active-caught"),
+        "inactive_error": ws(
             has_mutex=False,
             events=[WorkspaceEvent(severity="error", message="failed", create_time=now - timedelta(minutes=4))],
         ),
-        "attention_caught": ws(caught=True, last_seen=now - timedelta(minutes=2), has_mutex=False),
-        "attention_stale_mutex": ws(last_seen=now - timedelta(hours=25), has_mutex=True),
-        "quiet_done": ws(
+        "inactive_caught": ws(caught=True, last_seen=now - timedelta(minutes=2), has_mutex=False),
+        "inactive_stale_mutex": ws(last_seen=now - timedelta(hours=25), has_mutex=True),
+        "inactive_done": ws(
             has_mutex=False,
             events=[WorkspaceEvent(severity="success", message="done", create_time=now - timedelta(minutes=1))],
         ),
-        "quiet_idle": ws(has_mutex=False),
-        "quiet_stale": ws(last_seen=now - timedelta(hours=25), has_mutex=False),
+        "inactive_idle": ws(has_mutex=False),
+        "inactive_stale": ws(last_seen=now - timedelta(hours=25), has_mutex=False),
     }
 
     dashboard = build_dashboard(rows, DashboardFilters(), now=now)
 
     assert lane_names(dashboard) == {
-        "Active work": ["active_caught", "active_running"],
-        "Needs attention": ["attention_error", "attention_caught", "attention_stale_mutex"],
-        "Quiet work": ["quiet_done", "quiet_idle", "quiet_stale"],
+        "Active workspaces": ["active_running", "active_previous_error"],
+        "Caught workspaces": ["caught_connected"],
+        "Inactive workspaces": [
+            "inactive_error",
+            "inactive_caught",
+            "inactive_stale_mutex",
+            "inactive_stale",
+            "inactive_idle",
+            "inactive_done",
+        ],
     }
     assert [row.name for row in dashboard.rows] == [
-        "active_caught",
         "active_running",
-        "attention_error",
-        "attention_caught",
-        "attention_stale_mutex",
-        "quiet_done",
-        "quiet_idle",
-        "quiet_stale",
+        "active_previous_error",
+        "caught_connected",
+        "inactive_error",
+        "inactive_caught",
+        "inactive_stale_mutex",
+        "inactive_stale",
+        "inactive_idle",
+        "inactive_done",
     ]
 
 
-def test_build_dashboard_reuses_slack_error_advice_for_attention_rows():
+def test_build_dashboard_reuses_slack_error_advice_for_inactive_error_rows():
     now = datetime.now(UTC)
     rule = SlackErrorAdviceRule(
         name="Secret store auth expired",
@@ -354,7 +367,7 @@ def test_build_dashboard_reuses_slack_error_advice_for_attention_rows():
     dashboard = build_dashboard(rows, DashboardFilters(), error_advice_rules=[rule], now=now)
     row = dashboard.rows[0]
 
-    assert lane_names(dashboard) == {"Needs attention": ["auth_expired"]}
+    assert lane_names(dashboard) == {"Inactive workspaces": ["auth_expired"]}
     assert [(advice.name, advice.message) for advice in row.advice] == [
         ("Secret store auth expired", "Abort this CI job and start a fresh Boardwalk job.")
     ]
@@ -370,7 +383,6 @@ def test_build_dashboard_column_sorting_applies_inside_each_lane():
             events=[WorkspaceEvent(severity="info", message="newest", create_time=now)],
         ),
         "aa_jenkins": ws(
-            caught=True,
             last_seen=now,
             current_host="node-a",
             deployment_number="50321",
@@ -390,7 +402,7 @@ def test_build_dashboard_column_sorting_applies_inside_each_lane():
             jenkins_job_url="https://jenkins.example/job/boardwalk/",
             now=now,
         )
-    )["Active work"] == ["aa_jenkins", "mm_local", "zz_deploy"]
+    )["Active workspaces"] == ["aa_jenkins", "mm_local", "zz_deploy"]
     assert lane_names(
         build_dashboard(
             rows,
@@ -398,7 +410,7 @@ def test_build_dashboard_column_sorting_applies_inside_each_lane():
             jenkins_job_url="https://jenkins.example/job/boardwalk/",
             now=now,
         )
-    )["Active work"] == ["aa_jenkins", "mm_local", "zz_deploy"]
+    )["Active workspaces"] == ["aa_jenkins", "mm_local", "zz_deploy"]
     assert lane_names(
         build_dashboard(
             rows,
@@ -406,7 +418,7 @@ def test_build_dashboard_column_sorting_applies_inside_each_lane():
             jenkins_job_url="https://jenkins.example/job/boardwalk/",
             now=now,
         )
-    )["Active work"] == ["zz_deploy", "aa_jenkins", "mm_local"]
+    )["Active workspaces"] == ["zz_deploy", "aa_jenkins", "mm_local"]
     assert lane_names(
         build_dashboard(
             rows,
@@ -414,7 +426,7 @@ def test_build_dashboard_column_sorting_applies_inside_each_lane():
             jenkins_job_url="https://jenkins.example/job/boardwalk/",
             now=now,
         )
-    )["Active work"] == ["mm_local", "zz_deploy", "aa_jenkins"]
+    )["Active workspaces"] == ["aa_jenkins", "mm_local", "zz_deploy"]
     assert lane_names(
         build_dashboard(
             rows,
@@ -422,7 +434,7 @@ def test_build_dashboard_column_sorting_applies_inside_each_lane():
             jenkins_job_url="https://jenkins.example/job/boardwalk/",
             now=now,
         )
-    )["Active work"] == ["zz_deploy", "aa_jenkins", "mm_local"]
+    )["Active workspaces"] == ["zz_deploy", "aa_jenkins", "mm_local"]
 
 
 def test_source_for_workspace_prefers_jenkins_config_then_deployment_url_then_local():
@@ -571,7 +583,8 @@ def test_workspace_partial_renders_lanes_sort_headers_and_advice():
                 )
             ],
         ),
-        "quiet_workspace": ws(
+        "caught_workspace": ws(group="alpha", caught=True, last_seen=now, current_host="node-caught"),
+        "inactive_workspace": ws(
             group="alpha",
             has_mutex=False,
             events=[WorkspaceEvent(severity="success", message="done", create_time=now - timedelta(minutes=1))],
@@ -587,9 +600,9 @@ def test_workspace_partial_renders_lanes_sort_headers_and_advice():
 
     html = render_workspace_partial(dashboard, workspaces)
 
-    assert "Active work" in html
-    assert "Needs attention" in html
-    assert "Quiet work" in html
+    assert "Active workspaces" in html
+    assert "Caught workspaces" in html
+    assert "Inactive workspaces" in html
     assert 'class="bw-sort-label">Workspace</span>' in html
     assert 'class="bw-sort-arrow"' in html
     assert 'aria-label="Workspace sorted by default; sort by workspace"' in html

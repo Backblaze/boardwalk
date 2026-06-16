@@ -256,7 +256,11 @@ def test_seed_snapshot_workspaces_replays_sanitized_status_into_local_state(tmp_
         ("Multi-group", 1),
         ("theta", 1),
     ]
-    assert [row.status for row in dashboard.rows] == ["caught", "running", "stale"]
+    assert [(lane.label, [row.status for row in lane.rows]) for lane in dashboard.lanes] == [
+        ("Active workspaces", ["running"]),
+        ("Caught workspaces", ["caught"]),
+        ("Inactive workspaces", ["stale"]),
+    ]
     assert all("Sanitized production status snapshot" in row.latest_event for row in dashboard.rows)
 
 
