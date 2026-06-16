@@ -125,6 +125,8 @@
         return true;
     }
 
+    // Expansion state is per browser tab via sessionStorage. HTMX refreshes can
+    // redraw the table without turning one user's expanded row into server state.
     function restoreExpandedState(root) {
         var key = storedSessionValue(EXPANDED_WORKSPACE_KEY);
         if (key) {
@@ -227,6 +229,8 @@
         return match;
     }
 
+    // Auto-refresh replaces the dashboard fragment. Capture the focused control
+    // so in-progress search/filter typing survives the swap.
     function captureActiveControl() {
         var active = document.activeElement;
         if (!isEditableControl(active) || !active.closest(".bw-dashboard")) return null;

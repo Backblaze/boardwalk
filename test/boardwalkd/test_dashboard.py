@@ -9,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 from tornado.template import Loader
 
+import boardwalkd.server as boardwalkd_server
 from boardwalkd.dashboard import (
     DashboardFilters,
     action_url,
@@ -26,10 +27,10 @@ from boardwalkd.protocol import WorkspaceDetails, WorkspaceEvent, WorkspaceSemap
 from boardwalkd.server import (
     workspace_client_details_event_message,
     workspace_client_details_event_should_log,
-    workspace_has_recent_heartbeat,
 )
 from boardwalkd.slack_error_advice import SlackErrorAdviceRule
 from boardwalkd.state import WorkspaceState
+from boardwalkd.utils import is_workspace_active
 
 
 def ws(
@@ -767,8 +768,31 @@ def test_workspace_partial_renders_stale_status_and_filter():
     assert "1 stale" in html
 
 
-def test_workspace_has_recent_heartbeat_treats_missing_last_seen_as_inactive():
-    assert workspace_has_recent_heartbeat(WorkspaceState(last_seen=None), now=datetime.now(UTC)) is False
+def test_is_workspace_active_treats_missing_last_seen_as_inactive(monkeypatch):
+    monkeypatch.setattr(
+        boardwalkd_server,
+        "state",
+        SimpleNamespace(workspaces={"missing_last_seen": WorkspaceState(last_seen=None)}),
+    )
+
+    assert is_workspace_active("missing_last_seen", now=datetime.now(UTC)) is False
+
+
+def test_is_workspace_active_uses_supplied_now_for_deterministic_checks(monkeypatch):
+    now = datetime(2026, 6, 16, 12, 0, tzinfo=UTC)
+    monkeypatch.setattr(
+        boardwalkd_server,
+        "state",
+        SimpleNamespace(
+            workspaces={
+                "active": WorkspaceState(last_seen=now - timedelta(seconds=9)),
+                "inactive": WorkspaceState(last_seen=now - timedelta(seconds=11)),
+            }
+        ),
+    )
+
+    assert is_workspace_active("active", now=now) is True
+    assert is_workspace_active("inactive", now=now) is False
 
 
 def test_base_template_renders_theme_brand_links_and_scripts_without_github_corner():

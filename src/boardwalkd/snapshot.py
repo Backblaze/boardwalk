@@ -96,6 +96,8 @@ def _inventory_labels_for_pattern(pattern: Any, inventory: Mapping[str, Any] | N
     return labels
 
 
+# Group derivation here is only for sanitized local replay. Production grouping
+# comes from boardwalk clients posting WorkspaceDetails.ui_group.
 def _derived_group(details: Mapping[str, Any], inventory: Mapping[str, Any] | None = None) -> str:
     ui_group = str(details.get("ui_group") or "")
     if ui_group:

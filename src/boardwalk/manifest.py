@@ -93,9 +93,7 @@ def get_ws() -> Workspace:
 
 
 def get_boardwalkd_url() -> str:
-    if boardwalkd_url_override := os.environ.get("BOARDWALKD_URL"):
-        return boardwalkd_url_override
-
+    """Returns the boardwalkd URL from the active Boardwalkfile."""
     try:
         sys.path.append(str(Path.cwd()))
         try:

@@ -19,10 +19,18 @@ def list_active_workspaces(last_seen_seconds: int = 10, _sorted: bool = True) ->
         return workspaces
 
 
-def is_workspace_active(workspace_name: str, last_seen_seconds: int = 10) -> bool:
-    """Returns Boolean True if the provided workspace name is active, based on the configured `last_seen_seconds` value."""
+def is_workspace_active(workspace_name: str, last_seen_seconds: int = 10, now: datetime | None = None) -> bool:
+    """Returns True if the workspace has had a recent heartbeat.
+
+    :param workspace_name: The workspace name to check for recent activity.
+    :param last_seen_seconds: Seconds since last heartbeat to consider active.
+    :param now: Optional datetime used for deterministic tests.
+    """
     if ws := server.state.workspaces.get(workspace_name):
-        if (datetime.now(UTC) - ws.last_seen.replace(tzinfo=UTC)).total_seconds() < last_seen_seconds:  # type: ignore
+        if not ws.last_seen:
+            return False
+        current_time = (now or datetime.now(UTC)).replace(tzinfo=UTC)
+        if (current_time - ws.last_seen.replace(tzinfo=UTC)).total_seconds() < last_seen_seconds:
             return True
     return False
 

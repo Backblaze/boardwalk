@@ -86,7 +86,7 @@ def cli():
 @click.option(
     "--demo/--no-demo",
     default=False,
-    help="Seed generic demo workspace rows when the state file is empty",
+    help="Loads generic demo workspace rows into the `boardwalkd` state, only if the state is empty",
     show_default=True,
 )
 @click.option(
@@ -198,15 +198,46 @@ def cli():
 )
 @click.option(
     "--theme-static-path",
+    help="Directory of private theme assets to serve under /theme-static/",
     type=click.Path(exists=True, file_okay=False, readable=True),
     default=None,
     show_envvar=True,
 )
-@click.option("--theme-css-url", type=str, default="", show_envvar=True)
-@click.option("--theme-logo-url", type=str, default="", show_envvar=True)
-@click.option("--theme-logo-alt", type=str, default="", show_envvar=True)
-@click.option("--theme-brand-name", type=str, default="Boardwalk", show_envvar=True)
-@click.option("--jenkins-job-url", type=str, default="", show_envvar=True)
+@click.option(
+    "--theme-css-url",
+    help="Optional CSS URL loaded after the bundled boardwalkd stylesheet",
+    type=str,
+    default="",
+    show_envvar=True,
+)
+@click.option(
+    "--theme-logo-url",
+    help="Optional logo image URL for the top-left brand mark",
+    type=str,
+    default="",
+    show_envvar=True,
+)
+@click.option(
+    "--theme-logo-alt",
+    help="Alt text for the themed logo; defaults to the brand name in templates",
+    type=str,
+    default="",
+    show_envvar=True,
+)
+@click.option(
+    "--theme-brand-name",
+    help="Brand name rendered in the dashboard header and page title",
+    type=str,
+    default="Boardwalk",
+    show_envvar=True,
+)
+@click.option(
+    "--jenkins-job-url",
+    help="Base Jenkins job URL used to link workspace build numbers to build pages",
+    type=str,
+    default="",
+    show_envvar=True,
+)
 @click.option(
     "--url",
     help=(

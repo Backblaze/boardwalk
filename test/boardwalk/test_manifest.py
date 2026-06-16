@@ -1,7 +1,7 @@
 import pytest
 
 from boardwalk import Job, PlaybookJob, TaskJob, Workflow, WorkspaceConfig
-from boardwalk.manifest import JobTypes, get_boardwalkd_url
+from boardwalk.manifest import JobTypes
 
 
 class EmptyWorkflow(Workflow):
@@ -74,10 +74,3 @@ def test_workspace_config_accepts_generic_inventory_var_grouping():
 
     assert cfg.ui_group == ""
     assert cfg.ui_group_inventory_var == "site_group"
-
-
-def test_get_boardwalkd_url_prefers_environment_override(monkeypatch, tmp_path):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("BOARDWALKD_URL", "http://localhost:8888/")
-
-    assert get_boardwalkd_url() == "http://localhost:8888/"

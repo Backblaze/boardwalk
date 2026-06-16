@@ -562,13 +562,6 @@ class WorkspaceEventsTableHandler(UIBaseHandler):
         return self.render("workspace_events_table.html", workspace=workspace)
 
 
-def workspace_has_recent_heartbeat(workspace: WorkspaceState, now: datetime | None = None) -> bool:
-    if not workspace.last_seen:
-        return False
-    delta = (now or datetime.now(UTC)) - workspace.last_seen.replace(tzinfo=UTC)
-    return delta.total_seconds() < 10
-
-
 class WorkspaceMutexHandler(UIBaseHandler):
     """Handles mutex requests for workspaces from the UI"""
 
@@ -579,7 +572,7 @@ class WorkspaceMutexHandler(UIBaseHandler):
             # If the host is possibly still connected we will not delete the
             # mutex. Workspaces should send a heartbeat every 5 seconds
             workspace_state = state.workspaces[workspace]
-            if workspace_has_recent_heartbeat(workspace_state):
+            if is_workspace_active(workspace):
                 return self.send_error(412)
             workspace_state.semaphores.has_mutex = False
             state.flush()
@@ -923,6 +916,9 @@ class WorkspaceRemoteMutexClearApiHandler(APIBaseHandler):
             return self.send_error(404)
 
 
+# These fields decide whether a details POST should create a log event. current_host
+# and ui_group intentionally update state silently because workers POST details on
+# every host iteration, and logging each update would bury the useful event stream.
 WORKSPACE_CLIENT_DETAILS_EVENT_FIELDS = (
     "workflow",
     "worker_username",
@@ -1199,6 +1195,9 @@ def make_app(
     }
     if develop:
         settings["debug"] = True
+    # Snapshot/demo seeding is development-only fixture data. A snapshot wins over
+    # demo rows so local replay of real-shaped state is never mixed with synthetic
+    # demo workspaces.
     if develop_snapshot_path:
         seeded = seed_snapshot_workspaces(state, develop_snapshot_path)
     elif demo:

@@ -151,6 +151,9 @@ def _latest_terminal_event(workspace: WorkspaceState) -> WorkspaceEvent | None:
     return max(terminal_events, key=_event_time)
 
 
+# Status drives the badge/filter value. Lane placement is handled separately in
+# _lane_key because a caught workspace with no connected worker is operationally
+# different from a caught workspace that can still be released.
 def status_for_workspace(workspace: WorkspaceState, now: datetime | None = None) -> str:
     if workspace.semaphores.caught:
         return "caught"
@@ -309,6 +312,9 @@ COLUMN_STATUS_PRIORITY = {
 }
 
 
+# Lanes describe what the operator can act on now. A caught workspace only stays
+# in the caught lane while a worker heartbeat is active; once disconnected, it is
+# inactive even though its status badge remains caught.
 def _lane_key(row: DashboardRow) -> str:
     if row.worker_connected and row.caught:
         return "caught"
@@ -317,6 +323,9 @@ def _lane_key(row: DashboardRow) -> str:
     return "inactive"
 
 
+# The default ordering is tuned for live operations: active work shows the most
+# recent movement first, caught work shows the longest-waiting pauses first, and
+# inactive work puts likely follow-up items ahead of stale/done history.
 def _default_lane_sort_key(lane_key: str):
     def active_key(row: DashboardRow) -> tuple[int, tuple[int, int, int], str]:
         return (ACTIVE_STATUS_PRIORITY.get(row.status, 99), _time_desc_key(row.latest_event_time), row.name.casefold())

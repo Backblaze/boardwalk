@@ -279,6 +279,7 @@ def run_workflow(
         host = hosts[i]
 
         if boardwalkd_client:
+            # Update the server's workspace state so the UI reflects the current host.
             boardwalkd_client.post_details(
                 build_workspace_details(
                     workspace=workspace,
@@ -643,7 +644,12 @@ def resolve_workspace_ui_group(
     current_host: str = "",
     inventory_vars: HostVarsType | None = None,
 ) -> str:
-    """Returns the generic UI group label for a workspace."""
+    """Returns the generic UI group label for a workspace.
+
+    Explicit ui_group wins. Inventory-derived grouping is resolved from the
+    current host, so it can be blank during bootstrap and appear once the worker
+    starts processing a host.
+    """
     if workspace.cfg.ui_group:
         return workspace.cfg.ui_group
     if not current_host or not inventory_vars:
@@ -820,6 +826,7 @@ def workspace_event_for_ansible_task_start(
     hostname: str,
     event_data: Mapping[str, Any],
 ) -> WorkspaceEvent | None:
+    """Extracts an executing role/task from ansible_runner events for the workspace log."""
     if event_data.get("event") != "playbook_on_task_start":
         return None
 
@@ -840,6 +847,7 @@ def workspace_event_for_ansible_task_start(
 
 
 def queue_ansible_task_start_event(hostname: str, event_data: Mapping[str, Any]) -> bool:
+    """ansible_runner event handler that logs task starts to the active workspace."""
     if boardwalkd_client and (event := workspace_event_for_ansible_task_start(hostname, event_data)):
         boardwalkd_client.queue_event(event)
     return True
