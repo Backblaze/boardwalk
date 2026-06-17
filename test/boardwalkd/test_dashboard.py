@@ -795,7 +795,7 @@ def test_is_workspace_active_uses_supplied_now_for_deterministic_checks(monkeypa
     assert is_workspace_active("inactive", now=now) is False
 
 
-def test_base_template_renders_theme_brand_links_and_scripts_without_github_corner():
+def test_base_template_renders_theme_brand_links_and_scripts():
     loader = Loader(str(Path("src/boardwalkd/templates").resolve()))
     template = loader.load("base.html")
     handler = SimpleNamespace(
@@ -826,6 +826,6 @@ def test_base_template_renders_theme_brand_links_and_scripts_without_github_corn
     assert 'href="/admin"' in html
     assert "View source" not in html
     assert "bw-theme-toggle-icon-light" in html
-    assert "Switch to dark mode" in html
+    assert 'class="bw-theme-dark"' in html
+    assert "Switch to light mode" in html
     assert "/static/boardwalkd.js" in html
-    assert "github-corner" not in html

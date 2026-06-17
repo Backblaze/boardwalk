@@ -44,16 +44,14 @@ ifdef BOARDWALKD_SLACK_WEBHOOK_URL
 		--host-header-pattern="(localhost|127\.0\.0\.1)" \
 		--port=8888 \
 		--url='http://localhost:8888' \
-		--slack-error-advice-config test/server-client/slack-error-advice.toml \
-		--workspace-status-json
+		--slack-error-advice-config test/server-client/slack-error-advice.toml
 else
 	poetry run boardwalkd serve \
 		--develop \
 		--workspace-status-json \
 		--host-header-pattern="(localhost|127\.0\.0\.1)" \
 		--port=8888 \
-		--url='http://localhost:8888' \
-		--workspace-status-json
+		--url='http://localhost:8888'
 endif
 
 # Also runs the server, but loads demo data for UI testing

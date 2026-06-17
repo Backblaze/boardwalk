@@ -5,9 +5,9 @@
 
     function storedTheme() {
         try {
-            return localStorage.getItem("boardwalk.theme") || "light";
+            return localStorage.getItem("boardwalk.theme") || "dark";
         } catch (error) {
-            return "light";
+            return "dark";
         }
     }
 

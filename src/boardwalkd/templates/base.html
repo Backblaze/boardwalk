@@ -3,7 +3,7 @@
 {% set theme_logo_url = handler.settings.get("theme_logo_url", "") %}
 {% set theme_logo_alt = handler.settings.get("theme_logo_alt", "") %}
 {% set theme_brand_name = handler.settings.get("theme_brand_name", "Boardwalk") or "Boardwalk" %}
-<html lang="en" class="bw-theme-light">
+<html lang="en" class="bw-theme-dark">
 
 <head>
     <meta charset="utf-8">
@@ -44,7 +44,7 @@
         <nav class="bw-nav" aria-label="Primary">
             <a href="/" class="bw-nav-link">Dashboard</a>
             <a href="/admin" class="bw-nav-link">Admin</a>
-            <button type="button" class="bw-theme-toggle" data-theme-toggle aria-label="Switch to dark mode" aria-pressed="false" title="Switch to dark mode">
+            <button type="button" class="bw-theme-toggle" data-theme-toggle aria-label="Switch to light mode" aria-pressed="true" title="Switch to light mode">
                 <span class="bw-theme-toggle-icon bw-theme-toggle-icon-light" aria-hidden="true">&#9788;</span>
                 <span class="bw-theme-toggle-icon bw-theme-toggle-icon-dark" aria-hidden="true">&#9790;</span>
                 <span class="bw-theme-toggle-thumb"></span>
