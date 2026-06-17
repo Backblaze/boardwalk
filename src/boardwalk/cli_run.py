@@ -11,9 +11,10 @@ import random
 import socket
 import sys
 import time
+from collections.abc import Mapping
 from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import ansible_runner
 import click
@@ -212,6 +213,7 @@ def run(
         inventory_vars=inventory_vars,
         workspace=ws,
         verbosity=ctx.obj["VERBOSITY"],
+        ctx=ctx,
     )
 
 
@@ -269,11 +271,23 @@ def run_workflow(
     inventory_vars: HostVarsType,
     workspace: Workspace,
     verbosity: int,
+    ctx: click.Context,
 ):
     """Runs the workspace's workflow against a list of hosts"""
     i = 0
     while i < len(hosts):
         host = hosts[i]
+
+        if boardwalkd_client:
+            # Update the server's workspace state so the UI reflects the current host.
+            boardwalkd_client.post_details(
+                build_workspace_details(
+                    workspace=workspace,
+                    ctx=ctx,
+                    current_host=host.name,
+                    inventory_vars=inventory_vars,
+                )
+            )
 
         logger.info(f"{host.name}: Workflow iteration on host {i + 1} of {len(hosts)}")
         if boardwalkd_client:
@@ -625,6 +639,58 @@ def lock_remote_host(host: Host):
     )
 
 
+def resolve_workspace_ui_group(
+    workspace: Workspace,
+    current_host: str = "",
+    inventory_vars: HostVarsType | None = None,
+) -> str:
+    """Returns the generic UI group label for a workspace.
+
+    Explicit ui_group wins. Inventory-derived grouping is resolved from the
+    current host, so it can be blank during bootstrap and appear once the worker
+    starts processing a host.
+    """
+    if workspace.cfg.ui_group:
+        return workspace.cfg.ui_group
+    if not current_host or not inventory_vars:
+        return ""
+    if not workspace.cfg.ui_group_inventory_var:
+        return ""
+    host_vars = inventory_vars.get(current_host, {})
+    return str(host_vars.get(workspace.cfg.ui_group_inventory_var, "") or "")
+
+
+def build_workspace_details(
+    workspace: Workspace,
+    ctx: click.Context,
+    current_host: str = "",
+    inventory_vars: HostVarsType | None = None,
+) -> WorkspaceDetails:
+    """Builds worker details posted to boardwalkd."""
+    worker_limit = ctx.params.get("limit")
+    return WorkspaceDetails(
+        current_host=current_host,
+        deployment_url=os.environ.get("BUILD_URL") or os.environ.get("RUN_DISPLAY_URL") or "",
+        deployment_name=os.environ.get("JOB_NAME") or "",
+        deployment_number=os.environ.get("BUILD_NUMBER") or "",
+        deployment_tag=os.environ.get("BUILD_TAG") or "",
+        deployment_user=os.environ.get("BUILD_USER") or "",
+        deployment_user_id=os.environ.get("BUILD_USER_ID") or "",
+        deployment_user_email=os.environ.get("BUILD_USER_EMAIL") or "",
+        host_pattern=workspace.cfg.host_pattern,
+        ui_group=resolve_workspace_ui_group(
+            workspace=workspace,
+            current_host=current_host,
+            inventory_vars=inventory_vars,
+        ),
+        workflow=workspace.cfg.workflow.__class__.__qualname__,
+        worker_command="check" if _check_mode else "run",
+        worker_hostname=socket.gethostname(),
+        worker_limit=str(worker_limit) if worker_limit else "",
+        worker_username=getpass.getuser(),
+    )
+
+
 def bootstrap_with_server(workspace: Workspace, ctx: click.Context):
     """Performs all of the initial set-up actions needed when boardwalk is
     configured to connect to a central boardwalkd"""
@@ -662,23 +728,7 @@ def bootstrap_with_server(workspace: Workspace, ctx: click.Context):
 
     # Post the worker's details, which also creates the workspace
     try:
-        boardwalkd_client.post_details(
-            WorkspaceDetails(
-                deployment_url=auth_login_context.get("deployment_url") or "",
-                deployment_name=auth_login_context.get("deployment_name") or "",
-                deployment_number=auth_login_context.get("deployment_number") or "",
-                deployment_tag=auth_login_context.get("deployment_tag") or "",
-                deployment_user=auth_login_context.get("deployment_user") or "",
-                deployment_user_id=auth_login_context.get("deployment_user_id") or "",
-                deployment_user_email=auth_login_context.get("deployment_user_email") or "",
-                host_pattern=workspace.cfg.host_pattern,
-                workflow=workspace.cfg.workflow.__class__.__qualname__,
-                worker_command="check" if _check_mode else "run",
-                worker_hostname=socket.gethostname(),
-                worker_limit=ctx.params.get("limit"),  # type: ignore
-                worker_username=getpass.getuser(),
-            )
-        )
+        boardwalkd_client.post_details(build_workspace_details(workspace=workspace, ctx=ctx))
     except ConnectionRefusedError:
         raise BoardwalkException(f"Could not connect to server {boardwalkd_url}")
 
@@ -772,6 +822,37 @@ def directly_confirm_host_preconditions(host: Host, inventory_vars: InventoryHos
     return True
 
 
+def workspace_event_for_ansible_task_start(
+    hostname: str,
+    event_data: Mapping[str, Any],
+) -> WorkspaceEvent | None:
+    """Extracts an executing role/task from ansible_runner events for the workspace log."""
+    if event_data.get("event") != "playbook_on_task_start":
+        return None
+
+    raw_event_details = event_data.get("event_data", {})
+    if not isinstance(raw_event_details, Mapping):
+        return None
+
+    task = str(raw_event_details.get("task") or "").strip()
+    if not task:
+        return None
+
+    role = str(raw_event_details.get("role") or "").strip()
+    task_label = f"{role} : {task}" if role else task
+    return WorkspaceEvent(
+        severity="info",
+        message=f"{hostname}: Running Ansible task {task_label}",
+    )
+
+
+def queue_ansible_task_start_event(hostname: str, event_data: Mapping[str, Any]) -> bool:
+    """ansible_runner event handler that logs task starts to the active workspace."""
+    if boardwalkd_client and (event := workspace_event_for_ansible_task_start(hostname, event_data)):
+        boardwalkd_client.queue_event(event)
+    return True
+
+
 def execute_workflow_jobs(host: Host, workspace: Workspace, job_kind: str, verbosity: int):
     """
     Executes workflow jobs. Different kinds of job types are specified
@@ -816,6 +897,7 @@ def execute_workflow_jobs(host: Host, workspace: Workspace, job_kind: str, verbo
                 quiet=False,
                 tasks=tasks,
                 extra_vars=job.options,
+                event_handler=lambda event_data: queue_ansible_task_start_event(host.name, event_data),
             )
 
 

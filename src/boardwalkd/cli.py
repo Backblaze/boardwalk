@@ -3,9 +3,12 @@ This file contains the boardwalkd CLI code
 """
 
 import asyncio
+import json
 import re
 import sys
+from datetime import UTC, datetime
 from importlib.metadata import version as lib_version
+from pathlib import Path
 
 import click
 from email_validator import EmailNotValidError, validate_email
@@ -14,6 +17,8 @@ from loguru import logger
 from boardwalk.app_exceptions import BoardwalkException
 from boardwalkd.server import run
 from boardwalkd.slack_error_advice import SlackErrorAdviceConfigError, parse_slack_error_advice_config
+from boardwalkd.snapshot import load_inventory_context
+from boardwalkd.snapshot import sanitize_status_snapshot as sanitize_status_snapshot_data
 
 CONTEXT_SETTINGS: dict = dict(
     auto_envvar_prefix="BOARDWALKD",
@@ -77,6 +82,18 @@ def cli():
     default=False,
     help="Runs the server in development mode with auto-reloading and tracebacks",
     show_default=True,
+)
+@click.option(
+    "--demo/--no-demo",
+    default=False,
+    help="Loads generic demo workspace rows into the `boardwalkd` state, only if the state is empty",
+    show_default=True,
+)
+@click.option(
+    "--develop-snapshot",
+    type=click.Path(exists=True, readable=True, dir_okay=False),
+    default=None,
+    help="Seed development workspaces from a redacted /api/workspaces/status snapshot",
 )
 @click.option(
     "--host-header-pattern",
@@ -180,6 +197,48 @@ def cli():
     default=None,
 )
 @click.option(
+    "--theme-static-path",
+    help="Directory of private theme assets to serve under /theme-static/",
+    type=click.Path(exists=True, file_okay=False, readable=True),
+    default=None,
+    show_envvar=True,
+)
+@click.option(
+    "--theme-css-url",
+    help="Optional CSS URL loaded after the bundled boardwalkd stylesheet",
+    type=str,
+    default="",
+    show_envvar=True,
+)
+@click.option(
+    "--theme-logo-url",
+    help="Optional logo image URL for the top-left brand mark",
+    type=str,
+    default="",
+    show_envvar=True,
+)
+@click.option(
+    "--theme-logo-alt",
+    help="Alt text for the themed logo; defaults to the brand name in templates",
+    type=str,
+    default="",
+    show_envvar=True,
+)
+@click.option(
+    "--theme-brand-name",
+    help="Brand name rendered in the dashboard header and page title",
+    type=str,
+    default="Boardwalk",
+    show_envvar=True,
+)
+@click.option(
+    "--jenkins-job-url",
+    help="Base Jenkins job URL used to link workspace build numbers to build pages",
+    type=str,
+    default="",
+    show_envvar=True,
+)
+@click.option(
     "--url",
     help=(
         "The base URL where the server can be reached. UI Requests that do not"
@@ -210,6 +269,8 @@ def serve(
     auth_expire_days: float,
     auth_method: str,
     develop: bool,
+    demo: bool,
+    develop_snapshot: str | None,
     host_header_pattern: str,
     owner: str | None,
     port: int | None,
@@ -219,6 +280,12 @@ def serve(
     slack_bot_token: str | None,
     slack_error_advice_config: str | None,
     slack_slash_command_prefix: str,
+    theme_static_path: str | None,
+    theme_css_url: str,
+    theme_logo_url: str,
+    theme_logo_alt: str,
+    theme_brand_name: str,
+    jenkins_job_url: str,
     tls_crt: str | None,
     tls_key: str | None,
     tls_port: int | None,
@@ -234,6 +301,11 @@ def serve(
     logger.info(f"Log level is {loglevel}")
 
     logger.warning("boardwalkd is running in development mode, which should not be used in a production environment")
+
+    if develop_snapshot and not develop:
+        raise BoardwalkException("--develop-snapshot requires --develop")
+    if develop_snapshot and demo:
+        raise BoardwalkException("--demo cannot be combined with --develop-snapshot")
 
     # Validate host_header_pattern
     try:
@@ -289,6 +361,8 @@ def serve(
             auth_login_slack_notify=auth_login_slack_notify,
             auth_method=auth_method,
             develop=develop,
+            demo=demo,
+            develop_snapshot_path=develop_snapshot,
             host_header_pattern=host_header_regex,
             owner=owner,
             port_number=port,
@@ -298,6 +372,12 @@ def serve(
             slack_error_webhook_url=slack_error_webhook_url,
             slack_webhook_url=slack_webhook_url,
             slack_slash_command_prefix=slack_slash_command_prefix,
+            theme_static_path=theme_static_path,
+            theme_css_url=theme_css_url,
+            theme_logo_url=theme_logo_url,
+            theme_logo_alt=theme_logo_alt,
+            theme_brand_name=theme_brand_name,
+            jenkins_job_url=jenkins_job_url,
             tls_crt_path=tls_crt,
             tls_key_path=tls_key,
             tls_port_number=tls_port,
@@ -308,6 +388,47 @@ def serve(
 
     # Spawn the server and run until terminated
     asyncio.run(start_server_and_wait())
+
+
+@cli.command("sanitize-status-snapshot")
+@click.argument("source", type=click.Path(exists=True, readable=True, dir_okay=False))
+@click.argument("destination", type=click.Path(dir_okay=False))
+@click.option(
+    "--captured-at",
+    type=str,
+    default=None,
+    help="ISO-8601 timestamp to use as the snapshot capture time. Defaults to now.",
+)
+@click.option(
+    "--preserve-identifiers/--redact-identifiers",
+    default=False,
+    help="Keep workspace/user/host identifiers for private local replay.",
+    show_default=True,
+)
+@click.option(
+    "--inventory-json",
+    type=click.Path(exists=True, readable=True, dir_okay=False),
+    default=None,
+    help="Optional ansible-inventory --list --export JSON used to derive ui_group from group ancestry.",
+)
+def sanitize_status_snapshot(
+    source: str,
+    destination: str,
+    captured_at: str | None,
+    preserve_identifiers: bool,
+    inventory_json: str | None,
+):
+    """Converts a /api/workspaces/status JSON snapshot for local development replay."""
+    now = datetime.fromisoformat(captured_at).replace(tzinfo=UTC) if captured_at else None
+    raw_snapshot = json.loads(Path(source).read_text())
+    sanitized = sanitize_status_snapshot_data(
+        raw_snapshot,
+        now=now,
+        preserve_identifiers=preserve_identifiers,
+        inventory=load_inventory_context(inventory_json),
+    )
+    Path(destination).write_text(json.dumps(sanitized, indent=2, sort_keys=True) + "\n")
+    click.echo(f"Wrote sanitized snapshot to {destination}")
 
 
 @cli.command(

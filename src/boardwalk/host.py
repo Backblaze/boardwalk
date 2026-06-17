@@ -8,6 +8,7 @@ from __future__ import annotations
 import getpass
 import socket
 from base64 import b64decode
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -50,6 +51,7 @@ class Host(BaseModel, extra="forbid"):
         gather_facts: bool = True,
         quiet: bool = True,
         extra_vars: dict = {},
+        event_handler: Callable[[dict[str, Any]], bool] | None = None,
     ) -> Runner:
         """
         Wraps ansible_runner_run_tasks for performing Ansible tasks against this host
@@ -66,6 +68,7 @@ class Host(BaseModel, extra="forbid"):
             gather_facts=gather_facts,
             quiet=quiet,
             extra_vars=extra_vars,
+            event_handler=event_handler,
         )
 
     def is_locked(self) -> str | bool:

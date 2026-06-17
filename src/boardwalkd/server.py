@@ -15,7 +15,7 @@ import ssl
 import string
 from collections import deque
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from importlib.metadata import version as lib_version
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -42,8 +42,19 @@ from boardwalkd.auth_prompts import (
     set_auth_prompt,
 )
 from boardwalkd.broadcast import handle_auth_login_broadcast, handle_slack_broadcast, slack_user_mention_for_email
+from boardwalkd.dashboard import (
+    DashboardFilters,
+    action_url,
+    build_dashboard,
+    canonical_url,
+    partial_url,
+    query_url,
+    sort_url,
+)
+from boardwalkd.demo import seed_development_workspaces
 from boardwalkd.protocol import AUTH_LOGIN_CONTEXT_FIELDS, ApiLoginMessage, WorkspaceDetails, WorkspaceEvent
 from boardwalkd.slack_error_advice import SlackErrorAdviceRule, matching_error_advice
+from boardwalkd.snapshot import seed_snapshot_workspaces
 from boardwalkd.state import User, WorkspaceState, load_state, valid_user_roles
 from boardwalkd.utils import is_workspace_active
 
@@ -127,6 +138,46 @@ def ui_method_sort_events_by_date(handler: UIBaseHandler, events: deque[Workspac
     # with older `boardwalk` client versions
     key: Callable[[WorkspaceEvent], datetime] = lambda x: x.create_time.replace(tzinfo=UTC)  # type: ignore # noqa: E731
     return sorted(events, key=key, reverse=True)
+
+
+def dashboard_request_context(handler: UIBaseHandler) -> tuple[DashboardFilters, bool]:
+    try:
+        edit: str | int | bool = handler.get_argument("edit", default=0)  # type: ignore
+        edit = strtobool(edit)  # type: ignore
+    except (AttributeError, ValueError):
+        edit = 0
+    filters = DashboardFilters(
+        group=handler.get_query_argument("group", default="All"),
+        search=handler.get_query_argument("search", default=""),
+        status=handler.get_query_argument("status", default="all"),
+        source=handler.get_query_argument("source", default="all"),
+        sort=handler.get_query_argument("sort", default="default"),
+        direction=handler.get_query_argument("direction", default="asc"),
+    )
+    return filters, bool(edit)
+
+
+def render_workspaces_fragment(handler: UIBaseHandler, filters: DashboardFilters, edit: bool):
+    dashboard = build_dashboard(
+        state.workspaces,
+        filters,
+        jenkins_job_url=handler.settings.get("jenkins_job_url", ""),
+        error_advice_rules=handler.settings.get("slack_error_advice_rules", []),
+    )
+    return handler.render(
+        "index_workspace.html",
+        dashboard=dashboard,
+        workspaces=state.workspaces,
+        edit=edit,
+        auth_prompts=list(active_auth_prompts.values()),
+        auth_prompts_by_workspace=prompts_by_workspace(),
+        action_url=action_url,
+        canonical_url=canonical_url,
+        partial_url=partial_url,
+        query_url=query_url,
+        sort_url=sort_url,
+        orphan_auth_prompts=orphan_auth_prompts(state.workspaces.keys()),
+    )
 
 
 class AdminUIBaseHandler(UIBaseHandler):
@@ -383,12 +434,14 @@ class IndexHandler(UIBaseHandler):
 
     @tornado.web.authenticated
     def get(self):
-        try:
-            edit: str | int | bool = self.get_argument("edit", default=0)  # type: ignore
-            edit = strtobool(edit)  # type: ignore
-        except (AttributeError, ValueError):
-            edit = 0
-        return self.render("index.html", title="Index", workspaces=state.workspaces, edit=edit)
+        filters, edit = dashboard_request_context(self)
+        return self.render(
+            "index.html",
+            title="Index",
+            workspaces=state.workspaces,
+            workspaces_url=partial_url(filters, edit=edit),
+            edit=edit,
+        )
 
 
 class WorkspaceCatchHandler(UIBaseHandler):
@@ -396,6 +449,7 @@ class WorkspaceCatchHandler(UIBaseHandler):
 
     @tornado.web.authenticated
     def post(self, workspace: str):
+        filters, edit = dashboard_request_context(self)
         try:
             state.workspaces[workspace].semaphores.caught = True
         except KeyError:
@@ -406,10 +460,11 @@ class WorkspaceCatchHandler(UIBaseHandler):
         event = WorkspaceEvent(severity="info", message=f"Workspace caught by {cur_user}")
         internal_workspace_event(workspace, event)
 
-        return self.render("index_workspace_release.html", workspace_name=workspace)
+        return render_workspaces_fragment(self, filters, edit)
 
     @tornado.web.authenticated
     def delete(self, workspace: str):
+        filters, edit = dashboard_request_context(self)
         try:
             state.workspaces[workspace].semaphores.caught = False
         except KeyError:
@@ -420,7 +475,7 @@ class WorkspaceCatchHandler(UIBaseHandler):
         event = WorkspaceEvent(severity="info", message=f"Workspace released by {cur_user}")
         internal_workspace_event(workspace, event)
 
-        return self.render("index_workspace_catch.html", workspace_name=workspace)
+        return render_workspaces_fragment(self, filters, edit)
 
 
 class WorkspaceRemoteStateClearHandler(UIBaseHandler):
@@ -512,16 +567,16 @@ class WorkspaceMutexHandler(UIBaseHandler):
 
     @tornado.web.authenticated
     def delete(self, workspace: str):
+        filters, edit = dashboard_request_context(self)
         try:
             # If the host is possibly still connected we will not delete the
             # mutex. Workspaces should send a heartbeat every 5 seconds
-            delta: timedelta = datetime.now(UTC) - state.workspaces[workspace].last_seen.replace(tzinfo=UTC)  # type: ignore
-            if delta.total_seconds() < 10:
+            workspace_state = state.workspaces[workspace]
+            if is_workspace_active(workspace):
                 return self.send_error(412)
-            state.workspaces[workspace].semaphores.has_mutex = False
+            workspace_state.semaphores.has_mutex = False
             state.flush()
-            self.set_header(name="HX-Refresh", value="true")
-            return
+            return render_workspaces_fragment(self, filters, edit)
         except KeyError:
             return self.send_error(404)
 
@@ -531,14 +586,14 @@ class WorkspaceDeleteHandler(UIBaseHandler):
 
     @tornado.web.authenticated
     def post(self, workspace: str):
+        filters, edit = dashboard_request_context(self)
         try:
             # If there is a mutex on the workspace we will not delete it
             if state.workspaces[workspace].semaphores.has_mutex:
                 return self.send_error(412)
             del state.workspaces[workspace]
             state.flush()
-            self.set_header(name="HX-Refresh", value="true")
-            return
+            return render_workspaces_fragment(self, filters, edit)
         except KeyError:
             return self.send_error(404)
 
@@ -548,19 +603,10 @@ class WorkspacesHandler(UIBaseHandler):
 
     @tornado.web.authenticated
     def get(self):
-        try:
-            edit: str | int | bool = self.get_argument("edit", default=0)  # type: ignore
-            edit = strtobool(edit)  # type: ignore
-        except (AttributeError, ValueError):
-            edit = 0
-        return self.render(
-            "index_workspace.html",
-            workspaces=state.workspaces,
-            edit=edit,
-            auth_prompts=list(active_auth_prompts.values()),
-            auth_prompts_by_workspace=prompts_by_workspace(),
-            orphan_auth_prompts=orphan_auth_prompts(state.workspaces.keys()),
-        )
+        filters, edit = dashboard_request_context(self)
+        if self.get_query_argument("push_url", default="") == "1":
+            self.set_header(name="HX-Push-Url", value=canonical_url(filters, edit=edit))
+        return render_workspaces_fragment(self, filters, edit)
 
 
 """
@@ -630,12 +676,17 @@ def auth_login_context_from_request(handler: tornado.web.RequestHandler) -> dict
 async def notify_auth_login(login_url: str, auth_context: dict[str, str], settings: dict[str, Any]):
     """Posts an auth-login notification without interrupting the websocket flow."""
     try:
+        slack_user_mention = await slack_user_mention_for_email(
+            auth_context.get("deployment_user_email"),
+            settings.get("slack_bot_token"),
+        )
         await handle_auth_login_broadcast(
             login_url=login_url,
             auth_context=auth_context,
             webhook_url=settings.get("slack_webhook_url"),
             error_webhook_url=settings.get("slack_error_webhook_url"),
             server_url=settings["url"].geturl(),
+            slack_user_mention=slack_user_mention,
         )
     except Exception as e:
         app_log.error(f"Could not send auth login Slack notification: {e}")
@@ -865,6 +916,41 @@ class WorkspaceRemoteMutexClearApiHandler(APIBaseHandler):
             return self.send_error(404)
 
 
+# These fields decide whether a details POST should create a log event. current_host
+# and ui_group intentionally update state silently because workers POST details on
+# every host iteration, and logging each update would bury the useful event stream.
+WORKSPACE_CLIENT_DETAILS_EVENT_FIELDS = (
+    "workflow",
+    "worker_username",
+    "worker_hostname",
+    "host_pattern",
+    "worker_limit",
+    "worker_command",
+)
+
+
+def workspace_client_details_event_should_log(
+    old_details: WorkspaceDetails | None,
+    new_details: WorkspaceDetails,
+) -> bool:
+    if old_details is None:
+        return True
+    return any(
+        getattr(old_details, field) != getattr(new_details, field) for field in WORKSPACE_CLIENT_DETAILS_EVENT_FIELDS
+    )
+
+
+def workspace_client_details_event_message(workspace_details: WorkspaceDetails) -> str:
+    return (
+        "Workspace client details:"
+        f" Workflow: {workspace_details.workflow},"
+        f" Worker: {workspace_details.worker_username}@{workspace_details.worker_hostname},"
+        f" Host Pattern: {workspace_details.host_pattern},"
+        f" Limit Pattern: {workspace_details.worker_limit if workspace_details.worker_limit else '<unknown>'},"
+        f" Command: {workspace_details.worker_command}"
+    )
+
+
 class WorkspaceDetailsApiHandler(APIBaseHandler):
     """Handles getting and updating WorkspaceDetails for workspaces"""
 
@@ -888,6 +974,10 @@ class WorkspaceDetailsApiHandler(APIBaseHandler):
             app_log.error(e)
             return self.send_error(422)
 
+        existing_workspace = state.workspaces.get(workspace)
+        existing_details = existing_workspace.details if existing_workspace else None
+        log_client_details_event = workspace_client_details_event_should_log(existing_details, new_details)
+
         try:
             state.workspaces[workspace].details = new_details
         except KeyError:
@@ -896,18 +986,9 @@ class WorkspaceDetailsApiHandler(APIBaseHandler):
         state.workspaces[workspace].last_seen = datetime.now(UTC)
         state.flush()
 
-        # Log the updated details to the events table
-        workspace_details = state.workspaces[workspace].details
-        message = (
-            "Workspace client details:"
-            f" Workflow: {workspace_details.workflow},"
-            f" Worker: {workspace_details.worker_username}@{workspace_details.worker_hostname},"
-            f" Host Pattern: {workspace_details.host_pattern},"
-            f" Limit Pattern: {workspace_details.worker_limit if workspace_details.worker_limit else '<unknown>'},"
-            f" Command: {workspace_details.worker_command}"
-        )
-        event = WorkspaceEvent(severity="info", message=message)
-        internal_workspace_event(workspace, event)
+        if log_client_details_event:
+            event = WorkspaceEvent(severity="info", message=workspace_client_details_event_message(new_details))
+            internal_workspace_event(workspace, event)
 
 
 class WorkspaceHeartbeatApiHandler(APIBaseHandler):
@@ -1070,6 +1151,14 @@ def make_app(
     slack_webhook_url: str,
     url: str,
     workspace_status_json: bool,
+    develop_snapshot_path: str | None = None,
+    demo: bool = False,
+    theme_static_path: str | None = None,
+    theme_css_url: str = "",
+    theme_logo_url: str = "",
+    theme_logo_alt: str = "",
+    theme_brand_name: str = "Boardwalk",
+    jenkins_job_url: str = "",
 ) -> tornado.web.Application:
     """Builds the tornado application object"""
     handlers: list[tornado.web.OutputTransform] = []
@@ -1087,12 +1176,17 @@ def make_app(
         "slack_error_webhook_url": slack_error_webhook_url,
         "static_path": module_dir.joinpath("static"),
         "template_path": module_dir.joinpath("templates"),
+        "theme_css_url": theme_css_url,
+        "theme_logo_url": theme_logo_url,
+        "theme_logo_alt": theme_logo_alt,
+        "theme_brand_name": theme_brand_name or "Boardwalk",
         "ui_methods": {
             "secondsdelta": ui_method_secondsdelta,
             "server_version": ui_method_server_version,
             "sha256": ui_method_sha256,
             "sort_events_by_date": ui_method_sort_events_by_date,
         },
+        "jenkins_job_url": jenkins_job_url,
         "workspace_status_json": workspace_status_json,
         "url": urlparse(url),
         "websocket_ping_interval": 10,
@@ -1101,6 +1195,17 @@ def make_app(
     }
     if develop:
         settings["debug"] = True
+    # Snapshot/demo seeding is development-only fixture data. A snapshot wins over
+    # demo rows so local replay of real-shaped state is never mixed with synthetic
+    # demo workspaces.
+    if develop_snapshot_path:
+        seeded = seed_snapshot_workspaces(state, develop_snapshot_path)
+    elif demo:
+        seeded = seed_development_workspaces(state)
+    else:
+        seeded = False
+    if seeded:
+        state.flush()
 
     # Set-up authentication
     if auth_method != "anonymous":
@@ -1131,6 +1236,9 @@ def make_app(
             handlers.append((r"/auth/login", GoogleOAuth2LoginHandler))  # type: ignore
         case _:
             raise BoardwalkException(f"auth_method {auth_method} is not supported")
+
+    if theme_static_path:
+        handlers.append((r"/theme-static/(.*)", tornado.web.StaticFileHandler, {"path": theme_static_path}))  # type: ignore
 
     # Set-up all the main handlers
     handlers.extend(
@@ -1232,6 +1340,14 @@ async def run(
     slack_slash_command_prefix: str,
     url: str,
     workspace_status_json: bool,
+    develop_snapshot_path: str | None = None,
+    demo: bool = False,
+    theme_static_path: str | None = None,
+    theme_css_url: str = "",
+    theme_logo_url: str = "",
+    theme_logo_alt: str = "",
+    theme_brand_name: str = "Boardwalk",
+    jenkins_job_url: str = "",
 ) -> tuple[tornado.web.Application, list[HTTPServer]]:
     """Starts the tornado server and IO loop"""
     global state
@@ -1250,6 +1366,14 @@ async def run(
         slack_webhook_url=slack_webhook_url,
         url=url,
         workspace_status_json=workspace_status_json,
+        develop_snapshot_path=develop_snapshot_path,
+        demo=demo,
+        theme_static_path=theme_static_path,
+        theme_css_url=theme_css_url,
+        theme_logo_url=theme_logo_url,
+        theme_logo_alt=theme_logo_alt,
+        theme_brand_name=theme_brand_name,
+        jenkins_job_url=jenkins_job_url,
     )
 
     http_servers: list[HTTPServer] = []

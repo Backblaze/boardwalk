@@ -1,4 +1,6 @@
-<button class="btn btn-sm btn-outline-warning" hx-post="/workspace/{{ workspace_name }}/semaphores/caught"
-    hx-trigger="click" hx-swap="outerHTML" title="&quot;Catch&quot; the workflow before the next host">
+<button type="button" class="bw-button bw-button-catch"
+    hx-post="{{ action_url('/workspace/' + workspace_name + '/semaphores/caught', filters, edit=edit) }}"
+    hx-trigger="click" hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
+    title="Catch the workflow before the next host">
     Catch
 </button>

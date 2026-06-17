@@ -1,102 +1,248 @@
-<div class="div row">
-    <div class="col">
-        <h2>Workspaces</h2>
-    </div>
-    <div class="col text-end">
-        {% if edit %}
-        <a href="/" class="btn btn-sm btn-light border-danger" aria-current="Exit workspace edit mode"
-            title="Exit workspace edit mode">Edit</a>
-        {% else %}
-        <a href="/?edit=1" class="btn btn-sm btn-light" aria-current="Enter workspace edit mode"
-            title="Enter workspace edit mode">Edit</a>
+{% set filters = dashboard.filters %}
+<div class="bw-dashboard" hx-get="{{ partial_url(filters, edit=edit) }}" hx-trigger="every 8s"
+    hx-target="closest .bw-frame" hx-swap="innerHTML">
+    <nav class="bw-tabs" aria-label="Workspace groups">
+        {% for group in dashboard.groups %}
+        <a class="bw-tab{% if group.active %} is-active{% end %}"
+            href="{{ canonical_url(filters, edit=edit, group=group.label) # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}"
+            hx-get="{{ partial_url(filters, edit=edit, push_url=True, group=group.label) }}"
+            hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false">
+            <span>{{ group.label }}</span>
+            <span class="bw-tab-count">{{ group.count }}</span>
+        </a>
         {% end %}
-    </div>
-</div>
-{% if orphan_auth_prompts %}
-<div class="row pb-2">
-    <div class="container bg-warning-subtle border border-warning rounded">
-        <div class="row pt-2 pb-2">
-            <div class="col">
-                <h3 class="h5">Active authentication prompts</h3>
-                <table class="table table-sm mb-0">
-                    <tbody>
-                        {% for prompt in orphan_auth_prompts %}
-                        <tr title="{{ prompt.created_time }}">
-                            <td>
-                                {% if prompt.workspace %}
-                                {{ prompt.workspace }}
-                                {% else %}
-                                &lt;unknown workspace&gt;
-                                {% end %}
-                            </td>
-                            <td>
-                                {% if prompt.auth_context.get('worker_command') %}
-                                {{ prompt.auth_context.get('worker_command') }}
-                                {% else %}
-                                &lt;unknown command&gt;
-                                {% end %}
-                            </td>
-                            <td>
-                                {% if prompt.auth_context.get('worker_limit') %}
-                                {{ prompt.auth_context.get('worker_limit') }}
-                                {% else %}
-                                &lt;unknown limit&gt;
-                                {% end %}
-                            </td>
-                            <td>
-                                {% if prompt.auth_context.get('deployment_url') %}
-                                <a href="{{ prompt.auth_context.get('deployment_url') # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}">Deployment</a>
-                                {% else %}
-                                Deployment unavailable
-                                {% end %}
-                            </td>
-                            <td class="text-end">
-                                <a href="{{ prompt.login_url # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}" class="btn btn-sm btn-warning">Open login</a>
-                            </td>
-                        </tr>
-                        {% end %}
-                    </tbody>
-                </table>
-            </div>
+    </nav>
+
+    <div class="bw-filterbar">
+        <form class="bw-search-form" action="/" method="get" hx-get="/workspaces"
+            hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
+            hx-vals='{"push_url":"1"}'>
+            <input type="hidden" name="group" value="{{ filters.group }}">
+            <input type="hidden" name="status" value="{{ filters.status }}">
+            <input type="hidden" name="source" value="{{ filters.source }}">
+            <input type="hidden" name="sort" value="{{ filters.sort }}">
+            <input type="hidden" name="direction" value="{{ filters.direction }}">
+            {% if edit %}
+            <input type="hidden" name="edit" value="1">
+            {% end %}
+            <label class="bw-field bw-field-search">
+                <span>Search</span>
+                <input class="bw-input" type="search" name="search" value="{{ filters.search }}"
+                    placeholder="Workspace, host, limit, user, build">
+            </label>
+            <button type="submit" class="bw-button bw-button-primary">Search</button>
+        </form>
+
+        <form class="bw-select-form" action="/" method="get" hx-get="/workspaces"
+            hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
+            hx-vals='{"push_url":"1"}'>
+            <input type="hidden" name="group" value="{{ filters.group }}">
+            <input type="hidden" name="search" value="{{ filters.search }}">
+            <input type="hidden" name="source" value="{{ filters.source }}">
+            <input type="hidden" name="sort" value="{{ filters.sort }}">
+            <input type="hidden" name="direction" value="{{ filters.direction }}">
+            {% if edit %}
+            <input type="hidden" name="edit" value="1">
+            {% end %}
+            <label class="bw-field">
+                <span>Status</span>
+                <select class="bw-select" name="status" onchange="this.form.requestSubmit()">
+                    <option value="all" {% if filters.status == "all" %}selected{% end %}>All</option>
+                    <option value="running" {% if filters.status == "running" %}selected{% end %}>Running</option>
+                    <option value="caught" {% if filters.status == "caught" %}selected{% end %}>Caught</option>
+                    <option value="idle" {% if filters.status == "idle" %}selected{% end %}>Idle</option>
+                    <option value="stale" {% if filters.status == "stale" %}selected{% end %}>Stale</option>
+                    <option value="done" {% if filters.status == "done" %}selected{% end %}>Done</option>
+                    <option value="error" {% if filters.status == "error" %}selected{% end %}>Error</option>
+                </select>
+            </label>
+        </form>
+
+        <form class="bw-select-form" action="/" method="get" hx-get="/workspaces"
+            hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
+            hx-vals='{"push_url":"1"}'>
+            <input type="hidden" name="group" value="{{ filters.group }}">
+            <input type="hidden" name="search" value="{{ filters.search }}">
+            <input type="hidden" name="status" value="{{ filters.status }}">
+            <input type="hidden" name="sort" value="{{ filters.sort }}">
+            <input type="hidden" name="direction" value="{{ filters.direction }}">
+            {% if edit %}
+            <input type="hidden" name="edit" value="1">
+            {% end %}
+            <label class="bw-field">
+                <span>Source</span>
+                <select class="bw-select" name="source" onchange="this.form.requestSubmit()">
+                    <option value="all" {% if filters.source == "all" %}selected{% end %}>All</option>
+                    <option value="jenkins" {% if filters.source == "jenkins" %}selected{% end %}>Jenkins</option>
+                    <option value="deployment" {% if filters.source == "deployment" %}selected{% end %}>Deployment</option>
+                    <option value="local" {% if filters.source == "local" %}selected{% end %}>Local</option>
+                </select>
+            </label>
+        </form>
+
+        <div class="bw-filter-actions">
+            {% if edit %}
+            <a class="bw-button bw-button-secondary" href="{{ canonical_url(filters) # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}"
+                hx-get="{{ partial_url(filters, push_url=True) }}" hx-target="closest .bw-frame"
+                hx-swap="innerHTML" hx-push-url="false">Exit edit</a>
+            {% else %}
+            <a class="bw-button bw-button-secondary" href="{{ canonical_url(filters, edit=True) # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}"
+                hx-get="{{ partial_url(filters, edit=True, push_url=True) }}" hx-target="closest .bw-frame"
+                hx-swap="innerHTML" hx-push-url="false">Edit</a>
+            {% end %}
         </div>
     </div>
-</div>
-{% end %}
-{% for workspace_name, workspace in sorted(workspaces.items()) %}
-<div class="row pb-2">
-    <div class="container bg-light border border-dark rounded">
-        <div class="row pt-2 pb-2 border-bottom border-dark">
-            <div class="col-xxl-4 col-xl-5 col-l-12">
-                <span class="h3 workspace-title" id="{{ workspace_name }}">{{ workspace_name }}</span>
+
+    {% if orphan_auth_prompts %}
+    <section class="bw-notice">
+        <div class="bw-notice-title">Active authentication prompts</div>
+        {% for prompt in orphan_auth_prompts %}
+        <div class="bw-notice-row" title="{{ prompt.created_time }}">
+            <span>{% if prompt.workspace %}{{ prompt.workspace }}{% else %}&lt;unknown workspace&gt;{% end %}</span>
+            <span>{% if prompt.auth_context.get('worker_command') %}{{ prompt.auth_context.get('worker_command') }}{% else %}&lt;unknown command&gt;{% end %}</span>
+            <span>{% if prompt.auth_context.get('worker_limit') %}{{ prompt.auth_context.get('worker_limit') }}{% else %}&lt;unknown limit&gt;{% end %}</span>
+            {% if prompt.auth_context.get('deployment_url') %}
+            <a href="{{ prompt.auth_context.get('deployment_url') # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}">Deployment</a>
+            {% else %}
+            <span>Deployment unavailable</span>
+            {% end %}
+            <a href="{{ prompt.login_url # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}" class="bw-button bw-button-catch">Open login</a>
+        </div>
+        {% end %}
+    </section>
+    {% end %}
+
+    <div class="bw-lanes">
+        {% if not dashboard.rows %}
+        <div class="bw-empty">
+            <strong>No workspaces match these filters.</strong>
+            <span>{{ dashboard.total_count }} visible workspace{% if dashboard.total_count != 1 %}s{% end %}</span>
+        </div>
+        {% end %}
+
+        {% for lane in dashboard.lanes %}
+        <section class="bw-lane bw-lane-{{ lane.key }}">
+            <div class="bw-lane-header">
+                <h2>{{ lane.label }}</h2>
+                <span>{{ lane.count }} workspace{% if lane.count != 1 %}s{% end %}</span>
             </div>
-            <div class="col col-xxl-7 col-xl-6 col-l-6 col-sm-6 col-10">
-                <span class="h4 ms-1">
-                    {% if secondsdelta(workspace.last_seen) > 10 %}
-                    <span
-                        title="No worker connected to this workspace. Last seen {{ workspace.last_seen }} (UTC)">⚪️</span>
-                    {% else %}
-                    <span title="Worker is connected to this workspace">🟢</span>
+
+            <div class="bw-table" role="table" aria-label="{{ lane.label }} workspaces">
+                <div class="bw-head" role="row">
+                    <span class="bw-head-stack">
+                        <span class="bw-sort">
+                            <span class="bw-sort-label">Workspace</span>
+                            <a class="bw-sort-arrow{% if filters.sort == 'workspace' %} is-active{% end %}"
+                                href="{{ sort_url('/', filters, 'workspace', edit=edit) # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}"
+                                hx-get="{{ sort_url('/workspaces', filters, 'workspace', edit=edit, push_url='1') }}"
+                                hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
+                                aria-label="{% if filters.sort == 'workspace' %}Workspace sorted {{ filters.direction }}; switch sort direction{% else %}Workspace sorted by default; sort by workspace{% end %}">
+                                <span aria-hidden="true">{% if filters.sort == 'workspace' %}{% if filters.direction == 'asc' %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
+                            </a>
+                        </span>
+                        <span class="bw-sort bw-sort-subtle">
+                            <span class="bw-sort-label">Latest</span>
+                            <a class="bw-sort-arrow{% if filters.sort == 'updated' %} is-active{% end %}"
+                                href="{{ sort_url('/', filters, 'updated', edit=edit) # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}"
+                                hx-get="{{ sort_url('/workspaces', filters, 'updated', edit=edit, push_url='1') }}"
+                                hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
+                                aria-label="{% if filters.sort == 'updated' %}Latest event sorted {{ filters.direction }}; switch sort direction{% else %}Latest event sorted by default; sort by latest event{% end %}">
+                                <span aria-hidden="true">{% if filters.sort == 'updated' %}{% if filters.direction == 'asc' %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
+                            </a>
+                        </span>
+                    </span>
+                    <span>Limit</span>
+                    <span class="bw-sort">
+                        <span class="bw-sort-label">Current host</span>
+                        <a class="bw-sort-arrow{% if filters.sort == 'current_host' %} is-active{% end %}"
+                            href="{{ sort_url('/', filters, 'current_host', edit=edit) # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}"
+                            hx-get="{{ sort_url('/workspaces', filters, 'current_host', edit=edit, push_url='1') }}"
+                            hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
+                            aria-label="{% if filters.sort == 'current_host' %}Current host sorted {{ filters.direction }}; switch sort direction{% else %}Current host sorted by default; sort by current host{% end %}">
+                            <span aria-hidden="true">{% if filters.sort == 'current_host' %}{% if filters.direction == 'asc' %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
+                        </a>
+                    </span>
+                    <span class="bw-sort">
+                        <span class="bw-sort-label">Source</span>
+                        <a class="bw-sort-arrow{% if filters.sort == 'source' %} is-active{% end %}"
+                            href="{{ sort_url('/', filters, 'source', edit=edit) # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}"
+                            hx-get="{{ sort_url('/workspaces', filters, 'source', edit=edit, push_url='1') }}"
+                            hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
+                            aria-label="{% if filters.sort == 'source' %}Source sorted {{ filters.direction }}; switch sort direction{% else %}Source sorted by default; sort by source{% end %}">
+                            <span aria-hidden="true">{% if filters.sort == 'source' %}{% if filters.direction == 'asc' %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
+                        </a>
+                    </span>
+                    <span class="bw-sort">
+                        <span class="bw-sort-label">Status</span>
+                        <a class="bw-sort-arrow{% if filters.sort == 'status' %} is-active{% end %}"
+                            href="{{ sort_url('/', filters, 'status', edit=edit) # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}"
+                            hx-get="{{ sort_url('/workspaces', filters, 'status', edit=edit, push_url='1') }}"
+                            hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
+                            aria-label="{% if filters.sort == 'status' %}Status sorted {{ filters.direction }}; switch sort direction{% else %}Status sorted by default; sort by status{% end %}">
+                            <span aria-hidden="true">{% if filters.sort == 'status' %}{% if filters.direction == 'asc' %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
+                        </a>
+                    </span>
+                    <span>Actions</span>
+                </div>
+
+        {% for row in lane.rows %}
+        {% set workspace_name = row.name %}
+        {% set workspace = workspaces.get(row.name) %}
+        {% set detail_id = "workspace-details-" + sha256(row.name) %}
+        {% set workspace_key = sha256(row.name) %}
+        <div class="bw-row status-{{ row.status }}" role="row" data-workspace-row
+            data-workspace-key="{{ workspace_key }}">
+            <div class="bw-cell-main" role="cell">
+                <button type="button" class="bw-expand" data-row-toggle data-workspace-key="{{ workspace_key }}"
+                    aria-controls="{{ detail_id }}" aria-expanded="false" title="Expand {{ row.name }}">
+                    <span aria-hidden="true">›</span>
+                    <span class="bw-sr-only">Expand {{ row.name }}</span>
+                </button>
+                <div class="bw-workspace-title">
+                    <span class="bw-workspace-name" data-fit-name title="{{ row.name }}">{{ row.name }}</span>
+                    <span class="bw-latest" title="{{ row.latest_event }}">{% if row.latest_event %}{{ row.latest_event }}{% else %}No recent event{% end %}</span>
+                    {% if row.advice %}
+                    <span class="bw-advice-list">
+                        {% for advice in row.advice %}
+                        <span class="bw-advice-pill">{{ advice.name }}</span>
+                        {% end %}
+                    </span>
                     {% end %}
-                    {% if workspace.semaphores.has_mutex %}
-                    <span title="Worker has boardwalkd's server-side workspace mutex">🔒</span>
-                    {% else %}
-                    <span title="No worker has boardwalkd's server-side workspace mutex">🔓</span>
-                    {% end %}
+                </div>
+            </div>
+            <div class="bw-cell bw-mono" role="cell" data-fit-name title="{{ row.limit_pattern }}">{{ row.limit_pattern }}</div>
+            <div class="bw-cell bw-host" role="cell">
+                <span data-fit-name title="{{ row.current_host }}">{% if row.current_host %}{{ row.current_host }}{% else %}unknown{% end %}</span>
+            </div>
+            <div class="bw-source" role="cell">
+                {% if row.source_url %}
+                <a href="{{ row.source_url # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}" target="_blank" rel="noreferrer">{{ row.source_label }}</a>
+                {% else %}
+                <span class="bw-source-label">{{ row.source_label }}</span>
+                {% end %}
+                <span class="bw-source-user">{{ row.user }}</span>
+            </div>
+            <div role="cell">
+                <span class="bw-status status-{{ row.status }}">
+                    <span class="bw-status-dot" aria-hidden="true"></span>
+                    {{ row.status }}
                 </span>
             </div>
-            <div class="col-xxl-1 col-xl-1 col-l-6 col-sm-6 col-2 text-end">
-                {% if workspace.semaphores.caught %}
+            <div class="bw-actions-cell" role="cell">
+                {% if row.caught %}
                 {% include "index_workspace_release.html" %}
                 {% else %}
                 {% include "index_workspace_catch.html" %}
                 {% end %}
             </div>
         </div>
-        {% if workspace_name in auth_prompts_by_workspace %}
-        <div class="row border-bottom border-warning bg-warning-subtle">
-            <div class="col pt-2 pb-2">
-                {% for prompt in auth_prompts_by_workspace[workspace_name] %}
-                <div class="d-flex flex-wrap gap-2 align-items-center" title="{{ prompt.created_time }}">
+
+        <section id="{{ detail_id }}" class="bw-row-details status-{{ row.status }}"
+            data-workspace-key="{{ workspace_key }}" hidden>
+            {% if row.name in auth_prompts_by_workspace %}
+            <div class="bw-auth-prompts">
+                {% for prompt in auth_prompts_by_workspace[row.name] %}
+                <div class="bw-notice-row" title="{{ prompt.created_time }}">
                     <strong>Auth required</strong>
                     {% if prompt.auth_context.get('worker_command') %}
                     <span>Command: {{ prompt.auth_context.get('worker_command') }}</span>
@@ -110,129 +256,135 @@
                     {% if prompt.auth_context.get('deployment_url') %}
                     <a href="{{ prompt.auth_context.get('deployment_url') # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}">Deployment</a>
                     {% end %}
-                    <a href="{{ prompt.login_url # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}" class="btn btn-sm btn-warning">Open login</a>
+                    <a href="{{ prompt.login_url # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}" class="bw-button bw-button-catch">Open login</a>
                 </div>
                 {% end %}
             </div>
-        </div>
-        {% end %}
-        <div class="row">
-            <div class="col-xxl-4 col-xl-5">
-                <table class="table workspace-details-table">
-                    <tbody>
-                        <tr>
-                            <th scope="row">Workflow</th>
-                            <td>{{ workspace.details.workflow }}</td>
-                        </tr>
-                        <tr>
-                            <th scope="row">Worker</th>
-                            <td>{{ workspace.details.worker_username }}@{{ workspace.details.worker_hostname }}</td>
-                        </tr>
-                        <tr>
-                            <th scope="row">Host Pattern</th>
-                            <td>{{ workspace.details.host_pattern }}</td>
-                        </tr>
-                        <tr>
-                            <th scope="row" title="An additional --limit applied to this workspace's Host Pattern">
-                                <span class="context-underline">Limit Pattern</span>
-                            </th>
-                            <td>
-                                {% if not workspace.details.worker_limit %}
-                                    <span class="context-underline" title="A limit was not provided--thus equivalent to 'all'--or the worker client is old and did not send a limit">&lt;unknown&gt;</span>
-                                {% else %}
-                                    {{ workspace.details.worker_limit }}
-                                {% end %}
-                            </td>
-                        </tr>
-                        <tr>
-                            <th scope="row">Command</th>
-                            <td>{{ workspace.details.worker_command }}</td>
-                        </tr>
-                        {% if workspace.semaphores.caught %}
-                        <tr>
-                            <th scope="row" title="Request that the connected worker removes /etc/ansible/facts.d/boardwalk_state.fact from the current host">
-                                <span class="context-underline">Remote State</span>
-                            </th>
-                            <td>
-                                {% include "index_workspace_remote_state_clear.html" %}
-                            </td>
-                        </tr>
-                        <tr>
-                            <th scope="row" title="Request that the connected worker removes /opt/boardwalk.mutex from the current target host">
-                                <span class="context-underline">Host Mutex</span>
-                            </th>
-                            <td>
-                                {% include "index_workspace_remote_mutex_clear.html" %}
-                            </td>
-                        </tr>
-                        {% end %}
-                    </tbody>
-                </table>
-            </div>
-            <div class="col-xxl-8 col-xl-7 workspace-events-preview-col">
-                <div class="workspace-events-container">
-                    <table class="table table-borderless">
-                        <tbody>
-                            {% for event in sort_events_by_date(workspace.events)[:6] %}
-                            {% if event.severity == "info" %}
-                            <tr title="{{ event.create_time }}">
-                                <td>{{ event.severity }}</td>
-                                <td>{{ squeeze(event.message) }}</td>
-                            </tr>
-                            {% end %}
-                            {% if event.severity == "success" %}
-                            <tr title="{{ event.create_time }}" class="border-end border-2 border-success">
-                                <td>{{ event.severity }}</td>
-                                <td>{{ squeeze(event.message) }}</td>
-                            </tr>
-                            {% end %}
-                            {% if event.severity == "error" %}
-                            <tr title="{{ event.create_time }}" class="border-end border-2 border-danger">
-                                <td>{{ event.severity }}</td>
-                                <td>{{ squeeze(event.message) }}</td>
-                            </tr>
-                            {% end %}
-                            {% end %}
-                        </tbody>
-                    </table>
+            {% end %}
+
+            {% if row.advice %}
+            <div class="bw-advice-detail">
+                <span class="bw-detail-label">Advice</span>
+                {% for advice in row.advice %}
+                <div class="bw-advice-message">
+                    <strong>{{ advice.name }}</strong>
+                    <span>{{ advice.message }}</span>
                 </div>
-                <a href="/workspace/{{ workspace_name }}/events" class="more-events btn btn-sm btn-secondary"
-                    aria-current="More events" title="More events"
-                    style="--bs-btn-padding-y: .25rem; --bs-btn-padding-x: .5rem; --bs-btn-font-size: .75rem;">More</a>
+                {% end %}
             </div>
-        </div>
-        {% if edit %}
-        <div class="row pt-2 pb-2 border-top border-dark">
-            <div class="btn-group btn-group-sm" role="edit group" aria-label="edit button group">
-                {% if secondsdelta(workspace.last_seen) < 10 %} <button type="button" class="btn btn-danger"
-                    title="Clears boardwalkd's server-side workspace mutex. Does not remove /opt/boardwalk.mutex from target hosts. Disabled while a worker is connected."
-                    disabled>Clear workspace
-                    mutex</button>
-                    {% elif workspace.semaphores.has_mutex %}
-                    <button type="button" class="btn btn-danger"
-                        title="Clears boardwalkd's server-side workspace mutex. Does not remove /opt/boardwalk.mutex from target hosts."
-                        hx-delete="/workspace/{{ workspace_name }}/semaphores/has_mutex" hx-trigger="click"
-                        hx-confirm="Clear boardwalkd's server-side workspace mutex for &quot;{{ workspace_name }}&quot;? This does not remove /opt/boardwalk.mutex from target hosts.">Clear workspace
-                        mutex</button>
-                    {% else %}
-                    <button type="button" class="btn btn-danger"
-                        title="Clears boardwalkd's server-side workspace mutex. Does not remove /opt/boardwalk.mutex from target hosts."
-                        disabled>Clear workspace
-                        mutex</button>
+            {% end %}
+
+            <div class="bw-detail-grid">
+                <div class="bw-detail">
+                    <span class="bw-detail-label">Worker</span>
+                    <span class="bw-detail-value bw-mono">{{ row.worker }}</span>
+                </div>
+                <div class="bw-detail">
+                    <span class="bw-detail-label">Host pattern</span>
+                    <span class="bw-detail-value bw-mono">{{ row.host_pattern }}</span>
+                </div>
+                <div class="bw-detail">
+                    <span class="bw-detail-label">Workflow</span>
+                    <span class="bw-detail-value">{{ row.workflow }}</span>
+                </div>
+                <div class="bw-detail">
+                    <span class="bw-detail-label">Current host</span>
+                    <span class="bw-detail-value bw-mono">{% if row.current_host %}{{ row.current_host }}{% else %}unknown{% end %}</span>
+                </div>
+                <div class="bw-detail bw-detail-wide">
+                    <span class="bw-detail-label">Command</span>
+                    <span class="bw-detail-value bw-command">{{ row.command }}</span>
+                </div>
+            </div>
+
+            <div class="bw-events">
+                <div class="bw-events-header">
+                    <span>Recent events</span>
+                    {% if len(row.events) > 6 %}
+                    <button type="button" class="bw-events-more" data-events-toggle>
+                        Show {{ len(row.events) - 6 }} more
+                    </button>
                     {% end %}
-                    {% if workspace.semaphores.has_mutex or secondsdelta(workspace.last_seen) < 10 %} <button
-                        type="button" class="btn btn-danger" title="Deletes the workspace data from the server"
-                        disabled>Delete
-                        workspace</button>
-                        {% else %}
-                        <button type="button" class="btn btn-danger" title="Deletes the workspace data from the server"
-                            hx-post="/workspace/{{ workspace_name }}/delete" hx-trigger="click"
-                            hx-confirm="Are you sure you want to delete the workspace &quot;{{ workspace_name }}&quot; from the server?">Delete
-                            workspace</button>
-                        {% end %}
+                </div>
+                {% if row.events %}
+                {% for event in row.events[:6] %}
+                <div class="bw-event-line severity-{{ event.severity }}" title="{{ event.create_time }}">
+                    <span>{{ event.severity }}</span>
+                    <span>{{ squeeze(event.message) }}</span>
+                </div>
+                {% end %}
+                {% for event in row.events[6:] %}
+                <div class="bw-event-line severity-{{ event.severity }}" title="{{ event.create_time }}" hidden
+                    data-event-extra>
+                    <span>{{ event.severity }}</span>
+                    <span>{{ squeeze(event.message) }}</span>
+                </div>
+                {% end %}
+                {% else %}
+                <div class="bw-event-line">
+                    <span>info</span>
+                    <span>No recent events</span>
+                </div>
+                {% end %}
             </div>
-        </div>
+
+            {% if row.can_request_remote_cleanup and workspace %}
+            <div class="bw-cleanup-actions">
+                <span class="bw-detail-label">Remote cleanup</span>
+                {% include "index_workspace_remote_state_clear.html" %}
+                {% include "index_workspace_remote_mutex_clear.html" %}
+            </div>
+            {% end %}
+
+            {% if edit and workspace %}
+            {% set worker_active = row.worker_connected %}
+            <div class="bw-edit-actions">
+                <span class="bw-detail-label">Admin</span>
+                {% if worker_active %}
+                <button type="button" class="bw-button bw-button-danger" disabled
+                    title="Disabled while a worker is connected">
+                    Clear workspace mutex
+                </button>
+                {% elif workspace.semaphores.has_mutex %}
+                <button type="button" class="bw-button bw-button-danger"
+                    title="Clears boardwalkd's server-side workspace mutex. Does not remove /opt/boardwalk.mutex from target hosts."
+                    hx-delete="{{ action_url('/workspace/' + workspace_name + '/semaphores/has_mutex', filters, edit=edit) }}"
+                    hx-trigger="click" hx-target="closest .bw-frame" hx-swap="innerHTML"
+                    hx-push-url="false"
+                    hx-confirm="Clear boardwalkd's server-side workspace mutex for &quot;{{ workspace_name }}&quot;? This does not remove /opt/boardwalk.mutex from target hosts.">
+                    Clear workspace mutex
+                </button>
+                {% else %}
+                <button type="button" class="bw-button bw-button-danger" disabled
+                    title="No server-side workspace mutex is present">
+                    Clear workspace mutex
+                </button>
+                {% end %}
+
+                {% if workspace.semaphores.has_mutex or worker_active %}
+                <button type="button" class="bw-button bw-button-danger" disabled title="Deletes the workspace data from the server">
+                    Delete workspace
+                </button>
+                {% else %}
+                <button type="button" class="bw-button bw-button-danger" title="Deletes the workspace data from the server"
+                    hx-post="{{ action_url('/workspace/' + workspace_name + '/delete', filters, edit=edit) }}"
+                    hx-trigger="click" hx-target="closest .bw-frame" hx-swap="innerHTML"
+                    hx-push-url="false"
+                    hx-confirm="Are you sure you want to delete the workspace &quot;{{ workspace_name }}&quot; from the server?">
+                    Delete workspace
+                </button>
+                {% end %}
+            </div>
+            {% end %}
+        </section>
+        {% end %}
+            </div>
+        </section>
         {% end %}
     </div>
+
+    <footer class="bw-toolbar">
+        <span>{{ dashboard.total_count }} visible workspace{% if dashboard.total_count != 1 %}s{% end %}</span>
+        <span>{{ dashboard.running_count }} running · {{ dashboard.caught_count }} caught · {{ dashboard.done_count }} done · {{ dashboard.stale_count }} stale · {{ dashboard.error_count }} error</span>
+    </footer>
 </div>
-{% end %}

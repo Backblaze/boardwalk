@@ -66,6 +66,7 @@ async def handle_auth_login_broadcast(
     webhook_url: str | None,
     error_webhook_url: str | None,
     server_url: str,
+    slack_user_mention: str | None = None,
 ):
     """Posts a Slack notification when a worker is waiting for API authentication."""
     webhook_url = error_webhook_url or webhook_url
@@ -80,6 +81,9 @@ async def handle_auth_login_broadcast(
             )
         ),
     ]
+    if slack_user_mention:
+        slack_message_blocks.append(SectionBlock(text=MarkdownTextObject(text=f"*Notifying:* {slack_user_mention}")))
+
     context_fields = _auth_login_context_fields(auth_context=auth_context, server_url=server_url)
     for i in range(0, len(context_fields), 10):
         slack_message_blocks.append(SectionBlock(fields=context_fields[i : i + 10]))

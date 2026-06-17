@@ -6,7 +6,7 @@ build-backend = "poetry.core.masonry.api"
 name = "boardwalk"
 description = "Boardwalk is a linear Ansible workflow engine"
 readme = "README.md"
-version = "0.9.0"
+version = "0.9.1"
 requires-python = ">=3.11,<4"
 authors = [
     {name="Mat Hornbeek", email="84995001+m4wh6k@users.noreply.github.com"},
@@ -55,8 +55,9 @@ packages = [
 include = [
     { path = "py.typed" },
     { path = "static/*.css" },
-    { path = "static/*.js"},
-    { path = "templates/*.html"}
+    { path = "static/*.js" },
+    { path = "static/*.svg" },
+    { path = "templates/*.html" }
 ]
 
 [tool.poetry.group.dev.dependencies]

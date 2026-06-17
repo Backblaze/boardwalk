@@ -59,6 +59,7 @@ class ApiLoginMessage(ProtocolBaseModel):
 class WorkspaceDetails(ProtocolBaseModel):
     """Model for basic workspace details from workers"""
 
+    current_host: str = ""
     deployment_name: str = ""
     deployment_number: str = ""
     deployment_tag: str = ""
@@ -67,6 +68,7 @@ class WorkspaceDetails(ProtocolBaseModel):
     deployment_user_email: str = ""
     deployment_user_id: str = ""
     host_pattern: str = ""
+    ui_group: str = ""
     workflow: str = ""
     worker_command: str = ""
     worker_hostname: str = ""
@@ -93,7 +95,7 @@ class WorkspaceEvent(ProtocolBaseModel):
     create_time: datetime | None = None
     received_time: datetime | None = None
 
-    def __init__(self, **kwargs: str):
+    def __init__(self, **kwargs: str | datetime | None):
         super().__init__(**kwargs)
         if not self.create_time:
             self.create_time: datetime | None = datetime.now(UTC)
