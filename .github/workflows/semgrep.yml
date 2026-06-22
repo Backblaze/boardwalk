@@ -25,6 +25,9 @@ jobs:
     if: (github.actor != 'dependabot[bot]')
 
     steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3 - https://github.com/actions/checkout/releases/tag/v6.0.3
+
       - name: Run default job setup (Checkout, uv, python, install project)
         uses: ./.github/actions/project_setup
 
