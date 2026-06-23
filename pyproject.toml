@@ -60,7 +60,7 @@ source-include = [
 
 [dependency-groups]
 dev = [
-    "anyio >= 4.7.0, <5",
+    "anyio >= 4.14.0, < 5",
     "pyright >= 1.1.350",
     {include-group = "lint"},
     {include-group = "test"},
