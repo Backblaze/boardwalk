@@ -51,7 +51,7 @@ When you're ready to submit, see the section below, [Submitting a Pull Request](
 In addition to the python version specified in the `pyproject.toml`, you will
 need:
 
-- [Poetry](https://python-poetry.org/docs/)
+- [uv](https://docs.astral.sh/uv/)
 - `make`
 - `pip3`
 - `podman`
@@ -62,7 +62,7 @@ need:
 The [Makefile](./Makefile) has some useful targets for typical development
 operations, like formatting, building, and locally installing the module.
 
-To install the module into a Poetry virtual environment in editable mode run
+To install the module into a uv virtual environment in editable mode run
 `make develop`. This will also install extra development dependencies.
 To run the server in development mode, run `make develop-server`.
 

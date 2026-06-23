@@ -31,7 +31,7 @@ jobs:
 
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3 - https://github.com/actions/checkout/releases/tag/v6.0.3
 
       - name: Proceed to run linters
         id: linter-setup
@@ -39,18 +39,18 @@ jobs:
 
       - name: Run ansible-lint
         if: steps.linter-setup.conclusion == 'success' && !cancelled()
-        uses: ansible/ansible-lint@v25.6.1
+        uses: ansible/ansible-lint@5fac056c45595896c973fbde871f01f6cb14d74c  # v26.4.0 - https://github.com/ansible/ansible-lint/releases/tag/v26.4.0
         with:
           args: "--config-file ${{ github.workspace }}/test/ansible-lint.yaml"
           working_directory: ${{ github.workspace }}/test
 
       - name: Ruff - Linting
         if: steps.linter-setup.conclusion == 'success' && !cancelled()
-        uses: astral-sh/ruff-action@v3
+        uses: astral-sh/ruff-action@0ce1b0bf8b818ef400413f810f8a11cdbda0034b  # v4.0.0 - https://github.com/astral-sh/ruff-action/releases/tag/v4.0.0
 
       - name: Ruff - Formatting
         if: steps.linter-setup.conclusion == 'success' && !cancelled()
-        uses: astral-sh/ruff-action@v3
+        uses: astral-sh/ruff-action@0ce1b0bf8b818ef400413f810f8a11cdbda0034b  # v4.0.0 - https://github.com/astral-sh/ruff-action/releases/tag/v4.0.0
         with:
           args: "format --check"
 
@@ -60,13 +60,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ['3.13', '3.14']
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3 - https://github.com/actions/checkout/releases/tag/v6.0.3
 
-      - name: Install Poetry, setup Python, and install the Poetry project
-        uses: ./.github/actions/poetry_project_setup/
+      - name: Run default job setup (Checkout, uv, python, install project)
+        uses: ./.github/actions/project_setup
         with:
           python-version: ${{ matrix.python-version }}
       
@@ -87,10 +87,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3 - https://github.com/actions/checkout/releases/tag/v6.0.3
 
-      - name: Install Poetry, setup Python, and install the Poetry project
-        uses: ./.github/actions/poetry_project_setup
+      - name: Run default job setup (Checkout, uv, python, install project)
+        uses: ./.github/actions/project_setup
 
       - name: Ensure documentation is able to build without errors
         run: make docs

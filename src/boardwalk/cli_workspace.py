@@ -87,4 +87,4 @@ def workspace_dump():
     # because the output wouldn't be valid JSON. So we use click.echo() to simply
     # write to stderr
     click.echo(f"Using workspace: {ws.name}", err=True)
-    click.echo(ws.state.json())
+    click.echo(ws.state.model_dump_json())

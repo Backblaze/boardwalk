@@ -338,7 +338,7 @@ class Client:
             self.authenticated_request(
                 path=f"/api/workspace/{workspace_name}/details",
                 method="POST",
-                body=workspace_details.json(),
+                body=workspace_details.model_dump_json(),
             )
         except HTTPError as e:
             if e.code == 404:
@@ -404,7 +404,7 @@ class Client:
             self.authenticated_request(
                 path=path,
                 method="POST",
-                body=workspace_event.json(),
+                body=workspace_event.model_dump_json(),
                 auto_login_prompt=False,
             )
         except HTTPError as e:
