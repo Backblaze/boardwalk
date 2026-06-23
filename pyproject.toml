@@ -74,7 +74,7 @@ test = [
     "pytest >= 9.0.3, <10",
 ]
 security = [
-    "semgrep >= 1.164.0, <2",
+    "semgrep >= 1.167.0, < 2",
 ]
 docs = [
     "myst-parser[linkify] >=4.0.0, <5",
