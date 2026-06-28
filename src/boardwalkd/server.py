@@ -670,6 +670,13 @@ def auth_login_context_from_request(handler: tornado.web.RequestHandler) -> dict
         value = handler.get_query_argument(field, default="")
         if value:
             auth_context[field] = value
+    # Reject a deployment_url whose scheme is not http/https before it can be
+    # rendered into an <a href> on the dashboard, mirroring the validation that
+    # WorkspaceDetails.validate_url already applies to the worker-reported value
+    deployment_url = auth_context.get("deployment_url", "")
+    if deployment_url and urlparse(deployment_url).scheme not in ("http", "https"):
+        app_log.warning("Dropping auth-login deployment_url with disallowed URL scheme")
+        del auth_context["deployment_url"]
     return auth_context
 
 
