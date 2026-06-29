@@ -2,6 +2,7 @@
 Contains functions to handle Slack command handling
 """
 
+import asyncio
 import re
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
@@ -42,7 +43,43 @@ from boardwalkd.server import SERVER_URL, SLACK_SLASH_COMMAND_PREFIX, SLACK_TOKE
 from boardwalkd.server import state as STATE
 from boardwalkd.utils import count_of_workspaces_caught, list_active_workspaces, list_inactive_workspaces
 
+SLACK_DATA_CACHE_REFRESH_INTERVAL: float = 60 * 60 * 2  # 2 hours
+
 app = AsyncApp(token=SLACK_TOKENS.get("bot"))
+
+
+async def update_cached_slack_data(limit: int = 200, cursor: str | None = None) -> None:
+    """Asynchronously retrieves the Slack workspace's list of users, and for each user which
+    exists in `boardwalkd`'s state, updates certain data. Runs in a scheduled loop.
+
+    Relies on a match between the email in the Boardwalk state and Slack to determine a match.
+
+    :param str | None cursor: Used when retrieving the next page of paginated results"""
+    while True:
+        try:
+            logger.info("Processing cached Slack data updates...")
+            resp = await app.client.users_list(cursor=cursor, limit=limit)
+            next_cursor = resp.get("response_metadata", {}).get("next_cursor")
+            should_flush_state = False
+            for member in resp.get("members", {}):
+                if email := member.get("profile", {}).get("email"):
+                    if email in STATE.users:
+                        logger.debug(f"Updating cached Slack data for {email}")
+                        STATE.users[email].slack_cache.user_id = member.get("id")
+                        STATE.users[email].slack_cache.real_name = member.get("profile", {}).get("real_name", "Unknown")
+                        should_flush_state = True
+            if should_flush_state:
+                STATE.flush()
+            if next_cursor:
+                logger.trace("Waiting to retrieve next data page...")
+                await asyncio.sleep(10)
+                await update_cached_slack_data(cursor=next_cursor)
+        except SlackApiError as e:
+            logger.error(f"An error was encountered processing cached Slack data updates; error was {e}")
+
+        logger.trace(f"Queueing next cache update to run in {SLACK_DATA_CACHE_REFRESH_INTERVAL} seconds")
+        await asyncio.sleep(SLACK_DATA_CACHE_REFRESH_INTERVAL)
+        await update_cached_slack_data()
 
 
 async def middleware_verify_authorized_boardwalk_user(
@@ -53,7 +90,6 @@ async def middleware_verify_authorized_boardwalk_user(
     client: AsyncWebClient,
     context: AsyncBoltContext,
     next: Callable[[], Awaitable[BoltResponse]],
-    # payload: dict[str, Any],
 ):
     """Middleware for Slack app functions to verify if a given user has authenticated to Boardwalk.
 
@@ -61,10 +97,9 @@ async def middleware_verify_authorized_boardwalk_user(
     """
     slack_user_id = context.get("user_id", "")
     trigger_id = body.get("trigger_id", "")
-    slack_user_profile = await client.users_info(user=slack_user_id)
-    slack_user_email = slack_user_profile.get("user", {}).get("profile", {}).get("email")
-    if slack_user_email in STATE.users.keys():
-        context["boardwalk_user_email"] = slack_user_email
+    user = STATE.get_user_by_slack_id(slack_user_id=slack_user_id)
+    if user is not None:
+        context["boardwalk_user_email"] = user.email
         return await next()
     else:
         await ack()
@@ -75,13 +110,13 @@ async def middleware_verify_authorized_boardwalk_user(
         failure_info = {
             "attempted_action": attempted_action,
             "slack_user_id": slack_user_id,
-            "slack_user_email": slack_user_email,
         }
         if trigger_id:
             logger.warning(f"Not processing request from user due to missing authentication: {failure_info}")
             auth_fail_msg = [
-                f"Apologies, <@{slack_user_id}>, however the email associated with your Slack account -- {slack_user_email} -- does not exist within the Boardwalk's user list, and thus, are not allowed to perform that action.",
+                f"Apologies, <@{slack_user_id}>, however the email associated with your Slack account does not appear to exist within the Boardwalk's user list. Consequently, you are not allowed to perform that action.",
                 f"You will need to visit the Boardwalk Dashboard at {SERVER_URL}, and log in to authenticate.",
+                "If you believe this message was received in error, please try again in a moment.",
             ]
             modal_view = View(
                 title="Authentication Required",
@@ -611,4 +646,6 @@ async def dummy_slack_acknowledgement_handler(ack: AsyncAck):
 
 async def connect() -> None:
     handler = AsyncSocketModeHandler(app=app, app_token=SLACK_TOKENS.get("app"))
+    # Initiate scheduled cache updates
+    asyncio.create_task(update_cached_slack_data())
     await handler.connect_async()

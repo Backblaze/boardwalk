@@ -41,7 +41,7 @@ from boardwalkd.auth_prompts import (
     prompts_by_workspace,
     set_auth_prompt,
 )
-from boardwalkd.broadcast import handle_auth_login_broadcast, handle_slack_broadcast, slack_user_mention_for_email
+from boardwalkd.broadcast import handle_auth_login_broadcast, handle_slack_broadcast
 from boardwalkd.dashboard import (
     DashboardFilters,
     action_url,
@@ -676,20 +676,18 @@ def auth_login_context_from_request(handler: tornado.web.RequestHandler) -> dict
 async def notify_auth_login(login_url: str, auth_context: dict[str, str], settings: dict[str, Any]):
     """Posts an auth-login notification without interrupting the websocket flow."""
     try:
-        slack_user_mention = await slack_user_mention_for_email(
-            auth_context.get("deployment_user_email"),
-            settings.get("slack_bot_token"),
-        )
-        await handle_auth_login_broadcast(
-            login_url=login_url,
-            auth_context=auth_context,
-            webhook_url=settings.get("slack_webhook_url"),
-            error_webhook_url=settings.get("slack_error_webhook_url"),
-            server_url=settings["url"].geturl(),
-            slack_user_mention=slack_user_mention,
-        )
+        if deployment_user_email := auth_context.get("deployment_user_email", ""):
+            slack_user_mention = state.users[deployment_user_email].slack_cache.user_mention
+            await handle_auth_login_broadcast(
+                login_url=login_url,
+                auth_context=auth_context,
+                webhook_url=settings.get("slack_webhook_url"),
+                error_webhook_url=settings.get("slack_error_webhook_url"),
+                server_url=settings["url"].geturl(),
+                slack_user_mention=slack_user_mention,
+            )
     except Exception as e:
-        app_log.error(f"Could not send auth login Slack notification: {e}")
+        logger.error(f"Could not send auth login Slack notification: {e}")
 
 
 class AuthLoginApiHandler(UIBaseHandler):
@@ -1044,10 +1042,12 @@ class WorkspaceEventApiHandler(APIBaseHandler):
                 workspace_details = state.workspaces[workspace].details
                 slack_user_mention = None
                 if event.severity == "error":
-                    slack_user_mention = await slack_user_mention_for_email(
-                        workspace_details.deployment_user_email,
-                        self.settings.get("slack_bot_token"),
-                    )
+                    if workspace_details.deployment_user_email:
+                        slack_user_mention = state.users[
+                            workspace_details.deployment_user_email
+                        ].slack_cache.user_mention
+                    else:
+                        slack_user_mention = None
                 await handle_slack_broadcast(
                     event,
                     workspace,
