@@ -13,7 +13,7 @@
     <link href="{{ static_url('bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ static_url('boardwalkd.css') }}" rel="stylesheet">
     {% if theme_css_url %}
-    <link href="{{ theme_css_url # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}" rel="stylesheet">
+    <link href="{{ theme_css_url # nosemgrep: boardwalk.html-templates.security.var-in-href }}" rel="stylesheet">
     {% end %}
 
     <title>{{ theme_brand_name }} · {{ title }}</title>
@@ -34,7 +34,7 @@
     <header class="bw-topbar">
         <a href="/" class="bw-brand" aria-label="{{ theme_brand_name }}">
             {% if theme_logo_url %}
-            <img src="{{ theme_logo_url # nosemgrep: generic.html-templates.security.var-in-href.var-in-href }}" alt="{{ theme_logo_alt or theme_brand_name }}" class="bw-brand-mark">
+            <img src="{{ theme_logo_url # nosemgrep: boardwalk.html-templates.security.var-in-href }}" alt="{{ theme_logo_alt or theme_brand_name }}" class="bw-brand-mark">
             {% else %}
             <span class="bw-brand-mark bw-brand-mark-text">B</span>
             {% end %}

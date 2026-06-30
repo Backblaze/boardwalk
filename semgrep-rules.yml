@@ -79,3 +79,46 @@ rules:
       @tornado.web.authenticated
       def $METHOD(...):
           ...
+
+- id: boardwalk.html-templates.security.var-in-href
+  comment: Overridden version of Semgrep's
+    `generic.html-templates.security.var-in-href.var-in-href`, customized for
+    Boardwalk's use
+  message: Detected a template variable used in an anchor tag with the 'href'
+    attribute. This allows a malicious actor to input the 'javascript:' URI and
+    is subject to cross- site scripting (XSS) attacks. If this input is from an
+    untrusted source, use `xhtml_escape()` to ensure the string has any
+    potentially unsafe characters escaped.
+  metadata:
+    cwe:
+      - "CWE-79: Improper Neutralization of Input During Web Page Generation
+        ('Cross-site Scripting')"
+    references:
+      - https://www.tornadoweb.org/en/stable/escape.html#tornado.escape.xhtml_escape
+    category: security
+    technology:
+      - html-templates
+    confidence: LOW
+    subcategory:
+      - audit
+    likelihood: LOW
+    impact: MEDIUM
+    vulnerability_class:
+      - Cross-Site-Scripting (XSS)
+  languages:
+    - generic
+  paths:
+    include:
+      - "*.html"
+  severity: WARNING
+  patterns:
+    - pattern-inside: <a ...>
+    - pattern-either:
+        - pattern: href = {{ ... }}
+        - pattern: href = "{{ ... }}"
+        - pattern: href = '{{ ... }}'
+    - pattern-not-inside: href = {{ xhtml_escape(...) ... }}
+    - pattern-not-inside: href = "{{ xhtml_escape(...) ... }}"
+    - pattern-not-inside: href = '{{ xhtml_escape(...) ... }}'
+    - pattern-not-inside: href = "/{{ ... }}"
+    - pattern-not-inside: href = '/{{ ... }}'

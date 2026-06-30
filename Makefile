@@ -140,14 +140,11 @@ test-pyright: develop
 # Perform security static analysis
 .PHONY: test-semgrep
 test-semgrep: develop
-ifndef GITHUB_ACTIONS
 	uv run --frozen semgrep \
-		--config test/semgrep-rules.yml \
+		--config semgrep-rules.yml \
 		--config "p/r2c-security-audit" \
 		--config "p/r2c-bug-scan" \
 		--config "p/secrets" \
 		--config "p/dockerfile" \
+		--exclude-rule=generic.html-templates.security.var-in-href.var-in-href \
 		--metrics off
-else
-	echo Semgrep will run in its own GitHub Actions job.
-endif

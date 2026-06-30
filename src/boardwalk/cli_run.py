@@ -36,6 +36,7 @@ from boardwalk.host import Host, RemoteHostLocked
 from boardwalk.manifest import NoActiveWorkspace, Workspace, get_boardwalkd_url, get_ws
 from boardwalk.state import RemoteStateModel, RemoteStateWorkflow, RemoteStateWorkspace
 from boardwalk.utils import strtobool
+from boardwalkd.auth_prompts import AuthLoginPrompt
 from boardwalkd.protocol import (
     WorkspaceClient,
     WorkspaceDetails,
@@ -712,6 +713,8 @@ def bootstrap_with_server(workspace: Workspace, ctx: click.Context):
         "deployment_user_id": os.environ.get("BUILD_USER_ID"),
         "deployment_user_email": os.environ.get("BUILD_USER_EMAIL"),
     }
+    # The AuthLoginPrompt model is used to validate the deployment_url has a valid url scheme
+    _ = AuthLoginPrompt(client_id="_", login_url="_", auth_context=auth_login_context)
     boardwalkd_client.set_auth_login_context(**{key: value for key, value in auth_login_context.items() if value})
     # Check if the if the Workspace is locked. We don't want to conflict with another worker
     try:

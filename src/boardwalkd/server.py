@@ -327,7 +327,7 @@ class UserRoleHandler(AdminUIBaseHandler):
 class AnonymousLoginHandler(UIBaseHandler):
     """Handles "logging in" the UI when no auth is actually configured"""
 
-    # nosemgrep: test.boardwalk.python.security.handler-method-missing-authentication
+    # nosemgrep: boardwalk.python.security.handler-method-missing-authentication
     async def get(self):  # pyright: ignore [reportIncompatibleMethodOverride]
         # Save the user to the state if they aren't already in there
         anon_username = "anonymous@example.com"
@@ -353,7 +353,7 @@ class GoogleOAuth2LoginHandler(UIBaseHandler, tornado.auth.GoogleOAuth2Mixin):
 
     url_encryption_key = Fernet.generate_key()
 
-    # nosemgrep: test.boardwalk.python.security.handler-method-missing-authentication
+    # nosemgrep: boardwalk.python.security.handler-method-missing-authentication
     async def get(self, *args: Any, **kwargs: Any):
         try:
             # If the request is sent along with a code, then we assume the code
@@ -663,9 +663,9 @@ class AuthLoginApiWebsocketIDNotFound(Exception):
     """The auth login client socket was not found"""
 
 
-def auth_login_context_from_request(handler: tornado.web.RequestHandler) -> dict[str, str]:
+def auth_login_context_from_request(handler: tornado.web.RequestHandler) -> dict[str, str | None]:
     """Gets worker context from the auth login websocket query arguments."""
-    auth_context: dict[str, str] = {}
+    auth_context: dict[str, str | None] = {}
     for field in AUTH_LOGIN_CONTEXT_FIELDS:
         value = handler.get_query_argument(field, default="")
         if value:
@@ -673,7 +673,7 @@ def auth_login_context_from_request(handler: tornado.web.RequestHandler) -> dict
     return auth_context
 
 
-async def notify_auth_login(login_url: str, auth_context: dict[str, str], settings: dict[str, Any]):
+async def notify_auth_login(login_url: str, auth_context: dict[str, str | None], settings: dict[str, Any]):
     """Posts an auth-login notification without interrupting the websocket flow."""
     try:
         if deployment_user_email := auth_context.get("deployment_user_email", ""):
@@ -783,7 +783,7 @@ class AuthApiDenied(APIBaseHandler):
     """Dedicated handler for redirecting an unauthenticated user to an 'access
     denied' endpoint"""
 
-    # nosemgrep: test.boardwalk.python.security.handler-method-missing-authentication
+    # nosemgrep: boardwalk.python.security.handler-method-missing-authentication
     def get(self):
         return self.send_error(403)
 
@@ -791,14 +791,14 @@ class AuthApiDenied(APIBaseHandler):
 class DevelopmentClearAllWorkspaces(APIBaseHandler):
     """When run in development mode, allows clearing all workspaces"""
 
-    # nosemgrep: test.boardwalk.python.security.handler-method-missing-authentication
+    # nosemgrep: boardwalk.python.security.handler-method-missing-authentication
     def get(self):
         if self.settings.get("development_features_enabled", False):
             return self.send_error(405)
         else:
             return self.send_error(403)
 
-    # nosemgrep: test.boardwalk.python.security.handler-method-missing-authentication
+    # nosemgrep: boardwalk.python.security.handler-method-missing-authentication
     def post(self):
         if self.settings.get("development_features_enabled", False):
             ws_names = [name for name, _ in state.workspaces.items()]
@@ -817,7 +817,7 @@ class DevelopmentClearAllWorkspaces(APIBaseHandler):
 class WorkspacesStatusApiHandler(APIBaseHandler):
     """Returns an unauthenticated, read-only summary of all workspaces for monitoring integrations"""
 
-    # nosemgrep: test.boardwalk.python.security.handler-method-missing-authentication
+    # nosemgrep: boardwalk.python.security.handler-method-missing-authentication
     def get(self):
         if not self.settings.get("workspace_status_json"):
             return self.send_error(404)
@@ -1166,10 +1166,11 @@ def make_app(
         "api_access_denied_url": urljoin(url, "/api/auth/denied"),
         "auth_expire_days": auth_expire_days,
         "auth_login_slack_notify": auth_login_slack_notify,
+        "development_features_enabled": develop,
+        "jenkins_job_url": jenkins_job_url,
         "login_url": urljoin(url, "/auth/login"),
         "log_function": log_request,
         "owner": owner,
-        "development_features_enabled": develop,
         "slack_bot_token": slack_bot_token,
         "slack_error_advice_rules": slack_error_advice_rules,
         "slack_webhook_url": slack_webhook_url,
@@ -1186,10 +1187,9 @@ def make_app(
             "sha256": ui_method_sha256,
             "sort_events_by_date": ui_method_sort_events_by_date,
         },
-        "jenkins_job_url": jenkins_job_url,
-        "workspace_status_json": workspace_status_json,
         "url": urlparse(url),
         "websocket_ping_interval": 10,
+        "workspace_status_json": workspace_status_json,
         "xsrf_cookies": True,
         "xsrf_cookie_kwargs": {"samesite": "Strict", "secure": True},
     }

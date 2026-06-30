@@ -30,7 +30,7 @@ SLACK_USER_LOOKUP_TIMEOUT_SECONDS = 3.0
 SLACK_USER_MENTION_CACHE_TTL_SECONDS = 3600.0
 
 
-def _auth_login_context_fields(auth_context: dict[str, str], server_url: str) -> list[MarkdownTextObject]:
+def _auth_login_context_fields(auth_context: dict[str, str | None], server_url: str) -> list[MarkdownTextObject]:
     """Formats auth login context into Slack fields."""
     fields: list[MarkdownTextObject] = []
     for key, label in AUTH_CONTEXT_LABELS.items():
@@ -47,7 +47,7 @@ def _auth_login_context_fields(auth_context: dict[str, str], server_url: str) ->
 
 async def handle_auth_login_broadcast(
     login_url: str,
-    auth_context: dict[str, str],
+    auth_context: dict[str, str | None],
     webhook_url: str | None,
     error_webhook_url: str | None,
     server_url: str,
