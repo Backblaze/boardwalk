@@ -298,6 +298,7 @@ def serve(
     logger.remove()
     loglevel = "INFO" if verbose == 0 else "DEBUG" if verbose == 1 else "TRACE"
     logger.add(sys.stdout, level=loglevel)
+    logger.info(f"boardwalkd, version {lib_version('boardwalk')}, is now starting...")
     logger.info(f"Log level is {loglevel}")
 
     logger.warning("boardwalkd is running in development mode, which should not be used in a production environment")

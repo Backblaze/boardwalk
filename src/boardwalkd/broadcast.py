@@ -2,17 +2,11 @@
 Code for handling server broadcasts
 """
 
-import asyncio
-import time
-from dataclasses import dataclass
-
 from slack_sdk.models.blocks import (
     MarkdownTextObject,
     SectionBlock,
 )
-from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.webhook.async_client import AsyncWebhookClient
-from tornado.log import app_log
 
 from boardwalkd.protocol import WorkspaceEvent
 from boardwalkd.slack_error_advice import SlackErrorAdviceRule
@@ -36,16 +30,7 @@ SLACK_USER_LOOKUP_TIMEOUT_SECONDS = 3.0
 SLACK_USER_MENTION_CACHE_TTL_SECONDS = 3600.0
 
 
-@dataclass
-class SlackUserMentionCacheEntry:
-    mention: str
-    expires_at: float
-
-
-_slack_user_mention_cache: dict[str, SlackUserMentionCacheEntry] = {}
-
-
-def _auth_login_context_fields(auth_context: dict[str, str], server_url: str) -> list[MarkdownTextObject]:
+def _auth_login_context_fields(auth_context: dict[str, str | None], server_url: str) -> list[MarkdownTextObject]:
     """Formats auth login context into Slack fields."""
     fields: list[MarkdownTextObject] = []
     for key, label in AUTH_CONTEXT_LABELS.items():
@@ -62,7 +47,7 @@ def _auth_login_context_fields(auth_context: dict[str, str], server_url: str) ->
 
 async def handle_auth_login_broadcast(
     login_url: str,
-    auth_context: dict[str, str],
+    auth_context: dict[str, str | None],
     webhook_url: str | None,
     error_webhook_url: str | None,
     server_url: str,
@@ -145,37 +130,3 @@ async def handle_slack_broadcast(
     elif webhook_url:
         webhook_client = AsyncWebhookClient(url=webhook_url)
         await webhook_client.send(blocks=slack_message_blocks)
-
-
-async def slack_user_mention_for_email(email: str | None, slack_bot_token: str | None) -> str | None:
-    """Resolves a Slack mention for an email address using the configured bot token."""
-    if not email or not slack_bot_token or "@" not in email:
-        return None
-
-    normalized_email = email.strip().lower()
-    cached_entry = _slack_user_mention_cache.get(normalized_email)
-    if cached_entry:
-        if cached_entry.expires_at > time.monotonic():
-            return cached_entry.mention
-        del _slack_user_mention_cache[normalized_email]
-
-    client = AsyncWebClient(token=slack_bot_token)
-    try:
-        response = await asyncio.wait_for(
-            client.users_lookupByEmail(email=normalized_email),
-            timeout=SLACK_USER_LOOKUP_TIMEOUT_SECONDS,
-        )
-    except TimeoutError:
-        app_log.warning(f"Timed out resolving Slack user mention for {normalized_email}")
-        return None
-    except Exception as e:
-        app_log.warning(f"Could not resolve Slack user mention for {normalized_email}: {e}")
-        return None
-    user_id = response.get("user", {}).get("id")
-    mention = f"<@{user_id}>" if user_id else None
-    if mention:
-        _slack_user_mention_cache[normalized_email] = SlackUserMentionCacheEntry(
-            mention=mention,
-            expires_at=time.monotonic() + SLACK_USER_MENTION_CACHE_TTL_SECONDS,
-        )
-    return mention

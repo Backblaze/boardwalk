@@ -17,7 +17,8 @@ from urllib.parse import urlencode, urljoin, urlparse
 
 import click
 from loguru import logger
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ValidationInfo, field_validator
+from pydantic_core import PydanticCustomError
 from tornado.httpclient import (
     HTTPClient,
     HTTPClientError,
@@ -80,10 +81,22 @@ class WorkspaceDetails(ProtocolBaseModel):
 
     @field_validator("deployment_url")
     @classmethod
-    def validate_url(cls, url: str):
+    def validate_url(cls, url: str, values: ValidationInfo):
+        """Field validator for deployment_url"""
         valid_url_schemes: list[str] = ["http", "https"]
-        if url and urlparse(url).scheme not in valid_url_schemes:
-            raise ValueError(f"Invalid URL scheme for deployment_url; must be one of {valid_url_schemes}")
+        if url and (scheme := urlparse(url).scheme) not in valid_url_schemes:
+            logger.error(
+                f"Invalid `deployment_url` scheme received from {values.data.get('worker_username', 'unknown')}@{values.data.get('worker_hostname', 'unknown')}; expected one of {valid_url_schemes}; received: {scheme}"
+            )
+            raise PydanticCustomError(
+                "invalid_WorkspaceDetails_deployment_url_scheme",
+                "`deployment_url` failed to validate due to invalid scheme; expected one of {valid_schemes}; parsed [{invalid_scheme}]; the `deployment_url` was: `{deployment_url}`",
+                {
+                    "valid_schemes": valid_url_schemes,
+                    "invalid_scheme": scheme,
+                    "url": url,
+                },
+            )
         return url
 
 

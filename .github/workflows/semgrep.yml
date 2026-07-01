@@ -31,12 +31,5 @@ jobs:
       - name: Run default job setup (Checkout, uv, python, install project)
         uses: ./.github/actions/project_setup
 
-      # Run the "semgrep scan" command on the command line of the docker image.
-      - name: Execute semgrep scan command
-        run: >
-          uv run --frozen semgrep scan --config test/semgrep-rules.yml
-          --config "p/r2c-security-audit"
-          --config "p/r2c-bug-scan"
-          --config "p/secrets"
-          --config "p/dockerfile"
-          --metrics off
+      - name: Execute semgrep scan command using the Makefile recipe
+        run: make test-semgrep
