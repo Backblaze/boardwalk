@@ -65,12 +65,20 @@ async def execute_boardwalk_workspace_test(
 @pytest.mark.parametrize(
     ("workspace_name", "failure_expected", "failure_msg"),
     [
-        pytest.param("ShouldSucceedTestWorkspace", False, ""),
-        pytest.param("ShouldSucceedPlaybookExecutionTestWorkspace", False, ""),
-        pytest.param("UITestVeryVeryLongWorkSpaceNameWorkspace", False, ""),
+        pytest.param("ShouldSucceedTestWorkspace", False, "", id="ShouldSucceedTestWorkspace"),
+        pytest.param(
+            "ShouldSucceedPlaybookExecutionTestWorkspace", False, "", id="ShouldSucceedPlaybookExecutionTestWorkspace"
+        ),
+        pytest.param(
+            "UITestVeryVeryLongWorkSpaceNameWorkspace", False, "", id="UITestVeryVeryLongWorkSpaceNameWorkspace"
+        ),
         # Next four are from test/server-client/pylib/regression_bz_svreng_608.py
-        pytest.param("TaskJobWithOptionsShouldSucceedWorkspace", False, ""),
-        pytest.param("PlaybookJobWithOptionsShouldSucceedWorkspace", False, ""),
+        pytest.param(
+            "TaskJobWithOptionsShouldSucceedWorkspace", False, "", id="TaskJobWithOptionsShouldSucceedWorkspace"
+        ),
+        pytest.param(
+            "PlaybookJobWithOptionsShouldSucceedWorkspace", False, "", id="PlaybookJobWithOptionsShouldSucceedWorkspace"
+        ),
         pytest.param(
             "TaskJobWithPreconditionsShouldSucceedIfHostIsMacOSXWorkspace",
             False,
@@ -79,6 +87,7 @@ async def execute_boardwalk_workspace_test(
                 condition="macos" not in platform.platform().lower(),
                 reason="Workspace's preconditions depends on the host being MacOS.",
             ),
+            id="TaskJobWithPreconditionsShouldSucceedIfHostIsMacOSXWorkspace",
         ),
         # Technically this one doesn't _fail_, but this lets it fit neatly into the parameterized tests.
         pytest.param(
@@ -89,16 +98,19 @@ async def execute_boardwalk_workspace_test(
                 condition="macos" not in platform.platform().lower(),
                 reason="Workspace's preconditions depends on the host being MacOS.",
             ),
+            id="TaskJobWithPreconditionsShouldBeSkippedIfHostIsMacOSXWorkspace",
         ),
         pytest.param(
             "ShouldFailTestWorkspace",
             True,
             "Task failed successfully",
+            id="ShouldFailTestWorkspace",
         ),
         pytest.param(
             "ShouldFailPlaybookExecutionTestWorkspace",
             True,
             "Task failed successfully",
+            id="ShouldFailPlaybookExecutionTestWorkspace",
         ),
     ],
 )

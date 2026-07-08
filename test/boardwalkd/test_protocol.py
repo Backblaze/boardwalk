@@ -7,9 +7,9 @@ from boardwalkd.protocol import WorkspaceDetails
 @pytest.mark.parametrize(
     ("url"),
     [
-        pytest.param(""),
-        pytest.param("http://jenkins.example.network"),
-        pytest.param("https://jenkins.example.network"),
+        pytest.param("", id="url_empty"),
+        pytest.param("http://jenkins.example.network", id="scheme_http"),
+        pytest.param("https://jenkins.example.network", id="scheme_https"),
     ],
 )
 def test_WorkspaceDetails_accepts_deployment_url_with_valid_scheme(url: str):
@@ -21,9 +21,9 @@ def test_WorkspaceDetails_accepts_deployment_url_with_valid_scheme(url: str):
 @pytest.mark.parametrize(
     ("url"),
     [
-        pytest.param("javascript:alert(document.domain)"),
-        pytest.param("data:,Hello%2C%20World%21"),
-        pytest.param("httpx://jenkins.example.network"),
+        pytest.param("javascript:alert(document.domain)", id="scheme_javascript"),
+        pytest.param("data:,Hello%2C%20World%21", id="scheme_data"),
+        pytest.param("httpx://jenkins.example.network", id="scheme_httpx"),
     ],
 )
 def test_WorkspaceDetails_raises_when_invalid_url_scheme_provided(url: str):

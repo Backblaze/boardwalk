@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
+from pylib.dynamically_constructed_workspaces import *  # noqa: F403
 from pylib.regression_bz_svreng_609 import *  # noqa: F403
 from pylib.remote_state_set_unsuccessful_during_active_workflow import *  # noqa: F403
 
