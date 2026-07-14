@@ -70,7 +70,7 @@ dev = [
     {include-group = "test"},
 ]
 lint = [
-    "ansible-lint >= v26.4.0",
+    "ansible-lint >= v26.6.0",
     "ruff >= 0.11.13, <0.12",
 ]
 test = [
