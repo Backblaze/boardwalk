@@ -31,7 +31,7 @@ jobs:
 
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3 - https://github.com/actions/checkout/releases/tag/v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0 - https://github.com/actions/checkout/releases/tag/v7.0.0
 
       - name: Proceed to run linters
         id: linter-setup
@@ -63,7 +63,7 @@ jobs:
         python-version: ['3.13', '3.14']
     steps:
       - name: Check out repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3 - https://github.com/actions/checkout/releases/tag/v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0 - https://github.com/actions/checkout/releases/tag/v7.0.0
 
       - name: Run default job setup (Checkout, uv, python, install project)
         uses: ./.github/actions/project_setup
@@ -87,7 +87,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3 - https://github.com/actions/checkout/releases/tag/v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0 - https://github.com/actions/checkout/releases/tag/v7.0.0
 
       - name: Run default job setup (Checkout, uv, python, install project)
         uses: ./.github/actions/project_setup
