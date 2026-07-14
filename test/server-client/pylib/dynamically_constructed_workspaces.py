@@ -1,9 +1,4 @@
-from typing import TYPE_CHECKING
-
 from boardwalk import TaskJob, Workflow, Workspace, WorkspaceConfig
-
-if TYPE_CHECKING:
-    from boardwalk import AnsibleTasksType
 
 NUMBER_OF_GENERIC_WORKSPACES_TO_CREATE: int = 1
 GENERIC_WORKSPACE_DOCSTRING: str = """Example dynamically generated workspace.
@@ -26,7 +21,7 @@ class DynamicallyGeneratedWorkflowWorkflow(Workflow):
 
 
 class DynamicallyGeneratedWorkflowJob(TaskJob):
-    def tasks(self) -> AnsibleTasksType:
+    def tasks(self):
         return [{"ansible.builtin.debug": {"msg": "Hello, Boardwalk!"}}]
 
 
