@@ -1,7 +1,7 @@
 import hashlib
+import importlib.resources
 from collections import deque
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlparse
 
@@ -492,7 +492,7 @@ def test_query_url_preserves_non_default_sort_state():
 
 
 def test_index_template_uses_workspaces_url_for_hx_get():
-    loader = Loader(str(Path("src/boardwalkd/templates").resolve()))
+    loader = Loader(str(importlib.resources.files("boardwalkd").joinpath("templates")))
     template = loader.load("index.html")
     handler = SimpleNamespace(settings={})
 
@@ -514,7 +514,7 @@ def test_index_template_uses_workspaces_url_for_hx_get():
 
 
 def render_workspace_partial(dashboard, workspaces=None, edit=False):
-    loader = Loader(str(Path("src/boardwalkd/templates").resolve()))
+    loader = Loader(str(importlib.resources.files("boardwalkd").joinpath("templates")))
     template = loader.load("index_workspace.html")
     return template.generate(
         dashboard=dashboard,
@@ -796,7 +796,7 @@ def test_is_workspace_active_uses_supplied_now_for_deterministic_checks(monkeypa
 
 
 def test_base_template_renders_theme_brand_links_and_scripts():
-    loader = Loader(str(Path("src/boardwalkd/templates").resolve()))
+    loader = Loader(str(importlib.resources.files("boardwalkd").joinpath("templates")))
     template = loader.load("base.html")
     handler = SimpleNamespace(
         settings={

@@ -5,6 +5,7 @@ Boardwalkfile.py
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import warnings
@@ -348,7 +349,8 @@ class Workspace(ABC):
 
             # Get and set the state if there is one, else create one
             try:
-                self.state = LocalState.parse_file(self.path.joinpath("statefile.json"))
+                with open(self.path.joinpath("statefile.json")) as fd:
+                    self.state = LocalState.model_validate(json.load(fd))
             except FileNotFoundError:
                 self.state = LocalState(host_pattern=self.cfg.host_pattern)
                 self.flush()

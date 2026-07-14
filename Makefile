@@ -34,7 +34,7 @@ clean:
 # Installs modules in editable mode
 .PHONY: develop
 develop:
-	uv sync --frozen
+	uv sync --locked
 
 .PHONY: develop-server
 develop-server: develop
@@ -69,8 +69,7 @@ dist: clean
 # Builds the Sphinx HTML documentation -- Shortcut for `cd docs && make html`
 .PHONY: docs
 docs:
-	uv sync --frozen --group docs
-	uv run --frozen make --directory=./docs/ html
+	uv run --frozen --group docs make --directory=./docs/ html
 
 # Applies fixable errors, and formats code
 .PHONY: format
@@ -140,7 +139,7 @@ test-pyright: develop
 # Perform security static analysis
 .PHONY: test-semgrep
 test-semgrep: develop
-	uv run --frozen semgrep \
+	uvx semgrep \
 		--config semgrep-rules.yml \
 		--config "p/r2c-security-audit" \
 		--config "p/r2c-bug-scan" \

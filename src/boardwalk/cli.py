@@ -61,7 +61,7 @@ def handle_signal(sig: int, frame: Any):
     type=click.IntRange(min=0, max=5, clamp=True),
 )
 @click.pass_context
-def cli(ctx: click.Context, verbose: int):
+def cli(ctx: click.Context, verbose: int) -> None:
     """
     Boardwalk is a linear remote execution workflow engine built on top of Ansible.
     See the README.md @ https://github.com/Backblaze/boardwalk for more info
@@ -103,7 +103,7 @@ def cli(ctx: click.Context, verbose: int):
 @cli.command(
     "version",
 )
-def version():
+def version() -> None:
     """Prints the boardwalk module version number and exits"""
     click.echo(lib_version("boardwalk"))
 

@@ -1,0 +1,49 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debugger (boardwalk): `boardwalk workspace list`",
+            "type": "debugpy",
+            "request": "launch",
+            "cwd": "${workspaceFolder}/test/server-client/",
+            "program": "${workspaceFolder}/src/boardwalk/__main__.py",
+            "args": [
+                "workspace",
+                "list"
+            ],
+            "justMyCode": true,
+        },
+        {
+            "name": "Debugger (boardwalk): `boardwalk run --stomp-locks`",
+            "type": "debugpy",
+            "request": "launch",
+            "cwd": "${workspaceFolder}/test/server-client/",
+            "program": "${workspaceFolder}/src/boardwalk/__main__.py",
+            "args": [
+                "run",
+                "--stomp-locks"
+            ],
+            "justMyCode": true,
+        },
+        {
+            "name": "Debugger (boardwalk): Debug custom command",
+            "type": "debugpy",
+            "request": "launch",
+            "cwd": "${workspaceFolder}/test/server-client/",
+            "program": "${workspaceFolder}/src/boardwalk/__main__.py",
+            "args": "${input:boardwalkCustomCommand}",
+            "justMyCode": true,
+        }
+    ],
+    "inputs": [
+        {
+            "type": "promptString",
+            "id": "boardwalkCustomCommand",
+            "description": "Enter the custom boardwalk command to run",
+            "default": "version"
+        }
+    ]
+}

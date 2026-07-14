@@ -4,13 +4,37 @@ import re
 import shutil
 import tempfile
 from getpass import getpass
+from pathlib import Path
 
 import pytest
+from loguru import logger
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 
 # The default Boardwalkd url for testing via a pytest harness
 boardwalkd_standard_dev_port = 8888
 boardwalkd_url = "http://localhost:{port}"
+
+
+@pytest.fixture()
+def propagate_loguru_logs_to_pytest(request):
+    """Propagate Loguru logs to standard logging handlers used by Pytest."""
+    plugin = request.config.pluginmanager.getplugin("logging-plugin")
+
+    # Remove all existing Loguru handlers, including the default one.
+    logger.remove()
+
+    handler_ids = []
+
+    for handler in [plugin.caplog_handler, plugin.log_cli_handler, plugin.report_handler]:
+        # Note that, by default, all log levels are propagated to standard handlers.
+        # You can adjust the `level` here, modify the handler's level, or use `caplog.set_level()`.
+        handler_id = logger.add(handler, format="{message}", level=0)
+        handler_ids.append(handler_id)
+
+    yield
+
+    for handler_id in handler_ids:
+        logger.remove(handler_id)
 
 
 @pytest.fixture(scope="function")
@@ -106,7 +130,7 @@ def get_become_password_file_path():
 @pytest.fixture
 def use_isolated_boardwalk_directory(tmp_path_factory, request):
     dir = tmp_path_factory.mktemp("boardwalk")
-    test_dir = os.path.dirname(__file__)
+    test_dir = Path(os.path.dirname(__file__))
     shutil.copytree(src=os.path.join(test_dir, "server-client"), dst=dir, dirs_exist_ok=True)
     os.chdir(dir)
     return dir

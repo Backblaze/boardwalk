@@ -4,9 +4,16 @@ from boardwalk import Job, PlaybookJob, TaskJob, Workflow, WorkspaceConfig
 from boardwalk.manifest import JobTypes
 
 
-class EmptyWorkflow(Workflow):
-    def jobs(self):
-        return ()
+@pytest.fixture
+def empty_workflow_class_fixture() -> type[Workflow]:
+    """Having the EmptyWorkflow directly instantiated seems to be breaking things in strange ways;
+    it works if its defined in a fixture to return the class, so we'll use that"""
+
+    class EmptyWorkflow(Workflow):
+        def jobs(self):
+            return ()
+
+    return EmptyWorkflow
 
 
 @pytest.mark.parametrize(
@@ -54,10 +61,10 @@ def test_using_not_differentiated_Job_class_warns_about_deprecation():
         TestJob()
 
 
-def test_workspace_config_accepts_explicit_ui_group():
+def test_workspace_config_accepts_explicit_ui_group(empty_workflow_class_fixture):
     cfg = WorkspaceConfig(
         host_pattern="localhost",
-        workflow=EmptyWorkflow(),
+        workflow=empty_workflow_class_fixture(),
         ui_group="alpha",
     )
 
@@ -65,10 +72,10 @@ def test_workspace_config_accepts_explicit_ui_group():
     assert cfg.ui_group_inventory_var == ""
 
 
-def test_workspace_config_accepts_generic_inventory_var_grouping():
+def test_workspace_config_accepts_generic_inventory_var_grouping(empty_workflow_class_fixture):
     cfg = WorkspaceConfig(
         host_pattern="localhost",
-        workflow=EmptyWorkflow(),
+        workflow=empty_workflow_class_fixture(),
         ui_group_inventory_var="site_group",
     )
 
