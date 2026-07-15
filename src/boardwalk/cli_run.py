@@ -287,6 +287,8 @@ def run_workflow(
                     ctx=ctx,
                     current_host=host.name,
                     inventory_vars=inventory_vars,
+                    progress_hosts_total=str(len(hosts)),
+                    progress_hosts_completed=str(i),
                 )
             )
 
@@ -353,6 +355,19 @@ def run_workflow(
             pass
 
         i += 1
+
+        if boardwalkd_client:
+            # Update the Workspace progress
+            boardwalkd_client.post_details(
+                build_workspace_details(
+                    workspace=workspace,
+                    ctx=ctx,
+                    current_host=host.name,
+                    inventory_vars=inventory_vars,
+                    progress_hosts_total=str(len(hosts)),
+                    progress_hosts_completed=str(i),
+                )
+            )
 
 
 def run_failure_mode_handler(
@@ -666,6 +681,8 @@ def build_workspace_details(
     ctx: click.Context,
     current_host: str = "",
     inventory_vars: HostVarsType | None = None,
+    progress_hosts_completed: str = "",
+    progress_hosts_total: str = "",
 ) -> WorkspaceDetails:
     """Builds worker details posted to boardwalkd."""
     worker_limit = ctx.params.get("limit")
@@ -689,6 +706,8 @@ def build_workspace_details(
         worker_hostname=socket.gethostname(),
         worker_limit=str(worker_limit) if worker_limit else "",
         worker_username=getpass.getuser(),
+        progress_hosts_completed=progress_hosts_completed,
+        progress_hosts_total=progress_hosts_total,
     )
 
 

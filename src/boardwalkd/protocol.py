@@ -75,6 +75,8 @@ class WorkspaceDetails(ProtocolBaseModel):
     worker_hostname: str = ""
     worker_limit: str = ""
     worker_username: str = ""
+    progress_hosts_completed: str = ""
+    progress_hosts_total: str = ""
 
     def __init__(self, **kwargs: str):
         super().__init__(**kwargs)

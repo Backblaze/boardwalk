@@ -35,6 +35,10 @@
             "cwd": "${workspaceFolder}/test/server-client/",
             "program": "${workspaceFolder}/src/boardwalk/__main__.py",
             "args": "${input:boardwalkCustomCommand}",
+            "env": {
+                // Override any default environ which is True, and ensure the developer has full control (e.g., use -K or -nK)
+                "ANSIBLE_BECOME_ASK_PASS": "False"
+            },
             "justMyCode": true,
         }
     ],
