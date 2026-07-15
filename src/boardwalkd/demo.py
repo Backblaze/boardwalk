@@ -25,6 +25,8 @@ class DemoWorkspace:
     worker_hostname: str = "demo-worker-01"
     worker_limit: str = ""
     workflow: str = "DemoWorkflow"
+    progress_hosts_total: str = "1"
+    progress_hosts_completed: str = "0"
 
 
 DEMO_WORKSPACES = [
@@ -66,13 +68,35 @@ DEMO_WORKSPACES = [
         workflow="NodeUpgrade",
     ),
     DemoWorkspace(
-        name="nodes_omega_group_upgrade",
-        ui_group="omega",
+        name="host_progress_not_available",
+        ui_group="host_progress",
+        host_pattern="nodes_delta",
+        current_host="node-delta-a",
+        latest_event="Updating remote state",
+        workflow="ProgressNotAvailable",
+        progress_hosts_total="",
+        progress_hosts_completed="",
+    ),
+    DemoWorkspace(
+        name="host_progress_in_progress",
+        ui_group="host_progress",
+        host_pattern="nodes_delta",
+        current_host="node-delta-a",
+        latest_event="Updating remote state",
+        workflow="ProgressAvailable",
+        progress_hosts_total="73",
+        progress_hosts_completed="27",
+    ),
+    DemoWorkspace(
+        name="host_progress_completed",
+        ui_group="host_progress",
         host_pattern="nodes_omega",
         current_host="node-omega-a",
         latest_event="Host completed successfully; wrapping up",
         severity="success",
         workflow="NodeUpgrade",
+        progress_hosts_total="42",
+        progress_hosts_completed="42",
     ),
     DemoWorkspace(
         name="nodes_theta_group_upgrade",
@@ -215,6 +239,8 @@ def seed_development_workspaces(state: State) -> bool:
                 worker_limit=worker_limit,
                 worker_username="demo",
                 workflow=example.workflow,
+                progress_hosts_completed=example.progress_hosts_completed,
+                progress_hosts_total=example.progress_hosts_total,
             ),
             events=deque(events),
             last_seen=last_seen,

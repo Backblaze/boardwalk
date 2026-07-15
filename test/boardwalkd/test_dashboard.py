@@ -47,6 +47,8 @@ def ws(
     has_mutex=True,
     last_seen=None,
     events=None,
+    progress_hosts_completed="",
+    progress_hosts_total="",
 ):
     return WorkspaceState(
         details=WorkspaceDetails(
@@ -61,6 +63,8 @@ def ws(
             worker_limit=worker_limit,
             worker_username=worker_username,
             workflow="UpgradeWorkflow",
+            progress_hosts_completed=progress_hosts_completed,
+            progress_hosts_total=progress_hosts_total,
         ),
         events=deque(events or []),
         last_seen=last_seen,
@@ -537,7 +541,37 @@ def render_workspace_partial(dashboard, workspaces=None, edit=False):
     ).decode()
 
 
-def test_workspace_partial_renders_refreshed_rows_without_progress():
+def test_workspace_partial_renders_progress_bar_for_active_ws_when_hosts_not_reported():
+    """Deciphering the function, we currently have compatibility with older Boardwalk clients on newer servers,
+    so we want an indeterminate progress bar displayed when the worker doesn't report that data."""
+    workspaces = {
+        "workspace_alpha": ws(
+            group="alpha",
+            current_host="node-alpha-a",
+            deployment_number="50321",
+            events=[WorkspaceEvent(severity="info", message="Locking remote host")],
+            last_seen=datetime.now(tz=UTC),
+        )
+    }
+    dashboard = build_dashboard(
+        workspaces,
+        DashboardFilters(group="alpha"),
+        jenkins_job_url="https://ci.example/job/boardwalk/",
+    )
+
+    html = render_workspace_partial(dashboard, workspaces)
+
+    assert "workspace_alpha" in html
+    assert "node-alpha-a" in html
+    assert "Locking remote host" in html
+    assert "https://ci.example/job/boardwalk/50321/" in html
+    assert '<progress value="" max=""></progress>' in html
+    assert '<dfn title="the boardwalk worker did not report host completion progress">unknown</dfn>' in html.lower()
+
+
+def test_workspace_partial_renders_no_progress_bar_for_inactive_ws_when_hosts_not_reported():
+    """Deciphering the function, we currently have compatibility with older Boardwalk clients on newer servers,
+    so we want an indeterminate progress bar displayed when the worker doesn't report that data."""
     workspaces = {
         "workspace_alpha": ws(
             group="alpha",
@@ -559,8 +593,36 @@ def test_workspace_partial_renders_refreshed_rows_without_progress():
     assert "node-alpha-a" in html
     assert "Locking remote host" in html
     assert "https://ci.example/job/boardwalk/50321/" in html
-    assert "progress" not in html.lower()
-    assert "50%" not in html
+    assert '<progress value="" max=""></progress>' not in html
+    assert '<dfn title="the boardwalk worker did not report host completion progress">unknown</dfn>' in html.lower()
+
+
+def test_workspace_partial_renders_refreshed_rows_with_progress():
+    workspaces = {
+        "workspace_alpha": ws(
+            group="alpha",
+            current_host="node-alpha-a",
+            deployment_number="50321",
+            events=[WorkspaceEvent(severity="info", message="Locking remote host")],
+            progress_hosts_total="42",
+            progress_hosts_completed="21",
+        )
+    }
+    dashboard = build_dashboard(
+        workspaces,
+        DashboardFilters(group="alpha"),
+        jenkins_job_url="https://ci.example/job/boardwalk/",
+    )
+
+    html = render_workspace_partial(dashboard, workspaces)
+
+    assert 'class="bw-row status-idle"' in html
+    assert "workspace_alpha" in html
+    assert "node-alpha-a" in html
+    assert "Locking remote host" in html
+    assert "https://ci.example/job/boardwalk/50321/" in html
+    assert '<progress value="21" max="42"></progress>' in html.lower()
+    assert '<dfn title="hosts which have completed their workflow run">21 / 42</dfn>' in html.lower()
 
 
 def test_workspace_partial_renders_lanes_sort_headers_and_advice():

@@ -291,9 +291,25 @@
                     <span class="bw-detail-label">Current host</span>
                     <span class="bw-detail-value bw-mono">{% if row.current_host %}{{ row.current_host }}{% else %}unknown{% end %}</span>
                 </div>
-                <div class="bw-detail bw-detail-wide">
+                <div class="bw-detail bw-detail">
                     <span class="bw-detail-label">Command</span>
                     <span class="bw-detail-value bw-command">{{ row.command }}</span>
+                </div>
+                <div class="bw-detail bw-detail">
+                    <span class="bw-detail-label">Completed hosts</span>
+                    <span class="bw-detail-value bw-progress">
+                        <label>
+                            {% if row.progress_hosts_completed %}
+                                <progress value="{{ row.progress_hosts_completed }}" max="{{ row.progress_hosts_total }}"></progress>
+                                <dfn title="Hosts which have completed their workflow run">{{ row.progress_hosts_completed }} / {{ row.progress_hosts_total }}</dfn>
+                            {% else %}
+                                {% if row.worker_connected %}
+                                    <progress value="{{ row.progress_hosts_completed }}" max="{{ row.progress_hosts_total }}"></progress>
+                                {% end %}
+                                <dfn title="The boardwalk worker did not report host completion progress">Unknown</dfn>
+                            {% end %}
+                        </label>
+                    </span>
                 </div>
             </div>
 

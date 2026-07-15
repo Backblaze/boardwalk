@@ -206,9 +206,11 @@ def test_run_workflow_posts_current_host_details_when_each_host_starts(monkeypat
 
     assert [details.current_host for details in client.details] == [
         "node-alpha-a",
+        "node-alpha-a",
+        "node-beta-a",
         "node-beta-a",
     ]
-    assert [details.ui_group for details in client.details] == ["alpha", "beta"]
+    assert [details.ui_group for details in client.details] == ["alpha", "alpha", "beta", "beta"]
 
 
 def test_ansible_runner_run_tasks_passes_event_handler_to_ansible_runner(monkeypatch, tmp_path):

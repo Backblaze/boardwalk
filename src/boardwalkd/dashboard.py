@@ -65,6 +65,8 @@ class DashboardRow:
     has_mutex: bool
     stale: bool
     can_request_remote_cleanup: bool
+    progress_hosts_completed: str
+    progress_hosts_total: str
 
 
 @dataclass(frozen=True)
@@ -223,6 +225,8 @@ def row_for_workspace(
         has_mutex=workspace.semaphores.has_mutex,
         stale=stale,
         can_request_remote_cleanup=workspace.semaphores.caught and connected,
+        progress_hosts_completed=workspace.details.progress_hosts_completed,
+        progress_hosts_total=workspace.details.progress_hosts_total,
     )
 
 
