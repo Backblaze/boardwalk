@@ -71,6 +71,7 @@ def test_seed_development_workspaces_sorts_demo_rows_into_group_tabs():
         "delta",
         "gamma",
         "host_progress",
+        "large_volume_of_workspaces",
         "omega",
         "theta",
         "Ungrouped",

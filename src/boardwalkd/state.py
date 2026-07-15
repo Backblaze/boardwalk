@@ -4,7 +4,7 @@ state and survives service restarts
 """
 
 from collections import deque
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import click
@@ -59,7 +59,7 @@ class WorkspaceState(StateBaseModel):
     """Model for persistent server workspace data"""
 
     details: WorkspaceDetails = WorkspaceDetails()
-    last_seen: datetime | None = None  # When the worker last updated anything
+    last_seen: datetime | None = datetime.fromtimestamp(0, tz=UTC)  # When the worker last updated anything
     _max_workspace_events: int = 64
     events: deque[WorkspaceEvent] = deque([], maxlen=_max_workspace_events)
     semaphores: WorkspaceSemaphores = WorkspaceSemaphores()
