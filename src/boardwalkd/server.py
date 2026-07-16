@@ -134,6 +134,7 @@ def delete_workspaces(workspace_names: Sequence[str]) -> None:
         raise WorkspaceDeletionRejected(issues)
 
     previous_workspaces = state.workspaces.copy()
+    logger.debug(f"Processing requested deletion of {len(workspace_names)} workspace(s)")
     for name in workspace_names:
         del state.workspaces[name]
     try:
@@ -695,21 +696,11 @@ class WorkspaceMutexHandler(UIBaseHandler):
             return self.send_error(404)
 
 
-class WorkspaceDeleteHandler(UIBaseHandler):
-    """Handles delete requests for workspaces from the UI"""
-
-    @tornado.web.authenticated
-    def post(self, workspace: str):
-        filters, edit = dashboard_request_context(self)
-        try:
-            delete_workspaces([workspace])
-        except (WorkspaceDeletionRejected, WorkspaceDeletionPersistenceError) as error:
-            return render_workspace_deletion_error(self, filters, edit, error)
-        return render_workspaces_fragment(self, filters, edit)
-
-
 class WorkspaceBatchDeleteHandler(UIBaseHandler):
-    """Handles atomic batch delete requests for workspaces from the UI"""
+    """Handles atomic batch delete requests for workspaces from the UI
+
+    Can process single or multiple workspaces per request.
+    """
 
     @tornado.web.authenticated
     def post(self):
@@ -1383,7 +1374,6 @@ def make_app(
             (r"/admin", AdminHandler),
             (r"/admin/user/([\w%.]+)/enable", UserEnableHandler),
             (r"/admin/user/([\w%.]+)/roles", UserRoleHandler),
-            (r"/workspace/(\w+)/delete", WorkspaceDeleteHandler),
             (r"/workspace/(\w+)/events", WorkspaceEventsHandler),
             (r"/workspace/(\w+)/events/table", WorkspaceEventsTableHandler),
             (r"/workspace/(\w+)/remote_mutex/clear", WorkspaceRemoteMutexClearHandler),

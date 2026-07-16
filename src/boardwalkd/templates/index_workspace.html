@@ -448,7 +448,8 @@
                 </button>
                 {% else %}
                 <button type="button" class="bw-button bw-button-danger" title="Deletes the workspace data from the server"
-                    hx-post="{{ action_url('/workspace/' + workspace_name + '/delete', filters, edit=edit) }}"
+                    hx-post="{{ action_url('/workspaces/delete', filters, edit=edit) }}"
+                    hx-vals='{"workspace": ["{{ workspace_name }}"]}'
                     hx-trigger="click" hx-target="closest .bw-frame" hx-swap="innerHTML"
                     hx-push-url="false"
                     hx-confirm="Are you sure you want to delete the workspace &quot;{{ workspace_name }}&quot; from the server?">

@@ -129,7 +129,7 @@ class TestBoardwalkServer(AsyncHTTPTestCase):
             with self.subTest(name=name):
                 self.set_workspaces({name: row})
 
-                response = self.post_form(f"/workspace/{name}/delete", [])
+                response = self.post_form("/workspaces/delete", [name])
 
                 self.assert_deletion_error(response, 412, [message])
                 assert tuple(self.fake_state.workspaces) == (name,)
@@ -138,14 +138,14 @@ class TestBoardwalkServer(AsyncHTTPTestCase):
     def test_single_missing_and_success_responses_are_server_derived_fragments(self):
         self.set_workspaces({"kept": workspace()})
 
-        missing = self.post_form("/workspace/forged/delete", [])
+        missing = self.post_form("/workspaces/delete", ["forged"])
 
         self.assert_deletion_error(missing, 404, ['Workspace "forged" does not exist.'])
         assert tuple(self.fake_state.workspaces) == ("kept",)
         assert self.fake_state.flush_calls == 0
 
         self.set_workspaces({"delete_me": workspace(), "kept": workspace()})
-        deleted = self.post_form("/workspace/delete_me/delete", [])
+        deleted = self.post_form("/workspaces/delete", ["delete_me"])
 
         assert deleted.code == 200
         assert deleted.body.decode().count('class="bw-dashboard"') == 1

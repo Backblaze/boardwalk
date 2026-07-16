@@ -1016,7 +1016,8 @@ def test_workspace_partial_renders_edit_delete_actions_with_existing_guards():
 
     html = render_workspace_partial(dashboard, workspaces, edit=True)
 
-    assert 'hx-post="/workspace/deletable/delete?group=alpha&amp;edit=1"' in html
+    assert r'hx-post="/workspaces/delete' in html
+    assert r"""hx-vals='{"workspace": ["deletable"]}'""" in html
     assert 'hx-target="closest .bw-frame"' in html
     assert 'hx-delete="/workspace/mutexed/semaphores/has_mutex?group=alpha&amp;edit=1"' in html
     assert "Delete workspace" in html
