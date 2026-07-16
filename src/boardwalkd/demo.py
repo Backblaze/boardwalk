@@ -192,6 +192,20 @@ def seed_development_workspaces(state: State) -> bool:
     if state.workspaces:
         return False
 
+    # Pad out the demo workspaces to 100 for testing (e.g., some Slack objects have a max of 100 items)
+    for idx in range(100 - len(DEMO_WORKSPACES)):
+        DEMO_WORKSPACES.append(
+            DemoWorkspace(
+                name=f"testing_many_many_listed_workspaces_{str(idx).zfill(3)}",
+                ui_group="large_volume_of_workspaces",
+                host_pattern="nodes_alpha:nodes_beta:nodes_gamma",
+                current_host=f"node-{idx}",
+                latest_event="Locking remote host",
+                build="50327",
+                workflow="HugeNumberOfWorkspacesTesting",
+            )
+        )
+
     now = datetime.now(UTC)
     demo_connected_until = now + timedelta(hours=1)
     for index, example in enumerate(DEMO_WORKSPACES):

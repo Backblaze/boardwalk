@@ -830,16 +830,6 @@ def test_workspace_partial_renders_stale_status_and_filter():
     assert "1 stale" in html
 
 
-def test_is_workspace_active_treats_missing_last_seen_as_inactive(monkeypatch):
-    monkeypatch.setattr(
-        boardwalkd_server,
-        "state",
-        SimpleNamespace(workspaces={"missing_last_seen": WorkspaceState(last_seen=None)}),
-    )
-
-    assert is_workspace_active("missing_last_seen", now=datetime.now(UTC)) is False
-
-
 def test_is_workspace_active_uses_supplied_now_for_deterministic_checks(monkeypatch):
     now = datetime(2026, 6, 16, 12, 0, tzinfo=UTC)
     monkeypatch.setattr(

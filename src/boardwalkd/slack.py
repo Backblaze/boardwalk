@@ -48,6 +48,18 @@ SLACK_DATA_CACHE_REFRESH_INTERVAL: float = 60 * 60 * 2  # 2 hours
 app = AsyncApp(token=SLACK_TOKENS.get("bot"))
 
 
+def _get_option_list_for_latest_workspaces(max_items: int = 100) -> list[Option]:
+    """Returns a list of :class:`Option` items, sorted by the Workspace name
+
+    :param int max_items: How many items should be in the returned list"""
+    return [
+        Option(value=workspace, text=workspace[0:74])
+        for workspace in sorted(
+            [name for name, _ in sorted(STATE.workspaces.items(), key=lambda item: item[1].last_seen, reverse=True)]  # pyright: ignore[reportArgumentType, reportCallIssue]
+        )
+    ][0 : (max_items - 1)]
+
+
 async def update_cached_slack_data(limit: int = 200, cursor: str | None = None) -> None:
     """Asynchronously retrieves the Slack workspace's list of users, and for each user which
     exists in `boardwalkd`'s state, updates certain data. Runs in a scheduled loop.
@@ -153,11 +165,9 @@ async def catch_release_workspaces(ack: AsyncAck, body: dict[str, Any], client: 
     """
     await ack()
 
-    # Construct the list of workspaces that we need to pass to the view (maximum of 100 items)
+    # Construct the list of workspaces that we need to pass to the view (maximum of 100 items (1 for the "all" item, then 99 workspace names))
     workspaces: Sequence[Option] = [Option(value="**all_workspaces**", text="**ALL WORKSPACES**")]
-    workspaces.extend(
-        [Option(value=workspace, text=workspace[0:74]) for workspace in sorted(STATE.workspaces.keys())][0:99]
-    )
+    workspaces.extend(_get_option_list_for_latest_workspaces(max_items=99))
 
     modal_catch_release = View(
         type="modal",
@@ -192,9 +202,7 @@ async def catch_release_workspaces(ack: AsyncAck, body: dict[str, Any], client: 
                     action_id="workspaces", placeholder="Select target workspace(s)...", options=workspaces
                 ),
             ),
-            ContextBlock(
-                elements=[MarkdownTextObject(text="The displayed targets are limited to 100 items displayed in total.")]
-            ),
+            ContextBlock(elements=[MarkdownTextObject(text="Note: Targets list shows the most recent 99 workspaces.")]),
             DividerBlock(),
             SectionBlock(
                 block_id="status_block",
@@ -529,7 +537,7 @@ async def app_home_workspace_details(
                     initial_option=Option(value=_target_workspace, text=_target_workspace[0:74])
                     if _target_workspace
                     else None,
-                    options=[Option(value=name, text=name[0:74]) for name in sorted(STATE.workspaces.keys())]
+                    options=_get_option_list_for_latest_workspaces()
                     if len(STATE.workspaces) >= 1
                     else [Option(value="__NO_WORKSPACES_AVAILABLE", text="--- No workspaces ---")],
                 ),
@@ -544,7 +552,10 @@ async def app_home_workspace_details(
         ContextBlock(
             elements=[
                 MarkdownTextObject(
-                    text=f"The information shown was last refreshed at {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')} (UTC)."
+                    text="- Workspaces selectable are from the most recently seen, up to 100 workspaces"
+                ),
+                MarkdownTextObject(
+                    text=f"- The information shown was last refreshed at {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')} (UTC)."
                 ),
             ]
         ),
