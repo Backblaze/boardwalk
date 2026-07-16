@@ -3,6 +3,7 @@ import importlib.resources
 from collections import deque
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from typing import cast
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -25,6 +26,7 @@ from boardwalkd.dashboard import (
 )
 from boardwalkd.protocol import WorkspaceDetails, WorkspaceEvent, WorkspaceSemaphores
 from boardwalkd.server import (
+    UIBaseHandler,
     workspace_client_details_event_message,
     workspace_client_details_event_should_log,
 )
@@ -93,6 +95,30 @@ def test_workspace_details_defaults_new_ui_fields_to_blank_strings():
 def test_workspace_details_still_rejects_unknown_fields():
     with pytest.raises(ValidationError):
         WorkspaceDetails.model_validate({"made_up": "nope"})
+
+
+@pytest.mark.parametrize(
+    ("existing_group", "incoming_group", "expected_group"),
+    [
+        ("", "", ""),
+        ("", "ams5", "ams5"),
+        ("ams5", "", "ams5"),
+        ("ams5", "iad1", "iad1"),
+    ],
+)
+def test_merge_workspace_details_preserves_only_known_group(
+    existing_group: str,
+    incoming_group: str,
+    expected_group: str,
+):
+    existing = WorkspaceDetails(ui_group=existing_group, workflow="old")
+    incoming = WorkspaceDetails(ui_group=incoming_group, workflow="new")
+
+    merged = boardwalkd_server.merge_workspace_details(existing, incoming)
+
+    assert merged.ui_group == expected_group
+    assert merged.workflow == "new"
+    assert incoming.ui_group == incoming_group
 
 
 def test_workspace_client_details_event_logs_initial_client_details():
@@ -517,11 +543,12 @@ def test_index_template_uses_workspaces_url_for_hx_get():
     assert "every 8s" not in html
 
 
-def render_workspace_partial(dashboard, workspaces=None, edit=False):
+def render_workspace_partial(dashboard, workspaces=None, edit=False, deletion_issues=()):
     loader = Loader(str(importlib.resources.files("boardwalkd").joinpath("templates")))
     template = loader.load("index_workspace.html")
     return template.generate(
         dashboard=dashboard,
+        deletion_issues=deletion_issues,
         workspaces=workspaces or {},
         edit=edit,
         auth_prompts=[],
@@ -530,6 +557,7 @@ def render_workspace_partial(dashboard, workspaces=None, edit=False):
         jenkins_job_url="https://ci.example/job/boardwalk/",
         action_url=action_url,
         canonical_url=canonical_url,
+        event_time=lambda value: boardwalkd_server.ui_method_event_time(cast(UIBaseHandler, None), value),
         partial_url=partial_url,
         query_url=query_url,
         sort_url=sort_url,
@@ -567,6 +595,104 @@ def test_workspace_partial_renders_progress_bar_for_active_ws_when_hosts_not_rep
     assert "https://ci.example/job/boardwalk/50321/" in html
     assert '<progress value="" max=""></progress>' in html
     assert '<dfn title="the boardwalk worker did not report host completion progress">unknown</dfn>' in html.lower()
+
+
+def test_workspace_partial_renders_accessible_marked_deletion_issues():
+    dashboard = build_dashboard({}, DashboardFilters())
+
+    html = render_workspace_partial(
+        dashboard,
+        deletion_issues=(
+            'Workspace "active" has a connected worker.',
+            'Workspace "mutexed" has a server-side mutex.',
+        ),
+    )
+
+    assert 'role="alert"' in html
+    assert 'data-dashboard-error="workspace-deletion"' in html
+    assert "data-delete-result" in html
+    assert "<li>Workspace &quot;active&quot; has a connected worker.</li>" in html
+    assert "<li>Workspace &quot;mutexed&quot; has a server-side mutex.</li>" in html
+
+
+def workspace_row_markup(html: str, workspace_name: str) -> str:
+    workspace_key = hashlib.sha256(workspace_name.encode()).hexdigest()
+    key_position = html.index(f'data-workspace-key="{workspace_key}"')
+    row_start = html.rfind('<div class="bw-row', 0, key_position)
+    row_end = html.index(f'<section id="workspace-details-{workspace_key}"', key_position)
+    return html[row_start:row_end]
+
+
+def checkbox_markup(row_html: str) -> str:
+    checkbox_start = row_html.index('<input class="bw-delete-checkbox"')
+    checkbox_end = row_html.index(">", checkbox_start) + 1
+    return row_html[checkbox_start:checkbox_end]
+
+
+def test_workspace_partial_renders_bulk_delete_selection_and_row_eligibility_in_edit_mode():
+    now = datetime(2026, 7, 14, 21, 40, tzinfo=UTC)
+    workspaces = {
+        "done_workspace": ws(
+            group="alpha",
+            has_mutex=False,
+            events=[
+                WorkspaceEvent(
+                    severity="success",
+                    message="done",
+                    create_time=now - timedelta(minutes=1),
+                )
+            ],
+        ),
+        "idle_workspace": ws(group="alpha", has_mutex=False),
+        "active_workspace": ws(group="alpha", has_mutex=False, last_seen=now),
+        "mutexed_workspace": ws(group="alpha", has_mutex=True),
+    }
+    dashboard = build_dashboard(workspaces, DashboardFilters(group="alpha"), now=now)
+
+    html = render_workspace_partial(dashboard, workspaces, edit=True)
+
+    assert "data-select-visible-done" in html
+    assert "data-delete-selected" in html
+    assert "Delete selected (0)" in html
+    assert 'hx-post="/workspaces/delete?group=alpha&amp;edit=1"' in html
+    assert "data-bulk-delete-form" in html
+    assert "data-delete-result" in html
+    assert 'form="bw-bulk-delete-form"' in html
+    assert 'aria-live="polite"' in html
+
+    done_row = workspace_row_markup(html, "done_workspace")
+    done_checkbox = checkbox_markup(done_row)
+    assert 'name="workspace"' in done_checkbox
+    assert 'value="done_workspace"' in done_checkbox
+    assert 'form="bw-bulk-delete-form"' in done_checkbox
+    assert f'data-workspace-key="{hashlib.sha256(b"done_workspace").hexdigest()}"' in done_checkbox
+    assert 'data-workspace-status="done"' in done_checkbox
+    assert 'aria-label="Select done_workspace for deletion"' in done_checkbox
+    assert "disabled" not in done_checkbox
+
+    idle_checkbox = checkbox_markup(workspace_row_markup(html, "idle_workspace"))
+    assert 'data-workspace-status="idle"' in idle_checkbox
+    assert "disabled" not in idle_checkbox
+
+    active_row = workspace_row_markup(html, "active_workspace")
+    assert "disabled" in checkbox_markup(active_row)
+    assert "Connected worker prevents deletion" in active_row
+
+    mutexed_row = workspace_row_markup(html, "mutexed_workspace")
+    assert "disabled" in checkbox_markup(mutexed_row)
+    assert "Server-side mutex prevents deletion" in mutexed_row
+
+
+def test_workspace_partial_omits_bulk_delete_selection_outside_edit_mode():
+    workspaces = {"done_workspace": ws(group="alpha", has_mutex=False)}
+    dashboard = build_dashboard(workspaces, DashboardFilters(group="alpha"))
+
+    html = render_workspace_partial(dashboard, workspaces)
+
+    assert "data-bulk-delete-form" not in html
+    assert "data-select-visible-done" not in html
+    assert "data-delete-selected" not in html
+    assert "data-delete-workspace" not in html
 
 
 def test_workspace_partial_renders_no_progress_bar_for_inactive_ws_when_hosts_not_reported():
@@ -771,7 +897,7 @@ def test_workspace_partial_renders_remote_cleanup_actions_for_caught_active_work
 
 
 def test_workspace_partial_renders_extra_events_inline_without_more_events_page_link():
-    now = datetime.now(UTC)
+    now = datetime(2026, 7, 14, 21, 37, 15, tzinfo=UTC)
     workspaces = {
         "workspace_alpha": ws(
             group="alpha",
@@ -789,6 +915,87 @@ def test_workspace_partial_renders_extra_events_inline_without_more_events_page_
     assert "Show 2 more" in html
     assert 'href="/workspace/workspace_alpha/events"' not in html
     assert "data-event-extra" in html
+    extra_marker = html.index("data-event-extra")
+    extra_start = html.rfind('<div class="bw-event-line', 0, extra_marker)
+    extra_end = html.index("</div>", extra_marker)
+    extra_event_line = html[extra_start:extra_end]
+    expected_time = (
+        '<time class="bw-event-time" data-event-time datetime="2026-07-14T21:37:09+00:00" '
+        'title="Tuesday, July 14, 2026 at 21:37:09 UTC" '
+        'aria-label="Tuesday, July 14, 2026 at 21:37:09 UTC">21:37:09</time>'
+    )
+    severity = '<span class="bw-event-severity">info</span>'
+
+    assert expected_time in extra_event_line
+    assert extra_event_line.index(expected_time) < extra_event_line.index(severity) < extra_event_line.index("event 6")
+
+
+def test_workspace_partial_renders_event_timestamp_before_severity_and_message():
+    create_time = datetime(2026, 7, 14, 21, 37, 9, tzinfo=UTC)
+    workspaces = {
+        "workspace_alpha": ws(
+            group="alpha",
+            has_mutex=False,
+            events=[WorkspaceEvent(severity="info", message="timestamped event", create_time=create_time)],
+        )
+    }
+    dashboard = build_dashboard(workspaces, DashboardFilters(group="alpha"), now=create_time)
+
+    html = render_workspace_partial(dashboard, workspaces)
+    event_start = html.index('<div class="bw-event-line')
+    event_end = html.index("</div>", event_start)
+    event_line = html[event_start:event_end]
+    expected_time = (
+        '<time class="bw-event-time" data-event-time datetime="2026-07-14T21:37:09+00:00" '
+        'title="Tuesday, July 14, 2026 at 21:37:09 UTC" '
+        'aria-label="Tuesday, July 14, 2026 at 21:37:09 UTC">21:37:09</time>'
+    )
+
+    assert expected_time in event_line
+    severity = '<span class="bw-event-severity">info</span>'
+    assert event_line.index(expected_time) < event_line.index(severity) < event_line.index("timestamped event")
+
+
+def test_workspace_partial_renders_event_timestamp_fallback_for_malformed_time():
+    create_time = datetime(2026, 7, 14, 21, 37, 9, tzinfo=UTC)
+    workspaces = {
+        "workspace_alpha": ws(
+            group="alpha",
+            has_mutex=False,
+            events=[WorkspaceEvent(severity="info", message="placeholder", create_time=create_time)],
+        )
+    }
+    dashboard = build_dashboard(workspaces, DashboardFilters(group="alpha"), now=create_time)
+    row = next(row for lane in dashboard.lanes for row in lane.rows if row.name == "workspace_alpha")
+    row.events[0] = cast(
+        WorkspaceEvent,
+        SimpleNamespace(
+            severity="warning",
+            message="malformed time retained",
+            create_time=None,
+        ),
+    )
+
+    html = render_workspace_partial(dashboard, workspaces)
+    event_start = html.index('<div class="bw-event-line')
+    event_end = html.index("</div>", event_start)
+    event_line = html[event_start:event_end]
+
+    assert '<time class="bw-event-time" data-event-time>—</time>' in event_line
+    assert "malformed time retained" in event_line
+
+
+def test_workspace_partial_renders_event_timestamp_placeholder_when_no_events():
+    workspaces = {"workspace_alpha": ws(group="alpha", has_mutex=False)}
+    dashboard = build_dashboard(workspaces, DashboardFilters(group="alpha"))
+
+    html = render_workspace_partial(dashboard, workspaces)
+    event_start = html.index('<div class="bw-event-line')
+    event_end = html.index("</div>", event_start)
+    event_line = html[event_start:event_end]
+
+    assert '<time class="bw-event-time" data-event-time>—</time>' in event_line
+    assert "No recent events" in event_line
 
 
 def test_workspace_partial_preserves_filter_state_in_edit_link():
@@ -847,6 +1054,136 @@ def test_is_workspace_active_uses_supplied_now_for_deterministic_checks(monkeypa
     assert is_workspace_active("inactive", now=now) is False
 
 
+class FakeDeletionState:
+    def __init__(self, workspaces, flush_error: Exception | None = None):
+        self.workspaces = workspaces
+        self.flush_calls = 0
+        self.flush_error = flush_error
+
+    def flush(self):
+        self.flush_calls += 1
+        if self.flush_error is not None:
+            raise self.flush_error
+
+
+def deletion_workspaces():
+    now = datetime.now(UTC)
+    return {
+        "done": ws(has_mutex=False),
+        "other": ws(has_mutex=False),
+        "active": ws(has_mutex=False, last_seen=now),
+        "mutexed": ws(has_mutex=True),
+        "both": ws(has_mutex=True, last_seen=now),
+    }
+
+
+def test_validate_workspace_deletions_accepts_an_eligible_set(monkeypatch):
+    fake_state = FakeDeletionState(deletion_workspaces())
+    monkeypatch.setattr(boardwalkd_server, "state", fake_state)
+
+    issues = boardwalkd_server.validate_workspace_deletions(["done", "other"])
+
+    assert issues == ()
+
+
+def test_validate_workspace_deletions_gathers_every_issue_in_request_order(monkeypatch):
+    fake_state = FakeDeletionState(deletion_workspaces())
+    monkeypatch.setattr(boardwalkd_server, "state", fake_state)
+
+    issues = boardwalkd_server.validate_workspace_deletions(["done", "done", "missing", "active", "mutexed", "both"])
+
+    assert [(issue.workspace, issue.code, issue.message) for issue in issues] == [
+        ("done", "duplicate", 'Workspace "done" was requested more than once.'),
+        ("missing", "missing", 'Workspace "missing" does not exist.'),
+        ("active", "active", 'Workspace "active" has a connected worker.'),
+        ("mutexed", "mutex", 'Workspace "mutexed" has a server-side mutex.'),
+        ("both", "active", 'Workspace "both" has a connected worker.'),
+        ("both", "mutex", 'Workspace "both" has a server-side mutex.'),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("workspace_names", "expected_status"),
+    [
+        ([], 400),
+        (["done", "done"], 400),
+        (["missing"], 404),
+        (["done", "missing"], 404),
+        (["active", "missing"], 412),
+        (["mutexed"], 412),
+    ],
+)
+def test_workspace_deletion_status_uses_the_most_actionable_blocker(
+    monkeypatch,
+    workspace_names,
+    expected_status,
+):
+    fake_state = FakeDeletionState(deletion_workspaces())
+    monkeypatch.setattr(boardwalkd_server, "state", fake_state)
+    issues = boardwalkd_server.validate_workspace_deletions(workspace_names)
+
+    assert boardwalkd_server.workspace_deletion_status(issues) == expected_status
+
+
+@pytest.mark.parametrize(
+    ("workspace_names", "expected_status", "expected_codes"),
+    [
+        ([], 400, ["empty"]),
+        (["done", "done"], 400, ["duplicate"]),
+        (["done", "missing"], 404, ["missing"]),
+        (["done", "active"], 412, ["active"]),
+        (["done", "mutexed"], 412, ["mutex"]),
+    ],
+)
+def test_delete_workspaces_rejects_the_whole_invalid_set_before_mutation(
+    monkeypatch,
+    workspace_names,
+    expected_status,
+    expected_codes,
+):
+    fake_state = FakeDeletionState(deletion_workspaces())
+    original_items = tuple(fake_state.workspaces.items())
+    monkeypatch.setattr(boardwalkd_server, "state", fake_state)
+
+    with pytest.raises(boardwalkd_server.WorkspaceDeletionRejected) as raised:
+        boardwalkd_server.delete_workspaces(workspace_names)
+
+    assert raised.value.status_code == expected_status
+    assert [issue.code for issue in raised.value.issues] == expected_codes
+    assert tuple(fake_state.workspaces.items()) == original_items
+    assert fake_state.flush_calls == 0
+
+
+def test_delete_workspaces_deletes_the_validated_set_with_one_flush(monkeypatch):
+    fake_state = FakeDeletionState(deletion_workspaces())
+    monkeypatch.setattr(boardwalkd_server, "state", fake_state)
+
+    boardwalkd_server.delete_workspaces(["done", "other"])
+
+    assert tuple(fake_state.workspaces) == ("active", "mutexed", "both")
+    assert fake_state.flush_calls == 1
+
+
+def test_delete_workspaces_restores_exact_mapping_when_flush_fails(monkeypatch):
+    persistence_failure = OSError("disk unavailable")
+    fake_state = FakeDeletionState(deletion_workspaces(), flush_error=persistence_failure)
+    original_mapping = fake_state.workspaces
+    original_items = tuple(original_mapping.items())
+    monkeypatch.setattr(boardwalkd_server, "state", fake_state)
+
+    with pytest.raises(boardwalkd_server.WorkspaceDeletionPersistenceError) as raised:
+        boardwalkd_server.delete_workspaces(["done", "other"])
+
+    assert fake_state.workspaces is original_mapping
+    assert tuple(fake_state.workspaces.items()) == original_items
+    assert fake_state.flush_calls == 1
+    assert raised.value.deleted == ()
+    assert raised.value.failed == ("done", "other")
+    assert raised.value.durable_state_uncertain is True
+    assert raised.value.__cause__ is persistence_failure
+    assert "Durable state needs inspection" in str(raised.value)
+
+
 def test_base_template_renders_theme_brand_links_and_scripts():
     loader = Loader(str(importlib.resources.files("boardwalkd").joinpath("templates")))
     template = loader.load("base.html")
@@ -864,8 +1201,8 @@ def test_base_template_renders_theme_brand_links_and_scripts():
         handler=handler,
         static_url=lambda value: f"/static/{value}",
         server_version=lambda: "test",
-        xsrf_form_html=lambda: "",
-        _tt_modules=SimpleNamespace(xsrf_form_html=lambda: ""),
+        xsrf_form_html=lambda: "xsrf-cookie-seed",
+        _tt_modules=SimpleNamespace(xsrf_form_html=lambda: "xsrf-cookie-seed"),
     ).decode()
 
     assert html.index("/static/boardwalkd.css") < html.index("/theme-static/boardwalkd-custom.css")
@@ -881,3 +1218,7 @@ def test_base_template_renders_theme_brand_links_and_scripts():
     assert 'class="bw-theme-dark"' in html
     assert "Switch to light mode" in html
     assert "/static/boardwalkd.js" in html
+    assert "<!-- xsrf-cookie-seed -->" in html
+    htmx_xsrf_header = '<body hx-headers=\'js:{"X-XSRFToken": getCookie("_xsrf")}\'>'
+    assert htmx_xsrf_header in html
+    assert html.index("xsrf-cookie-seed") < html.index(htmx_xsrf_header)

@@ -14,11 +14,12 @@ import secrets
 import ssl
 import string
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib.metadata import version as lib_version
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import ParseResult, urljoin, urlparse
 
 import tornado.auth
@@ -67,6 +68,80 @@ SLACK_TOKENS: dict[str, str | None] = {"app": None, "bot": None}
 SLACK_SLASH_COMMAND_PREFIX: str = "brdwlk"
 SERVER_URL: str | None = None
 atexit.register(state.flush)
+
+
+@dataclass(frozen=True)
+class WorkspaceDeletionIssue:
+    workspace: str
+    code: Literal["empty", "duplicate", "missing", "active", "mutex"]
+    message: str
+
+
+def workspace_deletion_status(issues: Sequence[WorkspaceDeletionIssue]) -> int:
+    codes = {issue.code for issue in issues}
+    if codes & {"active", "mutex"}:
+        return 412
+    if "missing" in codes:
+        return 404
+    return 400
+
+
+class WorkspaceDeletionRejected(Exception):
+    def __init__(self, issues: Sequence[WorkspaceDeletionIssue]):
+        self.issues = tuple(issues)
+        self.status_code = workspace_deletion_status(self.issues)
+        super().__init__(" ".join(issue.message for issue in self.issues))
+
+
+class WorkspaceDeletionPersistenceError(Exception):
+    status_code = 500
+
+    def __init__(self, workspace_names: Sequence[str]):
+        self.deleted: tuple[str, ...] = ()
+        self.failed = tuple(workspace_names)
+        self.durable_state_uncertain = True
+        super().__init__(
+            "No workspace deletions completed in memory. Durable state needs inspection because persistence failed."
+        )
+
+
+def validate_workspace_deletions(workspace_names: Sequence[str]) -> tuple[WorkspaceDeletionIssue, ...]:
+    issues: list[WorkspaceDeletionIssue] = []
+    if not workspace_names:
+        return (WorkspaceDeletionIssue("", "empty", "Select at least one workspace to delete."),)
+    seen: set[str] = set()
+    for name in workspace_names:
+        if name in seen:
+            issues.append(
+                WorkspaceDeletionIssue(name, "duplicate", f'Workspace "{name}" was requested more than once.')
+            )
+            continue
+        seen.add(name)
+        workspace = state.workspaces.get(name)
+        if workspace is None:
+            issues.append(WorkspaceDeletionIssue(name, "missing", f'Workspace "{name}" does not exist.'))
+            continue
+        if is_workspace_active(name):
+            issues.append(WorkspaceDeletionIssue(name, "active", f'Workspace "{name}" has a connected worker.'))
+        if workspace.semaphores.has_mutex:
+            issues.append(WorkspaceDeletionIssue(name, "mutex", f'Workspace "{name}" has a server-side mutex.'))
+    return tuple(issues)
+
+
+def delete_workspaces(workspace_names: Sequence[str]) -> None:
+    issues = validate_workspace_deletions(workspace_names)
+    if issues:
+        raise WorkspaceDeletionRejected(issues)
+
+    previous_workspaces = state.workspaces.copy()
+    for name in workspace_names:
+        del state.workspaces[name]
+    try:
+        state.flush()
+    except Exception as error:
+        state.workspaces.clear()
+        state.workspaces.update(previous_workspaces)
+        raise WorkspaceDeletionPersistenceError(workspace_names) from error
 
 
 """
@@ -131,6 +206,19 @@ def ui_method_sha256(handler: UIBaseHandler, value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
 
 
+def ui_method_event_time(handler: UIBaseHandler, value: object) -> dict[str, str]:
+    if not isinstance(value, datetime):
+        return {"datetime": "", "fallback": "—", "accessible": ""}
+    normalized = value if value.tzinfo else value.replace(tzinfo=UTC)
+    timezone_name = normalized.tzname() or normalized.strftime("UTC%z")
+    accessible = f"{normalized.strftime('%A, %B %d, %Y at %H:%M:%S')} {timezone_name}"
+    return {
+        "datetime": normalized.isoformat(),
+        "fallback": normalized.strftime("%H:%M:%S"),
+        "accessible": accessible,
+    }
+
+
 def ui_method_sort_events_by_date(handler: UIBaseHandler, events: deque[WorkspaceEvent]) -> list[WorkspaceEvent]:
     """Custom UI templating method. Accepts a deque of Workspace events and
     sorts them by datetime in ascending order"""
@@ -157,7 +245,12 @@ def dashboard_request_context(handler: UIBaseHandler) -> tuple[DashboardFilters,
     return filters, bool(edit)
 
 
-def render_workspaces_fragment(handler: UIBaseHandler, filters: DashboardFilters, edit: bool):
+def render_workspaces_fragment(
+    handler: UIBaseHandler,
+    filters: DashboardFilters,
+    edit: bool,
+    deletion_issues: Sequence[str] = (),
+):
     dashboard = build_dashboard(
         state.workspaces,
         filters,
@@ -167,6 +260,7 @@ def render_workspaces_fragment(handler: UIBaseHandler, filters: DashboardFilters
     return handler.render(
         "index_workspace.html",
         dashboard=dashboard,
+        deletion_issues=tuple(deletion_issues),
         workspaces=state.workspaces,
         edit=edit,
         auth_prompts=list(active_auth_prompts.values()),
@@ -178,6 +272,26 @@ def render_workspaces_fragment(handler: UIBaseHandler, filters: DashboardFilters
         sort_url=sort_url,
         orphan_auth_prompts=orphan_auth_prompts(state.workspaces.keys()),
     )
+
+
+def render_workspace_deletion_error(
+    handler: UIBaseHandler,
+    filters: DashboardFilters,
+    edit: bool,
+    error: WorkspaceDeletionRejected | WorkspaceDeletionPersistenceError,
+):
+    if isinstance(error, WorkspaceDeletionRejected):
+        deletion_issues = tuple(issue.message for issue in error.issues)
+    else:
+        deletion_issues = (
+            "No workspace deletions completed in memory.",
+            *(f'Workspace "{workspace}" was not deleted.' for workspace in error.failed),
+            "Durable state needs inspection because persistence failed.",
+        )
+
+    handler.set_status(error.status_code)
+    handler.set_header("X-Boardwalk-Dashboard-Fragment", "deletion-error")
+    return render_workspaces_fragment(handler, filters, edit, deletion_issues)
 
 
 class AdminUIBaseHandler(UIBaseHandler):
@@ -588,14 +702,24 @@ class WorkspaceDeleteHandler(UIBaseHandler):
     def post(self, workspace: str):
         filters, edit = dashboard_request_context(self)
         try:
-            # If there is a mutex on the workspace we will not delete it
-            if state.workspaces[workspace].semaphores.has_mutex:
-                return self.send_error(412)
-            del state.workspaces[workspace]
-            state.flush()
-            return render_workspaces_fragment(self, filters, edit)
-        except KeyError:
-            return self.send_error(404)
+            delete_workspaces([workspace])
+        except (WorkspaceDeletionRejected, WorkspaceDeletionPersistenceError) as error:
+            return render_workspace_deletion_error(self, filters, edit, error)
+        return render_workspaces_fragment(self, filters, edit)
+
+
+class WorkspaceBatchDeleteHandler(UIBaseHandler):
+    """Handles atomic batch delete requests for workspaces from the UI"""
+
+    @tornado.web.authenticated
+    def post(self):
+        filters, edit = dashboard_request_context(self)
+        workspace_names = [name for name in self.get_body_arguments("workspace") if name]
+        try:
+            delete_workspaces(workspace_names)
+        except (WorkspaceDeletionRejected, WorkspaceDeletionPersistenceError) as error:
+            return render_workspace_deletion_error(self, filters, edit, error)
+        return render_workspaces_fragment(self, filters, edit)
 
 
 class WorkspacesHandler(UIBaseHandler):
@@ -949,6 +1073,15 @@ def workspace_client_details_event_message(workspace_details: WorkspaceDetails) 
     )
 
 
+def merge_workspace_details(
+    existing: WorkspaceDetails | None,
+    incoming: WorkspaceDetails,
+) -> WorkspaceDetails:
+    if incoming.ui_group or existing is None or not existing.ui_group:
+        return incoming
+    return incoming.model_copy(update={"ui_group": existing.ui_group})
+
+
 class WorkspaceDetailsApiHandler(APIBaseHandler):
     """Handles getting and updating WorkspaceDetails for workspaces"""
 
@@ -967,13 +1100,14 @@ class WorkspaceDetailsApiHandler(APIBaseHandler):
             return self.send_error(415)
 
         try:
-            new_details = WorkspaceDetails().model_validate(payload)
+            incoming_details = WorkspaceDetails().model_validate(payload)
         except ValidationError as e:
             app_log.error(e)
             return self.send_error(422)
 
         existing_workspace = state.workspaces.get(workspace)
         existing_details = existing_workspace.details if existing_workspace else None
+        new_details = merge_workspace_details(existing_details, incoming_details)
         log_client_details_event = workspace_client_details_event_should_log(existing_details, new_details)
 
         try:
@@ -1182,6 +1316,7 @@ def make_app(
         "theme_logo_alt": theme_logo_alt,
         "theme_brand_name": theme_brand_name or "Boardwalk",
         "ui_methods": {
+            "event_time": ui_method_event_time,
             "secondsdelta": ui_method_secondsdelta,
             "server_version": ui_method_server_version,
             "sha256": ui_method_sha256,
@@ -1255,6 +1390,7 @@ def make_app(
             (r"/workspace/(\w+)/remote_state/clear", WorkspaceRemoteStateClearHandler),
             (r"/workspace/(\w+)/semaphores/caught", WorkspaceCatchHandler),
             (r"/workspace/(\w+)/semaphores/has_mutex", WorkspaceMutexHandler),
+            (r"/workspaces/delete", WorkspaceBatchDeleteHandler),
             (r"/workspaces", WorkspacesHandler),
             # Routes that are gated behind the --develop flag
             (r"/develop/clear_all_workspaces", DevelopmentClearAllWorkspaces),

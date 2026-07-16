@@ -96,7 +96,11 @@ render-d2:
 
 # Runs all available tests
 .PHONY: test
-test: test-pytest test-ruff test-pyright test-semgrep test-ansible-lint
+test: test-js test-pytest test-ruff test-pyright test-semgrep test-ansible-lint
+
+.PHONY: test-js
+test-js:
+	node --test test/boardwalkd/test_boardwalkd_js.mjs
 
 .PHONY: test-ansible-lint
 test-ansible-lint:

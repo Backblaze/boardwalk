@@ -81,6 +81,35 @@
         </form>
 
         <div class="bw-filter-actions">
+            {% if edit or deletion_issues %}
+            <form id="bw-bulk-delete-form" class="bw-bulk-delete-form" aria-label="Bulk workspace deletion"
+                action="{{ action_url('/workspaces/delete', filters, edit=edit) }}" method="post"
+                {% if edit %}data-bulk-delete-form{% end %}
+                hx-post="{{ action_url('/workspaces/delete', filters, edit=edit) }}"
+                hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false">
+                {% if edit %}
+                <button type="button" class="bw-button bw-button-secondary" data-select-visible-done>
+                    Select visible done
+                </button>
+                <button type="submit" class="bw-button bw-button-danger" data-delete-selected disabled>
+                    Delete selected (<span data-delete-count>0</span>)
+                </button>
+                <span class="bw-sr-only" data-delete-count-live aria-live="polite">Delete selected (0)</span>
+                {% end %}
+                <div class="bw-delete-result{% if deletion_issues %} bw-notice{% end %}" data-delete-result
+                    {% if deletion_issues %}role="alert" aria-live="assertive"
+                    data-dashboard-error="workspace-deletion"{% else %}role="status" aria-live="polite"{% end %}>
+                    {% if deletion_issues %}
+                    <div class="bw-notice-title">Workspace deletion was not completed</div>
+                    <ul>
+                        {% for issue in deletion_issues %}
+                        <li>{{ issue }}</li>
+                        {% end %}
+                    </ul>
+                    {% end %}
+                </div>
+            </form>
+            {% end %}
             {% if edit %}
             <a class="bw-button bw-button-secondary" href="{{ canonical_url(filters) # nosemgrep: boardwalk.html-templates.security.var-in-href }}"
                 hx-get="{{ partial_url(filters, push_url=True) }}" hx-target="closest .bw-frame"
@@ -192,7 +221,29 @@
         {% set workspace_key = sha256(row.name) %}
         <div class="bw-row status-{{ row.status }}" role="row" data-workspace-row
             data-workspace-key="{{ workspace_key }}">
-            <div class="bw-cell-main" role="cell">
+            <div class="bw-cell-main{% if edit %} is-editable{% end %}" role="cell">
+                {% if edit %}
+                {% if not row.worker_connected and not workspace.semaphores.has_mutex %}
+                <input class="bw-delete-checkbox" type="checkbox" name="workspace"
+                    value="{{ row.name }}" form="bw-bulk-delete-form" data-delete-workspace
+                    data-workspace-key="{{ workspace_key }}"
+                    data-workspace-status="{{ row.status }}"
+                    aria-label="Select {{ row.name }} for deletion">
+                {% else %}
+                {% if row.worker_connected %}
+                {% set deletion_reason = "Connected worker prevents deletion" %}
+                {% else %}
+                {% set deletion_reason = "Server-side mutex prevents deletion" %}
+                {% end %}
+                <input class="bw-delete-checkbox" type="checkbox" name="workspace"
+                    value="{{ row.name }}" form="bw-bulk-delete-form" data-delete-workspace
+                    data-workspace-key="{{ workspace_key }}"
+                    data-workspace-status="{{ row.status }}"
+                    aria-label="Select {{ row.name }} for deletion" disabled
+                    title="{{ deletion_reason }}" aria-describedby="delete-reason-{{ workspace_key }}">
+                <span id="delete-reason-{{ workspace_key }}" class="bw-sr-only">{{ deletion_reason }}</span>
+                {% end %}
+                {% end %}
                 <button type="button" class="bw-expand" data-row-toggle data-workspace-key="{{ workspace_key }}"
                     aria-controls="{{ detail_id }}" aria-expanded="false" title="Expand {{ row.name }}">
                     <span aria-hidden="true">›</span>
@@ -324,21 +375,35 @@
                 </div>
                 {% if row.events %}
                 {% for event in row.events[:6] %}
-                <div class="bw-event-line severity-{{ event.severity }}" title="{{ event.create_time }}">
-                    <span>{{ event.severity }}</span>
+                {% set display_time = event_time(event.create_time) %}
+                <div class="bw-event-line severity-{{ event.severity }}"
+                    title="{{ display_time['datetime'] }}">
+                    {% if display_time['datetime'] %}
+                    <time class="bw-event-time" data-event-time datetime="{{ display_time['datetime'] }}" title="{{ display_time['accessible'] }}" aria-label="{{ display_time['accessible'] }}">{{ display_time['fallback'] }}</time>
+                    {% else %}
+                    <time class="bw-event-time" data-event-time>{{ display_time['fallback'] }}</time>
+                    {% end %}
+                    <span class="bw-event-severity">{{ event.severity }}</span>
                     <span>{{ squeeze(event.message) }}</span>
                 </div>
                 {% end %}
                 {% for event in row.events[6:] %}
-                <div class="bw-event-line severity-{{ event.severity }}" title="{{ event.create_time }}" hidden
-                    data-event-extra>
-                    <span>{{ event.severity }}</span>
+                {% set display_time = event_time(event.create_time) %}
+                <div class="bw-event-line severity-{{ event.severity }}"
+                    title="{{ display_time['datetime'] }}" hidden data-event-extra>
+                    {% if display_time['datetime'] %}
+                    <time class="bw-event-time" data-event-time datetime="{{ display_time['datetime'] }}" title="{{ display_time['accessible'] }}" aria-label="{{ display_time['accessible'] }}">{{ display_time['fallback'] }}</time>
+                    {% else %}
+                    <time class="bw-event-time" data-event-time>{{ display_time['fallback'] }}</time>
+                    {% end %}
+                    <span class="bw-event-severity">{{ event.severity }}</span>
                     <span>{{ squeeze(event.message) }}</span>
                 </div>
                 {% end %}
                 {% else %}
                 <div class="bw-event-line">
-                    <span>info</span>
+                    <time class="bw-event-time" data-event-time>—</time>
+                    <span class="bw-event-severity">info</span>
                     <span>No recent events</span>
                 </div>
                 {% end %}

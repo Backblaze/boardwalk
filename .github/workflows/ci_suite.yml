@@ -73,6 +73,9 @@ jobs:
       # If we need to add this for the replacement typechecker, uncomment this.
       # - run: poetry add ansible --no-interaction
 
+      - name: Execute JavaScript contract tests
+        run: make test-js
+
       - name: Execute Python test suite
         run: make test-pytest
 
