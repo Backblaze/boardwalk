@@ -1,10 +1,7 @@
 # Snyk (https://snyk.io) policy file, patches or ignores known vulnerabilities.
 version: v1.25.1
 # ignores vulnerabilities until expiry date; change duration by modifying expiry date
-ignore:
-  f2fdfd1c-4aaf-40d4-896e-30773bcc09e1:
-    - test/boardwalkd/test_server.py:
-        reason: 'Detection is in a test suite, and thus poses no risk of exploitation.'
-        expires: 2099-12-31T00:00:00.000Z
-        created: 2026-07-16T23:13:21.728Z
 patch: {}
+exclude:
+  global:
+    - test/boardwalkd/test_server.py
