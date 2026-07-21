@@ -684,6 +684,7 @@
             var snapshot = xhr ? refreshTransactions.get(xhr) : null;
             if (!snapshot || swapOwner(event) !== snapshot.owner) return;
             boot(event.target, true);
+            if (!snapshot.initial) restoreViewport(snapshot, event.target);
         });
         document.body.addEventListener("htmx:afterSettle", function (event) {
             var xhr = xhrForEvent(event);
@@ -694,7 +695,6 @@
             if (swapOwner(event) !== snapshot.owner) return;
             restoreDeletionSelection(event.target);
             restoreActiveControl(event.target, snapshot.activeControl);
-            if (!snapshot.initial) restoreViewport(snapshot, event.target);
         });
     }
 })();

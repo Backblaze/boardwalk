@@ -1053,6 +1053,29 @@ test("dashboard swap suppresses expansion transitions until restoration settles"
     assert.equal(frame.classList.contains("is-restoring-dashboard-state"), false);
 });
 
+test("footer-clamped expanded anchor restores before settle can paint", () => {
+    const harness = createHarness();
+    harness.sessionStorage.setItem("boardwalk.expandedWorkspace", "alpha");
+    const originalPanelTop = -80;
+    const clampedPanelTop = 188;
+    const oldAlpha = workspace("alpha", {expanded: true, panelTop: originalPanelTop});
+    const {frame} = dashboardFixture(harness, [oldAlpha]);
+    const newAlpha = workspace("alpha", {panelTop: clampedPanelTop});
+    const replacement = harness.document.adopt(new FakeElement("div", {classes: ["bw-dashboard"]}));
+    replacement.append(newAlpha.row, newAlpha.panel);
+    const beforeSwap = htmxSwap(frame);
+
+    harness.document.body.dispatch("htmx:beforeSwap", beforeSwap);
+    frame.replaceChildren(replacement);
+    harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
+
+    assert.equal(newAlpha.panel.hidden, false);
+    assert.deepEqual(harness.window.scrollByCalls, [[0, clampedPanelTop - originalPanelTop]]);
+
+    harness.document.body.dispatch("htmx:afterSettle", htmxAfter(frame, beforeSwap.detail.xhr));
+    assert.deepEqual(harness.window.scrollByCalls, [[0, clampedPanelTop - originalPanelTop]]);
+});
+
 test("initial empty frame load binds controls and restores expansion before settle", () => {
     const harness = createHarness();
     harness.sessionStorage.setItem("boardwalk.expandedWorkspace", "alpha");
