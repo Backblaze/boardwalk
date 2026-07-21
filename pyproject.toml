@@ -117,3 +117,9 @@ reportImportCycles = false
 reportMissingTypeStubs = false
 # Use basic type-checking for now, until strict type checking can be fixed again
 typeCheckingMode = "basic"
+
+# -- pytest configuration -----------------------------------------------------
+[tool.pytest]
+markers = [
+    "integration: mark a test as an integration test",
+]

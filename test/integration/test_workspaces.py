@@ -15,7 +15,7 @@ async def execute_boardwalk_workspace_test(
     workspace_name: str,
     failure_expected: bool,
     failure_msg: str,
-    get_become_password_file_path: Path,
+    get_become_password_file_path: Path | None,
     use_isolated_boardwalk_directory,
 ):
     # API_LOGIN_URI_REGEX = re.compile(r"http://localhost:\d{1,5}/api/auth/login\?id=[a-z0-9]{16}")
@@ -23,10 +23,12 @@ async def execute_boardwalk_workspace_test(
         rf"The {workspace_name} workspace is remotely caught on .+ Waiting for release before continuing"
     )
     envvars: dict[str, Any] = {
-        "ANSIBLE_BECOME_PASSWORD_FILE": get_become_password_file_path,
+        # "ANSIBLE_BECOME_PASSWORD_FILE": get_become_password_file_path,
         # "BOARDWALK_RUN_OPEN_BROWSER_FOR_API_LOGIN": "False",
         "BOARDWALK_VERBOSITY": "2",
     }
+    if "CI" not in os.environ:
+        envvars["ANSIBLE_BECOME_PASSWORD_FILE"] = get_become_password_file_path
     new_environ = os.environ | envvars
     new_environ.pop("ANSIBLE_BECOME_ASK_PASS", None)
     commands: tuple[str, ...] = (
@@ -61,7 +63,6 @@ async def execute_boardwalk_workspace_test(
 
 
 @pytest.mark.anyio
-@pytest.mark.skipif(condition="CI" in os.environ, reason="Not yet able to execute non-interactively.")
 @pytest.mark.parametrize(
     ("workspace_name", "failure_expected", "failure_msg"),
     [
@@ -115,6 +116,7 @@ async def execute_boardwalk_workspace_test(
     ],
 )
 @pytest.mark.usefixtures("spawn_boardwalkd_server_and_maybe_clear_workspaces")
+@pytest.mark.integration
 async def test_development_workspaces(
     workspace_name: str,
     failure_expected: bool,
@@ -133,7 +135,7 @@ async def test_development_workspaces(
 
 @pytest.mark.anyio
 @pytest.mark.usefixtures("spawn_boardwalkd_server_and_maybe_clear_workspaces")
-@pytest.mark.skipif(condition="CI" in os.environ, reason="Not yet able to execute non-interactively.")
+@pytest.mark.integration
 async def test_ensure_remote_workflow_success_state_false_during_workflow_execution(
     get_become_password_file_path: Path,
     use_isolated_boardwalk_directory,

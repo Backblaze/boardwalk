@@ -98,18 +98,22 @@ render-d2:
 .PHONY: test
 test: test-pytest test-ruff test-pyright test-semgrep test-ansible-lint
 
+# Skips integration tests
+.PHONY: test-quick
+test-quick: test-pytest-quick test-ruff test-pyright test-semgrep test-ansible-lint
+
 .PHONY: test-ansible-lint
 test-ansible-lint:
 	uvx --directory test ansible-lint --config-file ansible-lint.yaml z.dummy_playbook_for_ansible_lint.yml server-client/playbooks/
 
-# Run pytest verbosely if we're running manually, but normally if we're in a CI environment.
+# Run tests with --verbose, so we can list the tests run as the test goes
 .PHONY: test-pytest
 test-pytest: develop
-ifndef CI
-	uv run --frozen pytest  --verbose
-else
-	uv run --frozen pytest
-endif
+	uv run --frozen pytest --verbose
+
+.PHONY: test-pytest-quick
+test-pytest-quick: develop
+	uv run --frozen pytest --verbose -m "not integration"
 
 # Same as `test-pytest`, but does not clear the boardwalkd server state between
 # test runs (so the workspace state can be inspected after execution)

@@ -58,6 +58,9 @@ jobs:
     name: Boardwalk Test Suite
     needs: workflow_entrypoint
     runs-on: ubuntu-latest
+    # Locally, the pytest phase with integration takes ~8 minutes or so 60
+    # should be more than overkill (down from default 360)
+    timeout-minutes: 60
     strategy:
       matrix:
         python-version: ['3.13', '3.14']
@@ -70,8 +73,22 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       
-      # If we need to add this for the replacement typechecker, uncomment this.
-      # - run: poetry add ansible --no-interaction
+      - name: Configure the runner to allow it to ssh to itself
+        run: |
+          # 1. Create an SSH directory if it doesn't exist
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          # 2. Generate a new ed25519 keypair with no passphrase
+          ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519
+
+          # 3. Add the public key to the authorized_keys file
+          cat ~/.ssh/id_ed25519.pub >> ~/.ssh/authorized_keys
+          chmod 600 ~/.ssh/authorized_keys
+
+          # 4. Add localhost to known_hosts to prevent the StrictHostKeyChecking prompt
+          ssh-keyscan -H 127.0.0.1 >> ~/.ssh/known_hosts
+          ssh-keyscan -H localhost >> ~/.ssh/known_hosts
 
       - name: Execute Python test suite
         run: make test-pytest

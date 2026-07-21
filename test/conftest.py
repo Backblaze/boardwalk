@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 import tempfile
+from collections.abc import Iterator
 from getpass import getpass
 from pathlib import Path
 
@@ -115,16 +116,20 @@ async def spawn_boardwalkd_server_and_maybe_clear_workspaces(spawn_boardwalkd_se
 
 
 @pytest.fixture(scope="package")
-def get_become_password_file_path():
-    """Returns a pathlib.Path object with the supplied BECOME/sudo password written to it.
+def get_become_password_file_path() -> Iterator[str] | Iterator[None]:
+    """Returns a pathlib.Path object with the supplied BECOME/sudo password written to it, or None if in a CI instance.
 
     Required to run the Workspace tests.
     """
-    val = getpass(prompt="\nBECOME password: ")
-    with tempfile.NamedTemporaryFile(delete_on_close=False, mode="w") as file:
-        file.write(val)
-        file.close()
-        yield file.name
+    if "CI" in os.environ:
+        # For CI, make an educated assumption that sudo is passwordless.
+        yield None
+    else:
+        val = getpass(prompt="\nBECOME password: ")
+        with tempfile.NamedTemporaryFile(delete_on_close=False, mode="w") as file:
+            file.write(val)
+            file.close()
+            yield file.name
 
 
 @pytest.fixture
