@@ -88,8 +88,11 @@
                 hx-post="{{ action_url('/workspaces/delete', filters, edit=edit) }}"
                 hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false">
                 {% if edit %}
-                <button type="button" class="bw-button bw-button-secondary" data-select-visible-done>
+                <button type="button" class="bw-button bw-button-secondary" data-select-visible-status="done">
                     Select visible done
+                </button>
+                <button type="button" class="bw-button bw-button-secondary" data-select-visible-status="stale">
+                    Select visible stale
                 </button>
                 <button type="submit" class="bw-button bw-button-danger" data-delete-selected disabled>
                     Delete selected (<span data-delete-count>0</span>)

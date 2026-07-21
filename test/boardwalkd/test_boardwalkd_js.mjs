@@ -11,6 +11,32 @@ const htmxSource = fs.readFileSync(
     new URL("../../src/boardwalkd/static/htmx.min.js", import.meta.url),
     "utf8",
 );
+const cssSource = fs.readFileSync(
+    new URL("../../src/boardwalkd/static/boardwalkd.css", import.meta.url),
+    "utf8",
+);
+
+test("deletion checkboxes use compact theme-aware focus and disabled styles", () => {
+    assert.match(
+        cssSource,
+        /\.bw-delete-checkbox\s*\{[^}]*width:\s*16px;[^}]*height:\s*16px;[^}]*accent-color:\s*var\(--bw-brand\);[^}]*border-radius:\s*4px;/s,
+    );
+    assert.match(
+        cssSource,
+        /\.bw-delete-checkbox:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--bw-link\);[^}]*outline-offset:\s*2px;/s,
+    );
+    assert.match(cssSource, /\.bw-delete-checkbox:disabled\s*\{[^}]*opacity:\s*0\.35;/s);
+    assert.match(cssSource, /\.bw-theme-light \.bw-delete-checkbox\s*\{[^}]*color-scheme:\s*light;/s);
+    assert.match(cssSource, /\.bw-theme-dark \.bw-delete-checkbox\s*\{[^}]*color-scheme:\s*dark;/s);
+});
+
+test("stale row styling does not dim deletion controls through parent opacity", () => {
+    const staleRules = Array.from(cssSource.matchAll(/\.bw-row\.status-stale[^\{]*\{([^}]*)\}/g));
+    assert.ok(staleRules.length > 0);
+    for (const rule of staleRules) assert.doesNotMatch(rule[1], /\bopacity\s*:/);
+    assert.match(staleRules[0][1], /background-image:\s*linear-gradient/);
+    assert.doesNotMatch(staleRules[0][1], /box-shadow/);
+});
 
 class FakeEventTarget {
     constructor() {
@@ -326,7 +352,11 @@ function deletionControls(options = {}) {
     const form = new FakeElement("form", {dataset: {bulkDeleteForm: ""}});
     const selectVisibleDone = new FakeElement("button", {
         type: "button",
-        dataset: {selectVisibleDone: ""},
+        dataset: {selectVisibleStatus: "done"},
+    });
+    const selectVisibleStale = new FakeElement("button", {
+        type: "button",
+        dataset: {selectVisibleStatus: "stale"},
     });
     const deleteSelected = new FakeElement("button", {
         type: "submit",
@@ -344,8 +374,8 @@ function deletionControls(options = {}) {
         textContent: options.resultText,
     });
     deleteSelected.append(count);
-    form.append(selectVisibleDone, deleteSelected, countLive, result);
-    return {form, selectVisibleDone, deleteSelected, count, countLive, result};
+    form.append(selectVisibleDone, selectVisibleStale, deleteSelected, countLive, result);
+    return {form, selectVisibleDone, selectVisibleStale, deleteSelected, count, countLive, result};
 }
 
 function dashboardContent(harness, workspaces, options = {}) {
@@ -514,6 +544,49 @@ test("select visible done adds only eligible done rows without clearing manual c
     assert.equal(controls.count.textContent, "2");
     assert.equal(controls.countLive.textContent, "Delete selected (2)");
     assert.equal(controls.deleteSelected.disabled, false);
+});
+
+test("select visible stale adds only eligible stale rows without clearing manual choices", () => {
+    const harness = createHarness();
+    const manualIdle = workspace("manual", {name: "Manual idle", status: "idle"});
+    const visibleStale = workspace("visible", {name: "Visible stale", status: "stale"});
+    const disabledStale = workspace("disabled", {name: "Disabled stale", status: "stale", disabled: true});
+    const hiddenStale = workspace("hidden", {name: "Hidden stale", status: "stale", rowHidden: true});
+    const visibleDone = workspace("done", {name: "Visible done", status: "done"});
+    const {controls} = dashboardFixture(
+        harness,
+        [manualIdle, visibleStale, disabledStale, hiddenStale, visibleDone],
+        {edit: true},
+    );
+    startHarness(harness);
+    changeSelection(manualIdle.checkbox, true);
+
+    controls.selectVisibleStale.click();
+
+    assert.equal(manualIdle.checkbox.checked, true);
+    assert.equal(visibleStale.checkbox.checked, true);
+    assert.equal(disabledStale.checkbox.checked, false);
+    assert.equal(hiddenStale.checkbox.checked, false);
+    assert.equal(visibleDone.checkbox.checked, false);
+    assert.equal(controls.count.textContent, "2");
+    assert.equal(controls.countLive.textContent, "Delete selected (2)");
+    assert.equal(controls.deleteSelected.disabled, false);
+});
+
+test("focused visible-status shortcut restores the same status after refresh", () => {
+    const harness = createHarness();
+    const oldStale = workspace("stale", {status: "stale"});
+    const {frame, controls} = dashboardFixture(harness, [oldStale], {edit: true});
+    startHarness(harness);
+    harness.document.activeElement = controls.selectVisibleStale;
+    const newStale = workspace("stale", {status: "stale"});
+    const replacement = dashboardContent(harness, [newStale], {edit: true});
+
+    settleSwap(harness, frame, replacement.dashboard);
+
+    assert.equal(replacement.controls.selectVisibleDone.focusCalls.length, 0);
+    assert.equal(replacement.controls.selectVisibleStale.focusCalls.length, 1);
+    assert.equal(replacement.controls.selectVisibleStale.focusCalls[0].preventScroll, true);
 });
 
 test("selection eligibility rejects CSS-hidden checkbox ancestors", () => {
@@ -919,7 +992,7 @@ test("unnamed buttons restore focus by stable action discriminator", () => {
     assert.equal(newRelease.focusCalls[0].preventScroll, true);
 });
 
-test("one swap restores expansion exactly once after layout settles", () => {
+test("one swap restores expansion exactly once before layout settles", () => {
     const harness = createHarness();
     harness.sessionStorage.setItem("boardwalk.expandedWorkspace", "alpha");
     const oldAlpha = workspace("alpha", {expanded: true});
@@ -934,14 +1007,14 @@ test("one swap restores expansion exactly once after layout settles", () => {
     frame.replaceChildren(replacement);
 
     harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
-    assert.equal(newAlpha.panel.hidden, true);
+    assert.equal(newAlpha.panel.hidden, false);
     harness.document.body.dispatch("htmx:afterSettle", htmxAfter(frame, beforeSwap.detail.xhr));
 
     assert.equal(newAlpha.panel.hidden, false);
     assert.equal(newAlpha.panel.hiddenWrites.filter((value) => !value).length, 1);
 });
 
-test("initial empty frame load binds controls and restores expansion once after settle", () => {
+test("initial empty frame load binds controls and restores expansion before settle", () => {
     const harness = createHarness();
     harness.sessionStorage.setItem("boardwalk.expandedWorkspace", "alpha");
     const frame = harness.document.adopt(new FakeElement("main", {classes: ["bw-frame"]}));
@@ -956,7 +1029,7 @@ test("initial empty frame load binds controls and restores expansion once after 
 
     harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
     assert.equal(newAlpha.toggle.dataset.bound, "1");
-    assert.equal(newAlpha.panel.hidden, true);
+    assert.equal(newAlpha.panel.hidden, false);
     harness.document.body.dispatch("htmx:afterSettle", htmxAfter(frame, beforeSwap.detail.xhr));
 
     assert.equal(newAlpha.panel.hidden, false);

@@ -651,7 +651,10 @@ def test_workspace_partial_renders_bulk_delete_selection_and_row_eligibility_in_
 
     html = render_workspace_partial(dashboard, workspaces, edit=True)
 
-    assert "data-select-visible-done" in html
+    assert 'data-select-visible-status="done"' in html
+    assert 'data-select-visible-status="stale"' in html
+    assert "Select visible done" in html
+    assert "Select visible stale" in html
     assert "data-delete-selected" in html
     assert "Delete selected (0)" in html
     assert 'hx-post="/workspaces/delete?group=alpha&amp;edit=1"' in html
@@ -690,7 +693,7 @@ def test_workspace_partial_omits_bulk_delete_selection_outside_edit_mode():
     html = render_workspace_partial(dashboard, workspaces)
 
     assert "data-bulk-delete-form" not in html
-    assert "data-select-visible-done" not in html
+    assert "data-select-visible-status" not in html
     assert "data-delete-selected" not in html
     assert "data-delete-workspace" not in html
 

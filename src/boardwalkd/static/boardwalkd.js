@@ -168,15 +168,16 @@
             });
         });
 
-        scope.querySelectorAll("[data-select-visible-done]").forEach(function (button) {
+        scope.querySelectorAll("[data-select-visible-status]").forEach(function (button) {
             if (button.dataset.deletionBound === "1") return;
             button.dataset.deletionBound = "1";
             button.addEventListener("click", function () {
+                var status = button.dataset.selectVisibleStatus || "";
                 deletionCheckboxes(scope).forEach(function (checkbox) {
                     var key = checkbox.dataset.workspaceKey || "";
                     if (
                         key &&
-                        checkbox.dataset.workspaceStatus === "done" &&
+                        checkbox.dataset.workspaceStatus === status &&
                         deletionCheckboxIsEligible(checkbox)
                     ) {
                         checkbox.checked = true;
@@ -424,7 +425,7 @@
         var parts = [];
         if (element.id) parts.push("id=" + element.id);
         var dataset = element.dataset || {};
-        ["rowToggle", "eventsToggle", "themeToggle", "selectVisibleDone", "deleteSelected"].forEach(
+        ["rowToggle", "eventsToggle", "themeToggle", "selectVisibleStatus", "deleteSelected"].forEach(
             function (key) {
                 if (Object.prototype.hasOwnProperty.call(dataset, key)) {
                     parts.push("data:" + key + "=" + dataset[key]);
@@ -663,7 +664,7 @@
             var xhr = xhrForEvent(event);
             var snapshot = xhr ? refreshTransactions.get(xhr) : null;
             if (!snapshot || swapOwner(event) !== snapshot.owner) return;
-            boot(event.target, false);
+            boot(event.target, true);
         });
         document.body.addEventListener("htmx:afterSettle", function (event) {
             var xhr = xhrForEvent(event);
@@ -671,7 +672,6 @@
             if (!snapshot) return;
             refreshTransactions.delete(xhr);
             if (swapOwner(event) !== snapshot.owner) return;
-            restoreExpandedState(event.target);
             restoreDeletionSelection(event.target);
             restoreActiveControl(event.target, snapshot.activeControl);
             if (!snapshot.initial) restoreViewport(snapshot, event.target);
