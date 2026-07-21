@@ -918,9 +918,16 @@ a {
     border-bottom: 1px solid var(--bw-line);
 }
 
-.bw-row-details.is-expanded {
+.bw-row-details:not([hidden]) {
     background: color-mix(in srgb, var(--bw-brand) 5%, var(--bw-row-alt));
     border-bottom-color: color-mix(in srgb, var(--bw-brand) 34%, var(--bw-line));
+}
+
+.bw-frame.is-restoring-dashboard-state .bw-row,
+.bw-frame.is-restoring-dashboard-state .bw-expand,
+.bw-frame.is-restoring-dashboard-state .bw-expand span[aria-hidden="true"],
+.bw-frame.is-restoring-dashboard-state .bw-row-details {
+    transition: none;
 }
 
 .bw-row-details.status-caught {

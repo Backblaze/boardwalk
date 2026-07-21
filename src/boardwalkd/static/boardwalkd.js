@@ -2,6 +2,7 @@
     var EXPANDED_WORKSPACE_KEY = "boardwalk.expandedWorkspace";
     var EXPANDED_EVENTS_KEY = "boardwalk.expandedEvents";
     var refreshTransactions = new WeakMap();
+    var restorationCounts = new WeakMap();
     var selectedWorkspaceKeys = new Set();
 
     function storedTheme() {
@@ -550,7 +551,7 @@
 
         var expandedAnchor = null;
         dashboard.querySelectorAll(".bw-row-details").forEach(function (panel) {
-            if (!expandedAnchor && panel.classList.contains("is-expanded") && isInViewport(panel)) {
+            if (!expandedAnchor && !panel.hidden && isInViewport(panel)) {
                 expandedAnchor = anchorSnapshot(panel);
             }
         });
@@ -587,6 +588,21 @@
             activeControl: captureActiveControl(dashboard),
             initial: false,
         };
+    }
+
+    function beginDashboardRestoration(owner) {
+        restorationCounts.set(owner, (restorationCounts.get(owner) || 0) + 1);
+        owner.classList.add("is-restoring-dashboard-state");
+    }
+
+    function endDashboardRestoration(owner) {
+        var remaining = (restorationCounts.get(owner) || 1) - 1;
+        if (remaining > 0) {
+            restorationCounts.set(owner, remaining);
+            return;
+        }
+        restorationCounts.delete(owner);
+        owner.classList.remove("is-restoring-dashboard-state");
     }
 
     function matchingWorkspaceElement(root, anchor) {
@@ -658,7 +674,10 @@
             var xhr = xhrForEvent(event);
             if (!xhr || detail.shouldSwap !== true || detail.isError) return;
             var snapshot = captureRefreshState(event);
-            if (snapshot) refreshTransactions.set(xhr, snapshot);
+            if (snapshot) {
+                beginDashboardRestoration(snapshot.owner);
+                refreshTransactions.set(xhr, snapshot);
+            }
         });
         document.body.addEventListener("htmx:afterSwap", function (event) {
             var xhr = xhrForEvent(event);
@@ -671,6 +690,7 @@
             var snapshot = xhr ? refreshTransactions.get(xhr) : null;
             if (!snapshot) return;
             refreshTransactions.delete(xhr);
+            endDashboardRestoration(snapshot.owner);
             if (swapOwner(event) !== snapshot.owner) return;
             restoreDeletionSelection(event.target);
             restoreActiveControl(event.target, snapshot.activeControl);

@@ -38,6 +38,20 @@ test("stale row styling does not dim deletion controls through parent opacity", 
     assert.doesNotMatch(staleRules[0][1], /box-shadow/);
 });
 
+test("dashboard restoration disables expansion transitions without removing normal animations", () => {
+    const restorationRule = cssSource.match(
+        /\.bw-frame\.is-restoring-dashboard-state \.bw-row,\s*\.bw-frame\.is-restoring-dashboard-state \.bw-expand,\s*\.bw-frame\.is-restoring-dashboard-state \.bw-expand span\[aria-hidden="true"\],\s*\.bw-frame\.is-restoring-dashboard-state \.bw-row-details\s*\{([^}]*)\}/s,
+    );
+    assert.ok(restorationRule);
+    assert.match(restorationRule[1], /transition:\s*none;/);
+    assert.match(cssSource, /\.bw-row\s*\{[^}]*transition:\s*background 140ms ease/s);
+    assert.match(cssSource, /\.bw-expand span\[aria-hidden="true"\]\s*\{[^}]*transition:\s*transform 160ms ease;/s);
+    assert.match(
+        cssSource,
+        /\.bw-row-details:not\(\[hidden\]\)\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--bw-brand\) 5%, var\(--bw-row-alt\)\);/s,
+    );
+});
+
 class FakeEventTarget {
     constructor() {
         this.listeners = new Map();
@@ -947,6 +961,7 @@ test("overlapping same-frame swaps restore the snapshot owned by each xhr", () =
     harness.document.activeElement = oldBeta.checkbox;
     const betaSwap = htmxSwap(frame);
     harness.document.body.dispatch("htmx:beforeSwap", betaSwap);
+    assert.equal(frame.classList.contains("is-restoring-dashboard-state"), true);
     const newAlpha = workspace("alpha");
     const newBeta = workspace("beta");
     const replacement = harness.document.adopt(new FakeElement("div", {classes: ["bw-dashboard"]}));
@@ -957,11 +972,13 @@ test("overlapping same-frame swaps restore the snapshot owned by each xhr", () =
     harness.document.body.dispatch("htmx:afterSettle", htmxAfter(frame, alphaSwap.detail.xhr));
     assert.equal(newAlpha.checkbox.focusCalls.length, 1);
     assert.equal(newBeta.checkbox.focusCalls.length, 0);
+    assert.equal(frame.classList.contains("is-restoring-dashboard-state"), true);
 
     harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, betaSwap.detail.xhr));
     harness.document.body.dispatch("htmx:afterSettle", htmxAfter(frame, betaSwap.detail.xhr));
     assert.equal(newAlpha.checkbox.focusCalls.length, 1);
     assert.equal(newBeta.checkbox.focusCalls.length, 1);
+    assert.equal(frame.classList.contains("is-restoring-dashboard-state"), false);
 });
 
 test("unnamed buttons restore focus by stable action discriminator", () => {
@@ -1012,6 +1029,28 @@ test("one swap restores expansion exactly once before layout settles", () => {
 
     assert.equal(newAlpha.panel.hidden, false);
     assert.equal(newAlpha.panel.hiddenWrites.filter((value) => !value).length, 1);
+});
+
+test("dashboard swap suppresses expansion transitions until restoration settles", () => {
+    const harness = createHarness();
+    harness.sessionStorage.setItem("boardwalk.expandedWorkspace", "alpha");
+    const oldAlpha = workspace("alpha", {expanded: true});
+    const {frame} = dashboardFixture(harness, [oldAlpha]);
+    const newAlpha = workspace("alpha");
+    const replacement = harness.document.adopt(new FakeElement("div", {classes: ["bw-dashboard"]}));
+    replacement.append(newAlpha.row, newAlpha.panel);
+    const beforeSwap = htmxSwap(frame);
+
+    harness.document.body.dispatch("htmx:beforeSwap", beforeSwap);
+    assert.equal(frame.classList.contains("is-restoring-dashboard-state"), true);
+    frame.replaceChildren(replacement);
+
+    harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
+    assert.equal(frame.classList.contains("is-restoring-dashboard-state"), true);
+    assert.equal(newAlpha.panel.hidden, false);
+
+    harness.document.body.dispatch("htmx:afterSettle", htmxAfter(frame, beforeSwap.detail.xhr));
+    assert.equal(frame.classList.contains("is-restoring-dashboard-state"), false);
 });
 
 test("initial empty frame load binds controls and restores expansion before settle", () => {
@@ -1173,6 +1212,25 @@ test("expanded details anchor stays fixed after content above it resizes", () =>
     harness.sessionStorage.setItem("boardwalk.expandedWorkspace", "beta");
     const oldAlpha = workspace("alpha", {rowTop: 40});
     const oldBeta = workspace("beta", {rowTop: 160, panelTop: 220, expanded: true});
+    const {frame} = dashboardFixture(harness, [oldAlpha, oldBeta]);
+    const newAlpha = workspace("alpha", {rowTop: 40});
+    const newBeta = workspace("beta", {rowTop: 230, panelTop: 310});
+    const replacement = harness.document.adopt(new FakeElement("div", {classes: ["bw-dashboard"]}));
+    replacement.append(newAlpha.row, newAlpha.panel, newBeta.row, newBeta.panel);
+
+    settleSwap(harness, frame, replacement);
+
+    const correction = 310 - 220;
+    assert.deepEqual(harness.window.scrollByCalls, [[0, correction]]);
+    assert.equal(newBeta.panel.getBoundingClientRect().top - correction, 220);
+});
+
+test("visible details remain the viewport anchor after htmx settles their classes", () => {
+    const harness = createHarness();
+    harness.sessionStorage.setItem("boardwalk.expandedWorkspace", "beta");
+    const oldAlpha = workspace("alpha", {rowTop: 40});
+    const oldBeta = workspace("beta", {rowTop: 160, panelTop: 220, expanded: true});
+    oldBeta.panel.classList.remove("is-expanded");
     const {frame} = dashboardFixture(harness, [oldAlpha, oldBeta]);
     const newAlpha = workspace("alpha", {rowTop: 40});
     const newBeta = workspace("beta", {rowTop: 230, panelTop: 310});
