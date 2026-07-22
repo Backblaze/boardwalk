@@ -75,6 +75,7 @@ lint = [
 ]
 test = [
     "pytest >= 9.0.3, <10",
+    "pytest-timeout >=2.4.0, <3",
 ]
 docs = [
     "myst-parser[linkify] >=4.0.0, <5",
@@ -122,4 +123,8 @@ typeCheckingMode = "basic"
 [tool.pytest]
 markers = [
     "integration: mark a test as an integration test",
+]
+addopts = [
+    "--verbose",
+    "--maxfail=2",
 ]

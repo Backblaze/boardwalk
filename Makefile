@@ -106,20 +106,21 @@ test-quick: test-pytest-quick test-ruff test-pyright test-semgrep test-ansible-l
 test-ansible-lint:
 	uvx --directory test ansible-lint --config-file ansible-lint.yaml z.dummy_playbook_for_ansible_lint.yml server-client/playbooks/
 
-# Run tests with --verbose, so we can list the tests run as the test goes
+# Run all tests
 .PHONY: test-pytest
 test-pytest: develop
-	uv run --frozen pytest --verbose
+	uv run --frozen pytest
 
+# Run all quick tests (excludes integration tests, which are not quick)
 .PHONY: test-pytest-quick
 test-pytest-quick: develop
-	uv run --frozen pytest --verbose -m "not integration"
+	uv run --frozen pytest -m "not integration"
 
 # Same as `test-pytest`, but does not clear the boardwalkd server state between
 # test runs (so the workspace state can be inspected after execution)
 .PHONY: test-pytest-keep-workspace-state
 test-pytest-keep-workspace-state: develop
-	PYTEST_BOARDWALKD_PERSIST_WORKSPACES_BETWEEN_TESTS=True uv run --frozen pytest  --verbose
+	PYTEST_BOARDWALKD_PERSIST_WORKSPACES_BETWEEN_TESTS=True uv run --frozen pytest
 
 # Run all available Ruff checks
 .PHONY: test-ruff
