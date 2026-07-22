@@ -9,11 +9,21 @@ from pathlib import Path
 
 import pytest
 from loguru import logger
+from loopsentry import LoopSentry
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 
 # The default Boardwalkd url for testing via a pytest harness
 boardwalkd_standard_dev_port = 8888
 boardwalkd_url = "http://localhost:{port}"
+
+
+@pytest.fixture(scope="session")
+async def initiate_loop_sentry():
+    """Initiates loopsentry to try and identify bottlenecks"""
+    sentry = LoopSentry(threshold=0.1)
+    sentry.start()
+    yield
+    sentry.stop()
 
 
 @pytest.fixture()
@@ -141,6 +151,6 @@ def use_isolated_boardwalk_directory(tmp_path_factory, request):
     return dir
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def anyio_backend():
     return "asyncio"

@@ -115,8 +115,8 @@ async def execute_boardwalk_workspace_test(
         ),
     ],
 )
-@pytest.mark.usefixtures("spawn_boardwalkd_server_and_maybe_clear_workspaces")
-@pytest.mark.timeout(180)
+@pytest.mark.usefixtures("spawn_boardwalkd_server_and_maybe_clear_workspaces", "initiate_loop_sentry")
+@pytest.mark.timeout(120)
 @pytest.mark.integration
 async def test_development_workspaces(
     workspace_name: str,
@@ -135,8 +135,8 @@ async def test_development_workspaces(
 
 
 @pytest.mark.anyio
-@pytest.mark.usefixtures("spawn_boardwalkd_server_and_maybe_clear_workspaces")
-@pytest.mark.timeout(180)
+@pytest.mark.usefixtures("spawn_boardwalkd_server_and_maybe_clear_workspaces", "initiate_loop_sentry")
+@pytest.mark.timeout(120)
 @pytest.mark.integration
 async def test_ensure_remote_workflow_success_state_false_during_workflow_execution(
     get_become_password_file_path: Path,

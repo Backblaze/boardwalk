@@ -93,6 +93,19 @@ jobs:
       - name: Execute Python test suite
         run: make test-pytest
 
+      - name: Dump directory structure (because where is the sentry_logs directory)
+        if: failure()
+        run: find "$PWD" -type d
+
+      - name: Upload loopsentry logs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # https://github.com/actions/upload-artifact/releases/tag/v7.0.1
+        if: failure()
+        with:
+          name: loopsentry_logs
+          path: ${{ github.workspace }}/sentry_logs/
+          retention-days: 7
+
+
       # Commented out because we're planning on switching to a different static
       # typechecker, and frankly whatever is taking pyright _minutes_ to run is
       # a little excessive, for now.
