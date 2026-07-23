@@ -15,6 +15,7 @@ const cssSource = fs.readFileSync(
     new URL("../../src/boardwalkd/static/boardwalkd.css", import.meta.url),
     "utf8",
 );
+const obsoleteRestorationClass = ["is", "restoring", "dashboard", "state"].join("-");
 
 test("deletion checkboxes use compact theme-aware focus and disabled styles", () => {
     assert.match(
@@ -38,12 +39,9 @@ test("stale row styling does not dim deletion controls through parent opacity", 
     assert.doesNotMatch(staleRules[0][1], /box-shadow/);
 });
 
-test("dashboard restoration disables expansion transitions without removing normal animations", () => {
-    const restorationRule = cssSource.match(
-        /\.bw-frame\.is-restoring-dashboard-state \.bw-row,\s*\.bw-frame\.is-restoring-dashboard-state \.bw-expand,\s*\.bw-frame\.is-restoring-dashboard-state \.bw-expand span\[aria-hidden="true"\],\s*\.bw-frame\.is-restoring-dashboard-state \.bw-row-details\s*\{([^}]*)\}/s,
-    );
-    assert.ok(restorationRule);
-    assert.match(restorationRule[1], /transition:\s*none;/);
+test("obsolete dashboard restoration state is absent without removing normal animations", () => {
+    assert.doesNotMatch(source, new RegExp(obsoleteRestorationClass));
+    assert.doesNotMatch(cssSource, new RegExp(obsoleteRestorationClass));
     assert.match(cssSource, /\.bw-row\s*\{[^}]*transition:\s*background 140ms ease/s);
     assert.match(cssSource, /\.bw-expand span\[aria-hidden="true"\]\s*\{[^}]*transition:\s*transform 160ms ease;/s);
     assert.match(
@@ -73,6 +71,7 @@ class FakeEventTarget {
 class FakeClassList {
     constructor(values = []) {
         this.values = new Set(values);
+        this.toggleCalls = [];
     }
 
     add(...values) {
@@ -88,6 +87,7 @@ class FakeClassList {
     }
 
     toggle(value, force) {
+        this.toggleCalls.push([value, force]);
         const enabled = force === undefined ? !this.values.has(value) : force;
         if (enabled) this.values.add(value);
         else this.values.delete(value);
@@ -102,7 +102,17 @@ class FakeElement extends FakeEventTarget {
         this.id = options.id || "";
         this.name = options.name || "";
         this.type = options.type || "";
-        this.dataset = {...options.dataset};
+        this.datasetWrites = [];
+        this.dataset = new Proxy(
+            {...options.dataset},
+            {
+                set: (target, key, value) => {
+                    this.datasetWrites.push([key, value]);
+                    target[key] = value;
+                    return true;
+                },
+            },
+        );
         this.classList = new FakeClassList(options.classes);
         this.attributes = new Map(Object.entries(options.attributes || {}));
         this.children = [];
@@ -112,9 +122,12 @@ class FakeElement extends FakeEventTarget {
         this.open = Boolean(options.open);
         this.checked = Boolean(options.checked);
         this.disabled = Boolean(options.disabled);
-        this.textContent = options.textContent || "";
+        this._textContent = options.textContent || "";
+        this.textWrites = [];
         this.value = options.value || "";
         this.rect = options.rect || {top: 0, bottom: 20, height: 20};
+        this.scrollWidth = options.scrollWidth;
+        this.clientWidth = options.clientWidth;
         this.focusCalls = [];
         this.queryOverrides = new Map();
     }
@@ -142,6 +155,19 @@ class FakeElement extends FakeEventTarget {
         this.hiddenWrites.push(this._hidden);
     }
 
+    get isConnected() {
+        return Boolean(this.ownerDocument && this.ownerDocument.documentElement.contains(this));
+    }
+
+    get textContent() {
+        return this._textContent;
+    }
+
+    set textContent(value) {
+        this._textContent = String(value);
+        this.textWrites.push(this._textContent);
+    }
+
     setAttribute(name, value) {
         this.attributes.set(name, String(value));
     }
@@ -164,10 +190,7 @@ class FakeElement extends FakeEventTarget {
     }
 
     click() {
-        this.dispatch("click", {
-            target: this,
-            stopPropagation() {},
-        });
+        dispatchBubbling(this, "click");
     }
 
     getBoundingClientRect() {
@@ -284,10 +307,20 @@ class FakeDocument extends FakeEventTarget {
 
 function fakeStorage() {
     const values = new Map();
+    const setItemCalls = [];
+    const removeItemCalls = [];
     return {
         getItem: (key) => values.get(key) ?? null,
-        setItem: (key, value) => values.set(key, String(value)),
-        removeItem: (key) => values.delete(key),
+        setItem(key, value) {
+            setItemCalls.push([key, String(value)]);
+            values.set(key, String(value));
+        },
+        removeItem(key) {
+            removeItemCalls.push(key);
+            values.delete(key);
+        },
+        setItemCalls,
+        removeItemCalls,
     };
 }
 
@@ -296,16 +329,17 @@ function createHarness(options = {}) {
     const window = new FakeEventTarget();
     Object.assign(window, {
         document,
+        Idiomorph: options.Idiomorph,
         innerHeight: 800,
         scrollX: 0,
         scrollY: 0,
         scrollByCalls: [],
         scrollToCalls: [],
-        scrollBy(x, y) {
-            this.scrollByCalls.push([x, y]);
+        scrollBy(...args) {
+            this.scrollByCalls.push(args.map((arg) => (arg && typeof arg === "object" ? {...arg} : arg)));
         },
-        scrollTo(x, y) {
-            this.scrollToCalls.push([x, y]);
+        scrollTo(...args) {
+            this.scrollToCalls.push(args.map((arg) => (arg && typeof arg === "object" ? {...arg} : arg)));
         },
         getComputedStyle: options.getComputedStyle || (() => ({display: "block", visibility: "visible"})),
         matchMedia: () => ({matches: false, addEventListener() {}}),
@@ -458,8 +492,248 @@ function settleSwap(harness, frame, replacementDashboard, beforeSwap = htmxSwap(
 
 function changeSelection(checkbox, checked) {
     checkbox.checked = checked;
-    checkbox.dispatch("change", {target: checkbox});
+    dispatchBubbling(checkbox, "change");
 }
+
+function dispatchBubbling(target, type, event = {}) {
+    let propagationStopped = false;
+    const dispatchedEvent = {
+        ...event,
+        target: event.target || target,
+        stopPropagation() {
+            propagationStopped = true;
+            if (event.stopPropagation) event.stopPropagation();
+        },
+    };
+    for (let node = target; node; node = node.parentElement) {
+        node.dispatch(type, dispatchedEvent);
+        if (propagationStopped) break;
+    }
+    return dispatchedEvent;
+}
+
+test("global morph callbacks preserve prior vetoes and project only marked dashboard state", () => {
+    const previousCalls = [];
+    const previousMorphed = (oldNode) => {
+        previousCalls.push(["morphed", oldNode.id]);
+        return oldNode.id === "veto-row" ? false : true;
+    };
+    const previousAdded = (newNode) => {
+        previousCalls.push(["added", newNode.id]);
+        return newNode.id === "veto-added" ? false : true;
+    };
+    const Idiomorph = {
+        defaults: {
+            callbacks: {
+                beforeNodeMorphed: previousMorphed,
+                beforeNodeAdded: previousAdded,
+            },
+        },
+    };
+    const harness = createHarness({Idiomorph});
+    assert.notStrictEqual(Idiomorph.defaults.callbacks.beforeNodeMorphed, previousMorphed);
+    assert.notStrictEqual(Idiomorph.defaults.callbacks.beforeNodeAdded, previousAdded);
+
+    const oldDashboard = new FakeElement("section", {id: "workspace-dashboard"});
+    const oldRow = new FakeElement("article", {
+        id: "alpha-row",
+        classes: ["status-running", "is-expanded"],
+        dataset: {workspaceRow: "", workspaceKey: "alpha"},
+    });
+    const oldToggle = new FakeElement("button", {
+        id: "alpha-toggle",
+        dataset: {rowToggle: "", workspaceKey: "alpha"},
+        attributes: {"aria-expanded": "true"},
+    });
+    const oldPanel = new FakeElement("section", {
+        id: "alpha-panel",
+        classes: ["bw-row-details", "is-expanded"],
+        dataset: {workspaceKey: "alpha"},
+    });
+    oldDashboard.append(oldRow, oldToggle, oldPanel);
+
+    const newDashboard = new FakeElement("section", {id: "workspace-dashboard"});
+    const newRow = new FakeElement("article", {
+        id: "alpha-row",
+        classes: ["status-done"],
+        dataset: {workspaceRow: "", workspaceKey: "alpha"},
+    });
+    const newToggle = new FakeElement("button", {
+        id: "alpha-toggle",
+        dataset: {rowToggle: "", workspaceKey: "alpha"},
+        attributes: {"aria-expanded": "false"},
+    });
+    const newPanel = new FakeElement("section", {
+        id: "alpha-panel",
+        classes: ["bw-row-details"],
+        dataset: {workspaceKey: "alpha"},
+        hidden: true,
+    });
+    newDashboard.append(newRow, newToggle, newPanel);
+
+    assert.equal(Idiomorph.defaults.callbacks.beforeNodeMorphed(oldRow, newRow), true);
+    assert.equal(Idiomorph.defaults.callbacks.beforeNodeMorphed(oldToggle, newToggle), true);
+    assert.equal(Idiomorph.defaults.callbacks.beforeNodeMorphed(oldPanel, newPanel), true);
+    assert.equal(newRow.classList.contains("status-done"), true);
+    assert.equal(newRow.classList.contains("status-running"), false);
+    assert.equal(newRow.classList.contains("is-expanded"), true);
+    assert.equal(newToggle.getAttribute("aria-expanded"), "true");
+    assert.equal(newPanel.hidden, false);
+    assert.equal(newPanel.classList.contains("is-expanded"), true);
+
+    const outsideOld = new FakeElement("article", {
+        id: "outside-row",
+        classes: ["is-expanded"],
+        dataset: {workspaceRow: ""},
+    });
+    const outsideNew = new FakeElement("article", {
+        id: "outside-row",
+        classes: ["status-done"],
+        dataset: {workspaceRow: ""},
+    });
+    assert.equal(Idiomorph.defaults.callbacks.beforeNodeMorphed(outsideOld, outsideNew), true);
+    assert.equal(outsideNew.classList.contains("is-expanded"), false);
+
+    const vetoOld = new FakeElement("article", {
+        id: "veto-row",
+        classes: ["is-expanded"],
+        dataset: {workspaceRow: ""},
+    });
+    const vetoNew = new FakeElement("article", {
+        id: "veto-row",
+        dataset: {workspaceRow: ""},
+    });
+    oldDashboard.append(vetoOld);
+    newDashboard.append(vetoNew);
+    assert.equal(Idiomorph.defaults.callbacks.beforeNodeMorphed(vetoOld, vetoNew), false);
+    assert.equal(vetoNew.classList.contains("is-expanded"), false);
+
+    harness.sessionStorage.setItem("boardwalk.expandedWorkspace", "new");
+    harness.sessionStorage.setItem("boardwalk.expandedEvents", "new");
+    const addedRow = new FakeElement("article", {
+        id: "new-row",
+        dataset: {workspaceRow: "", workspaceKey: "new"},
+    });
+    const addedToggle = new FakeElement("button", {
+        dataset: {rowToggle: "", workspaceKey: "new"},
+        attributes: {"aria-expanded": "false"},
+    });
+    addedRow.append(addedToggle);
+    const addedPanel = new FakeElement("section", {
+        id: "new-panel",
+        classes: ["bw-row-details"],
+        dataset: {workspaceKey: "new"},
+        hidden: true,
+    });
+    const extraEvent = new FakeElement("div", {dataset: {eventExtra: ""}, hidden: true});
+    const eventToggle = new FakeElement("button", {dataset: {eventsToggle: ""}});
+    addedPanel.append(extraEvent, eventToggle);
+    newDashboard.append(addedRow, addedPanel);
+
+    assert.equal(Idiomorph.defaults.callbacks.beforeNodeAdded(addedRow), true);
+    assert.equal(Idiomorph.defaults.callbacks.beforeNodeAdded(addedPanel), true);
+    assert.equal(addedRow.classList.contains("is-expanded"), true);
+    assert.equal(addedToggle.getAttribute("aria-expanded"), "true");
+    assert.equal(addedPanel.hidden, false);
+    assert.equal(addedPanel.classList.contains("is-expanded"), true);
+    assert.equal(extraEvent.hidden, false);
+    assert.equal(eventToggle.hidden, true);
+
+    const vetoAdded = new FakeElement("article", {id: "veto-added"});
+    newDashboard.append(vetoAdded);
+    assert.equal(Idiomorph.defaults.callbacks.beforeNodeAdded(vetoAdded), false);
+    assert.ok(previousCalls.some(([type, id]) => type === "morphed" && id === "alpha-row"));
+    assert.ok(previousCalls.some(([type, id]) => type === "added" && id === "new-row"));
+});
+
+test("delegated retained controls act exactly once after duplicate enhancements", () => {
+    const harness = createHarness();
+    const themeToggle = harness.document.adopt(
+        new FakeElement("button", {type: "button", dataset: {themeToggle: ""}}),
+    );
+    harness.document.body.append(themeToggle);
+    const alpha = workspace("alpha", {name: "Alpha", status: "done"});
+    const stale = workspace("stale", {name: "Stale", status: "stale"});
+    const events = new FakeElement("div", {classes: ["bw-events"]});
+    const extraEvent = new FakeElement("div", {dataset: {eventExtra: ""}, hidden: true});
+    const eventsToggle = new FakeElement("button", {
+        type: "button",
+        dataset: {eventsToggle: ""},
+        textContent: "Show more",
+    });
+    events.append(extraEvent, eventsToggle);
+    alpha.panel.append(events);
+    const {frame, controls} = dashboardFixture(harness, [alpha, stale], {edit: true});
+    startHarness(harness);
+
+    for (let index = 0; index < 10; index += 1) {
+        delete themeToggle.dataset.bound;
+        delete alpha.toggle.dataset.bound;
+        delete alpha.row.dataset.bound;
+        delete eventsToggle.dataset.bound;
+        delete alpha.checkbox.dataset.deletionBound;
+        delete controls.selectVisibleStale.dataset.deletionBound;
+        const beforeSwap = htmxSwap(frame);
+        harness.document.body.dispatch("htmx:beforeSwap", beforeSwap);
+        harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
+        harness.document.body.dispatch("htmx:afterSettle", htmxAfter(frame, beforeSwap.detail.xhr));
+    }
+
+    assert.equal(harness.document.body.listeners.get("click")?.length, 1);
+    assert.equal(harness.document.body.listeners.get("change")?.length, 1);
+    assert.equal(themeToggle.listeners.get("click")?.length || 0, 0);
+    assert.equal(alpha.toggle.listeners.get("click")?.length || 0, 0);
+    assert.equal(alpha.row.listeners.get("click")?.length || 0, 0);
+    assert.equal(eventsToggle.listeners.get("click")?.length || 0, 0);
+    assert.equal(alpha.checkbox.listeners.get("change")?.length || 0, 0);
+    assert.equal(controls.selectVisibleStale.listeners.get("click")?.length || 0, 0);
+    for (const element of [
+        themeToggle,
+        alpha.toggle,
+        alpha.row,
+        eventsToggle,
+        alpha.checkbox,
+        controls.selectVisibleStale,
+    ]) {
+        assert.equal(element.dataset.bound, undefined);
+        assert.equal(element.dataset.deletionBound, undefined);
+    }
+
+    alpha.panel.hiddenWrites = [];
+    alpha.toggle.click();
+    assert.equal(alpha.panel.hiddenWrites.filter((hidden) => !hidden).length, 1);
+    alpha.panel.hiddenWrites = [];
+    dispatchBubbling(alpha.row, "click");
+    assert.deepEqual(alpha.panel.hiddenWrites, [true]);
+
+    extraEvent.hiddenWrites = [];
+    eventsToggle.hiddenWrites = [];
+    harness.sessionStorage.setItemCalls.length = 0;
+    eventsToggle.click();
+    assert.deepEqual(extraEvent.hiddenWrites, [false]);
+    assert.deepEqual(eventsToggle.hiddenWrites, [true]);
+    assert.deepEqual(harness.sessionStorage.setItemCalls, [
+        ["boardwalk.expandedEvents", "alpha"],
+    ]);
+
+    controls.count.textWrites = [];
+    changeSelection(alpha.checkbox, true);
+    assert.deepEqual(controls.count.textWrites, ["1"]);
+
+    controls.count.textWrites = [];
+    controls.selectVisibleStale.click();
+    assert.equal(stale.checkbox.checked, true);
+    assert.deepEqual(controls.count.textWrites, ["2"]);
+
+    harness.document.documentElement.classList.toggleCalls = [];
+    harness.localStorage.setItemCalls.length = 0;
+    themeToggle.click();
+    assert.deepEqual(harness.document.documentElement.classList.toggleCalls, [
+        ["bw-theme-dark", false],
+        ["bw-theme-light", true],
+    ]);
+    assert.deepEqual(harness.localStorage.setItemCalls, [["boardwalk.theme", "light"]]);
+});
 
 test("manual eligible deletion selections survive a dashboard refresh", () => {
     const harness = createHarness();
@@ -747,13 +1021,10 @@ test("Boardwalk leaves confirmation and cancellation to the shipped HTMX attribu
     assert.equal(confirmCalls, 0);
 });
 
-test("shipped HTMX 1.8.2 inherits hx-confirm and cancels before issuing a request", () => {
-    assert.match(htmxSource, /version:"1\.8\.2"/);
-    assert.match(
-        htmxSource,
-        /var R=z\(n,"hx-confirm"\);if\(R\)\{if\(!confirm\(R\)\)\{Z\(c\);s\(\);return d\}\}/,
-    );
-    assert.doesNotMatch(htmxSource, /htmx:confirm|issueRequest/);
+test("shipped HTMX 2.0.10 inherits hx-confirm and cancels before issuing a request", () => {
+    assert.match(htmxSource, /version:"2\.0\.10"/);
+    assert.match(htmxSource, /const a=ne\(r,"hx-confirm"\)/);
+    assert.match(htmxSource, /if\(a&&!k\)\{if\(!confirm\(a\)\)\{re\(s\);m\(\);return e\}\}/);
 });
 
 test("event times localize defensively with compact and accessible full formats", () => {
@@ -823,6 +1094,41 @@ test("new event times localize during afterSwap before layout settles", () => {
 
     assert.equal(timestamp.textContent, "4:05:06 PM");
     assert.equal(timestamp.getAttribute("aria-label"), "Tuesday, July 14, 2026 at 4:05:06 PM PDT");
+});
+
+test("afterSwap runs timestamp localization and name fitting once per response", () => {
+    const harness = createHarness({
+        Intl: {
+            DateTimeFormat: class {
+                constructor(_locales, options) {
+                    this.options = options;
+                }
+
+                format() {
+                    return this.options.hour ? "4:05:06 PM" : "Tuesday, July 14, 2026 at 4:05:06 PM PDT";
+                }
+            },
+        },
+    });
+    const {frame} = dashboardFixture(harness, []);
+    const replacement = dashboardContent(harness, []);
+    const timestamp = eventTime("2026-07-14T23:05:06Z", "23:05:06");
+    const fittedName = new FakeElement("span", {
+        dataset: {fitName: ""},
+        scrollWidth: 40,
+        clientWidth: 40,
+    });
+    replacement.dashboard.append(timestamp, fittedName);
+    const beforeSwap = htmxSwap(frame);
+
+    harness.document.body.dispatch("htmx:beforeSwap", beforeSwap);
+    frame.replaceChildren(replacement.dashboard);
+    harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
+    harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
+    harness.document.body.dispatch("htmx:afterSettle", htmxAfter(frame, beforeSwap.detail.xhr));
+
+    assert.deepEqual(timestamp.textWrites, ["4:05:06 PM"]);
+    assert.deepEqual(fittedName.datasetWrites, [["fit", "normal"]]);
 });
 
 test("valid event times retain the server fallback when Intl formatting fails", () => {
@@ -895,7 +1201,7 @@ test("text search and select focus still cancel dashboard polling", () => {
     }
 });
 
-test("checkbox focus snapshot restores the same workspace key", () => {
+test("afterSwap focus fallback restores the same workspace key exactly once", () => {
     const harness = createHarness();
     const oldAlpha = workspace("alpha");
     const oldBeta = workspace("beta");
@@ -906,11 +1212,40 @@ test("checkbox focus snapshot restores the same workspace key", () => {
     const replacement = harness.document.adopt(new FakeElement("div", {classes: ["bw-dashboard"]}));
     replacement.append(newAlpha.row, newAlpha.panel, newBeta.row, newBeta.panel);
 
-    settleSwap(harness, frame, replacement);
+    const beforeSwap = htmxSwap(frame);
+    harness.document.body.dispatch("htmx:beforeSwap", beforeSwap);
+    frame.replaceChildren(replacement);
+    harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
 
     assert.equal(newAlpha.checkbox.focusCalls.length, 0);
     assert.equal(newBeta.checkbox.focusCalls.length, 1);
     assert.equal(newBeta.checkbox.focusCalls[0].preventScroll, true);
+
+    harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
+    harness.document.body.dispatch("htmx:afterSettle", htmxAfter(frame, beforeSwap.detail.xhr));
+    assert.equal(newBeta.checkbox.focusCalls.length, 1);
+});
+
+test("afterSwap never refocuses or overwrites a retained active node", () => {
+    const harness = createHarness();
+    const alpha = workspace("alpha");
+    const filter = new FakeElement("input", {
+        type: "search",
+        name: "filter",
+        value: "operator draft",
+    });
+    alpha.row.append(filter);
+    const {frame} = dashboardFixture(harness, [alpha]);
+    harness.document.activeElement = filter;
+    const beforeSwap = htmxSwap(frame);
+
+    harness.document.body.dispatch("htmx:beforeSwap", beforeSwap);
+    filter.value = "server-authoritative filter";
+    harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
+    harness.document.body.dispatch("htmx:afterSettle", htmxAfter(frame, beforeSwap.detail.xhr));
+
+    assert.equal(filter.value, "server-authoritative filter");
+    assert.deepEqual(filter.focusCalls, []);
 });
 
 test("missing focused control falls forward to the nearest dashboard control without scrolling", () => {
@@ -950,7 +1285,7 @@ test("focused checkbox that becomes disabled falls forward to an eligible dashbo
     assert.equal(newBeta.toggle.focusCalls[0].preventScroll, true);
 });
 
-test("overlapping same-frame swaps restore the snapshot owned by each xhr", () => {
+test("overlapping same-frame swaps apply the snapshot owned by each xhr without restoration state", () => {
     const harness = createHarness();
     const oldAlpha = workspace("alpha");
     const oldBeta = workspace("beta");
@@ -961,7 +1296,7 @@ test("overlapping same-frame swaps restore the snapshot owned by each xhr", () =
     harness.document.activeElement = oldBeta.checkbox;
     const betaSwap = htmxSwap(frame);
     harness.document.body.dispatch("htmx:beforeSwap", betaSwap);
-    assert.equal(frame.classList.contains("is-restoring-dashboard-state"), true);
+    assert.equal(frame.classList.contains(obsoleteRestorationClass), false);
     const newAlpha = workspace("alpha");
     const newBeta = workspace("beta");
     const replacement = harness.document.adopt(new FakeElement("div", {classes: ["bw-dashboard"]}));
@@ -972,13 +1307,13 @@ test("overlapping same-frame swaps restore the snapshot owned by each xhr", () =
     harness.document.body.dispatch("htmx:afterSettle", htmxAfter(frame, alphaSwap.detail.xhr));
     assert.equal(newAlpha.checkbox.focusCalls.length, 1);
     assert.equal(newBeta.checkbox.focusCalls.length, 0);
-    assert.equal(frame.classList.contains("is-restoring-dashboard-state"), true);
+    assert.equal(frame.classList.contains(obsoleteRestorationClass), false);
 
     harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, betaSwap.detail.xhr));
     harness.document.body.dispatch("htmx:afterSettle", htmxAfter(frame, betaSwap.detail.xhr));
     assert.equal(newAlpha.checkbox.focusCalls.length, 1);
     assert.equal(newBeta.checkbox.focusCalls.length, 1);
-    assert.equal(frame.classList.contains("is-restoring-dashboard-state"), false);
+    assert.equal(frame.classList.contains(obsoleteRestorationClass), false);
 });
 
 test("unnamed buttons restore focus by stable action discriminator", () => {
@@ -1009,12 +1344,16 @@ test("unnamed buttons restore focus by stable action discriminator", () => {
     assert.equal(newRelease.focusCalls[0].preventScroll, true);
 });
 
-test("one swap restores expansion exactly once before layout settles", () => {
+test("afterSwap leaves morph-projected expansion untouched", () => {
     const harness = createHarness();
     harness.sessionStorage.setItem("boardwalk.expandedWorkspace", "alpha");
     const oldAlpha = workspace("alpha", {expanded: true});
+    oldAlpha.row.classList.add("is-expanded");
+    oldAlpha.toggle.setAttribute("aria-expanded", "true");
     const {frame} = dashboardFixture(harness, [oldAlpha]);
-    const newAlpha = workspace("alpha");
+    const newAlpha = workspace("alpha", {expanded: true});
+    newAlpha.row.classList.add("is-expanded");
+    newAlpha.toggle.setAttribute("aria-expanded", "true");
     const replacement = harness.document.adopt(new FakeElement("div", {classes: ["bw-dashboard"]}));
     replacement.append(newAlpha.row, newAlpha.panel);
     const beforeSwap = htmxSwap(frame);
@@ -1022,19 +1361,23 @@ test("one swap restores expansion exactly once before layout settles", () => {
     assert.equal(beforeSwap.detail.isError, false);
     harness.document.body.dispatch("htmx:beforeSwap", beforeSwap);
     frame.replaceChildren(replacement);
+    assert.equal(newAlpha.panel.hidden, false);
+    assert.deepEqual(newAlpha.panel.hiddenWrites, []);
 
     harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
     assert.equal(newAlpha.panel.hidden, false);
     harness.document.body.dispatch("htmx:afterSettle", htmxAfter(frame, beforeSwap.detail.xhr));
 
     assert.equal(newAlpha.panel.hidden, false);
-    assert.equal(newAlpha.panel.hiddenWrites.filter((value) => !value).length, 1);
+    assert.deepEqual(newAlpha.panel.hiddenWrites, []);
 });
 
-test("dashboard swap suppresses expansion transitions until restoration settles", () => {
+test("afterSwap restores stored row expansion when a plain replacement loses morph state", () => {
     const harness = createHarness();
     harness.sessionStorage.setItem("boardwalk.expandedWorkspace", "alpha");
     const oldAlpha = workspace("alpha", {expanded: true});
+    oldAlpha.row.classList.add("is-expanded");
+    oldAlpha.toggle.setAttribute("aria-expanded", "true");
     const {frame} = dashboardFixture(harness, [oldAlpha]);
     const newAlpha = workspace("alpha");
     const replacement = harness.document.adopt(new FakeElement("div", {classes: ["bw-dashboard"]}));
@@ -1042,25 +1385,74 @@ test("dashboard swap suppresses expansion transitions until restoration settles"
     const beforeSwap = htmxSwap(frame);
 
     harness.document.body.dispatch("htmx:beforeSwap", beforeSwap);
-    assert.equal(frame.classList.contains("is-restoring-dashboard-state"), true);
     frame.replaceChildren(replacement);
+    assert.equal(newAlpha.panel.hidden, true);
+    assert.equal(newAlpha.toggle.getAttribute("aria-expanded"), "false");
+    assert.equal(newAlpha.row.classList.contains("is-expanded"), false);
 
     harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
-    assert.equal(frame.classList.contains("is-restoring-dashboard-state"), true);
-    assert.equal(newAlpha.panel.hidden, false);
 
-    harness.document.body.dispatch("htmx:afterSettle", htmxAfter(frame, beforeSwap.detail.xhr));
-    assert.equal(frame.classList.contains("is-restoring-dashboard-state"), false);
+    assert.equal(newAlpha.panel.hidden, false);
+    assert.equal(newAlpha.panel.classList.contains("is-expanded"), true);
+    assert.equal(newAlpha.toggle.getAttribute("aria-expanded"), "true");
+    assert.equal(newAlpha.row.classList.contains("is-expanded"), true);
 });
 
-test("footer-clamped expanded anchor restores before settle can paint", () => {
+test("afterSwap restores stored recent-event expansion after a plain replacement", () => {
+    const harness = createHarness();
+    harness.sessionStorage.setItem("boardwalk.expandedEvents", "alpha");
+    const oldAlpha = workspace("alpha");
+    const {frame} = dashboardFixture(harness, [oldAlpha]);
+    const newAlpha = workspace("alpha");
+    const extraEvent = new FakeElement("div", {dataset: {eventExtra: ""}, hidden: true});
+    const eventsToggle = new FakeElement("button", {dataset: {eventsToggle: ""}});
+    newAlpha.panel.append(extraEvent, eventsToggle);
+    const replacement = harness.document.adopt(new FakeElement("div", {classes: ["bw-dashboard"]}));
+    replacement.append(newAlpha.row, newAlpha.panel);
+    const beforeSwap = htmxSwap(frame);
+
+    harness.document.body.dispatch("htmx:beforeSwap", beforeSwap);
+    frame.replaceChildren(replacement);
+    assert.equal(extraEvent.hidden, true);
+    assert.equal(eventsToggle.hidden, false);
+
+    harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
+
+    assert.equal(extraEvent.hidden, false);
+    assert.equal(eventsToggle.hidden, true);
+});
+
+test("response swap and abort error cleanup discard refresh transactions", () => {
+    for (const eventType of ["htmx:responseError", "htmx:swapError", "htmx:sendAbort"]) {
+        const harness = createHarness();
+        const oldAlpha = workspace("alpha", {rowTop: 100});
+        const {frame} = dashboardFixture(harness, [oldAlpha]);
+        harness.document.activeElement = oldAlpha.checkbox;
+        const beforeSwap = htmxSwap(frame);
+        harness.document.body.dispatch("htmx:beforeSwap", beforeSwap);
+        harness.document.body.dispatch(eventType, htmxAfter(frame, beforeSwap.detail.xhr));
+
+        const newAlpha = workspace("alpha", {rowTop: 220});
+        const replacement = harness.document.adopt(new FakeElement("div", {classes: ["bw-dashboard"]}));
+        replacement.append(newAlpha.row, newAlpha.panel);
+        frame.replaceChildren(replacement);
+        harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
+
+        assert.equal(frame.classList.contains(obsoleteRestorationClass), false, eventType);
+        assert.deepEqual(newAlpha.checkbox.focusCalls, [], eventType);
+        assert.deepEqual(harness.window.scrollByCalls, [], eventType);
+        assert.deepEqual(harness.window.scrollToCalls, [], eventType);
+    }
+});
+
+test("expanded anchor correction is instant once before settle can paint", () => {
     const harness = createHarness();
     harness.sessionStorage.setItem("boardwalk.expandedWorkspace", "alpha");
     const originalPanelTop = -80;
     const clampedPanelTop = 188;
     const oldAlpha = workspace("alpha", {expanded: true, panelTop: originalPanelTop});
     const {frame} = dashboardFixture(harness, [oldAlpha]);
-    const newAlpha = workspace("alpha", {panelTop: clampedPanelTop});
+    const newAlpha = workspace("alpha", {expanded: true, panelTop: clampedPanelTop});
     const replacement = harness.document.adopt(new FakeElement("div", {classes: ["bw-dashboard"]}));
     replacement.append(newAlpha.row, newAlpha.panel);
     const beforeSwap = htmxSwap(frame);
@@ -1070,18 +1462,39 @@ test("footer-clamped expanded anchor restores before settle can paint", () => {
     harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
 
     assert.equal(newAlpha.panel.hidden, false);
-    assert.deepEqual(harness.window.scrollByCalls, [[0, clampedPanelTop - originalPanelTop]]);
+    assert.deepEqual(harness.window.scrollByCalls, [
+        [{behavior: "instant", left: 0, top: clampedPanelTop - originalPanelTop}],
+    ]);
 
+    harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
     harness.document.body.dispatch("htmx:afterSettle", htmxAfter(frame, beforeSwap.detail.xhr));
-    assert.deepEqual(harness.window.scrollByCalls, [[0, clampedPanelTop - originalPanelTop]]);
+    assert.deepEqual(harness.window.scrollByCalls, [
+        [{behavior: "instant", left: 0, top: clampedPanelTop - originalPanelTop}],
+    ]);
 });
 
-test("initial empty frame load binds controls and restores expansion before settle", () => {
+test("zero anchor delta does not move the viewport", () => {
+    const harness = createHarness();
+    const oldAlpha = workspace("alpha", {rowTop: 120});
+    const {frame} = dashboardFixture(harness, [oldAlpha]);
+    const newAlpha = workspace("alpha", {rowTop: 120});
+    const replacement = harness.document.adopt(new FakeElement("div", {classes: ["bw-dashboard"]}));
+    replacement.append(newAlpha.row, newAlpha.panel);
+
+    settleSwap(harness, frame, replacement);
+
+    assert.deepEqual(harness.window.scrollByCalls, []);
+    assert.deepEqual(harness.window.scrollToCalls, []);
+});
+
+test("initial empty frame afterSwap enhances morph-projected controls without viewport work", () => {
     const harness = createHarness();
     harness.sessionStorage.setItem("boardwalk.expandedWorkspace", "alpha");
     const frame = harness.document.adopt(new FakeElement("main", {classes: ["bw-frame"]}));
     harness.document.body.append(frame);
-    const newAlpha = workspace("alpha");
+    const newAlpha = workspace("alpha", {expanded: true});
+    newAlpha.row.classList.add("is-expanded");
+    newAlpha.toggle.setAttribute("aria-expanded", "true");
     const replacement = harness.document.adopt(new FakeElement("div", {classes: ["bw-dashboard"]}));
     replacement.append(newAlpha.row, newAlpha.panel);
     const beforeSwap = htmxSwap(frame);
@@ -1090,12 +1503,13 @@ test("initial empty frame load binds controls and restores expansion before sett
     assert.equal(newAlpha.toggle.dataset.bound, undefined);
 
     harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
-    assert.equal(newAlpha.toggle.dataset.bound, "1");
+    assert.equal(newAlpha.toggle.dataset.bound, undefined);
+    assert.equal(harness.document.body.listeners.get("click")?.length, 1);
     assert.equal(newAlpha.panel.hidden, false);
     harness.document.body.dispatch("htmx:afterSettle", htmxAfter(frame, beforeSwap.detail.xhr));
 
     assert.equal(newAlpha.panel.hidden, false);
-    assert.equal(newAlpha.panel.hiddenWrites.filter((value) => !value).length, 1);
+    assert.deepEqual(newAlpha.panel.hiddenWrites, []);
     assert.deepEqual(harness.window.scrollByCalls, []);
     assert.deepEqual(harness.window.scrollToCalls, []);
 });
@@ -1189,7 +1603,7 @@ test("collapsed workspace anchor stays fixed when a row is inserted above it", (
     settleSwap(harness, frame, replacement);
 
     const correction = 215 - 120;
-    assert.deepEqual(harness.window.scrollByCalls, [[0, correction]]);
+    assert.deepEqual(harness.window.scrollByCalls, [[{behavior: "instant", left: 0, top: correction}]]);
     assert.equal(newAlpha.row.getBoundingClientRect().top - correction, 120);
 });
 
@@ -1207,8 +1621,28 @@ test("active workspace anchor wins over the first visible row", () => {
     settleSwap(harness, frame, replacement);
 
     const correction = 250 - 180;
-    assert.deepEqual(harness.window.scrollByCalls, [[0, correction]]);
+    assert.deepEqual(harness.window.scrollByCalls, [[{behavior: "instant", left: 0, top: correction}]]);
     assert.equal(newBeta.row.getBoundingClientRect().top - correction, 180);
+});
+
+test("offscreen active workspace anchor yields to the first visible expanded panel", () => {
+    const harness = createHarness();
+    const oldAlpha = workspace("alpha", {rowTop: 900});
+    const oldBeta = workspace("beta", {expanded: true, rowTop: 140, panelTop: 200});
+    const {frame} = dashboardFixture(harness, [oldAlpha, oldBeta]);
+    harness.document.activeElement = oldAlpha.checkbox;
+    const newAlpha = workspace("alpha", {rowTop: 1040});
+    const newBeta = workspace("beta", {expanded: true, rowTop: 180, panelTop: 260});
+    const replacement = harness.document.adopt(new FakeElement("div", {classes: ["bw-dashboard"]}));
+    replacement.append(newAlpha.row, newAlpha.panel, newBeta.row, newBeta.panel);
+
+    settleSwap(harness, frame, replacement);
+
+    const visiblePanelCorrection = 260 - 200;
+    assert.deepEqual(harness.window.scrollByCalls, [
+        [{behavior: "instant", left: 0, top: visiblePanelCorrection}],
+    ]);
+    assert.equal(newBeta.panel.getBoundingClientRect().top - visiblePanelCorrection, 200);
 });
 
 test("active workspace row anchor remains a row when its details restore", () => {
@@ -1226,7 +1660,7 @@ test("active workspace row anchor remains a row when its details restore", () =>
     settleSwap(harness, frame, replacement);
 
     const correction = 250 - 180;
-    assert.deepEqual(harness.window.scrollByCalls, [[0, correction]]);
+    assert.deepEqual(harness.window.scrollByCalls, [[{behavior: "instant", left: 0, top: correction}]]);
     assert.equal(newBeta.row.getBoundingClientRect().top - correction, 180);
 });
 
@@ -1244,7 +1678,7 @@ test("expanded details anchor stays fixed after content above it resizes", () =>
     settleSwap(harness, frame, replacement);
 
     const correction = 310 - 220;
-    assert.deepEqual(harness.window.scrollByCalls, [[0, correction]]);
+    assert.deepEqual(harness.window.scrollByCalls, [[{behavior: "instant", left: 0, top: correction}]]);
     assert.equal(newBeta.panel.getBoundingClientRect().top - correction, 220);
 });
 
@@ -1263,7 +1697,7 @@ test("visible details remain the viewport anchor after htmx settles their classe
     settleSwap(harness, frame, replacement);
 
     const correction = 310 - 220;
-    assert.deepEqual(harness.window.scrollByCalls, [[0, correction]]);
+    assert.deepEqual(harness.window.scrollByCalls, [[{behavior: "instant", left: 0, top: correction}]]);
     assert.equal(newBeta.panel.getBoundingClientRect().top - correction, 220);
 });
 
@@ -1282,7 +1716,7 @@ test("missing saved anchor part uses absolute fallback instead of another part",
     settleSwap(harness, frame, replacement);
 
     assert.deepEqual(harness.window.scrollByCalls, []);
-    assert.deepEqual(harness.window.scrollToCalls, [[20, 200]]);
+    assert.deepEqual(harness.window.scrollToCalls, [[{behavior: "instant", left: 0, top: 200}]]);
 });
 
 test("missing workspace anchor falls back to saved clamped scroll position", () => {
@@ -1297,8 +1731,13 @@ test("missing workspace anchor falls back to saved clamped scroll position", () 
     const replacement = harness.document.adopt(new FakeElement("div", {classes: ["bw-dashboard"]}));
     replacement.append(newBeta.row, newBeta.panel);
 
-    settleSwap(harness, frame, replacement);
+    const beforeSwap = htmxSwap(frame);
+    harness.document.body.dispatch("htmx:beforeSwap", beforeSwap);
+    frame.replaceChildren(replacement);
+    harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
+    harness.document.body.dispatch("htmx:afterSwap", htmxAfter(frame, beforeSwap.detail.xhr));
+    harness.document.body.dispatch("htmx:afterSettle", htmxAfter(frame, beforeSwap.detail.xhr));
 
     assert.deepEqual(harness.window.scrollByCalls, []);
-    assert.deepEqual(harness.window.scrollToCalls, [[12, 200]]);
+    assert.deepEqual(harness.window.scrollToCalls, [[{behavior: "instant", left: 0, top: 200}]]);
 });

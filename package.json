@@ -1,0 +1,10 @@
+{
+  "name": "boardwalk-js-tests",
+  "private": true,
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
+  },
+  "devDependencies": {
+    "jsdom": "29.1.1"
+  }
+}

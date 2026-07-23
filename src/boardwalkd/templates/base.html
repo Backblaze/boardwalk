@@ -30,7 +30,7 @@
     }
 </script>
 
-<body hx-headers='js:{"X-XSRFToken": getCookie("_xsrf")}'>
+<body hx-ext="morph" hx-headers='js:{"X-XSRFToken": getCookie("_xsrf")}'>
     <header class="bw-topbar">
         <a href="/" class="bw-brand" aria-label="{{ theme_brand_name }}">
             {% if theme_logo_url %}
@@ -58,6 +58,7 @@
 
     <script src="{{ static_url('bootstrap.bundle.min.js') }}" defer></script>
     <script src="{{ static_url('htmx.min.js') }}" defer></script>
+    <script src="{{ static_url('idiomorph-ext.min.js') }}" defer></script>
     <script src="{{ static_url('boardwalkd.js') }}" defer></script>
     {% block bottom %}{% end %}
 </body>

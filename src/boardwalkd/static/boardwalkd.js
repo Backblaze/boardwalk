@@ -2,7 +2,6 @@
     var EXPANDED_WORKSPACE_KEY = "boardwalk.expandedWorkspace";
     var EXPANDED_EVENTS_KEY = "boardwalk.expandedEvents";
     var refreshTransactions = new WeakMap();
-    var restorationCounts = new WeakMap();
     var selectedWorkspaceKeys = new Set();
 
     function storedTheme() {
@@ -63,6 +62,98 @@
             }
         });
         return match;
+    }
+
+    function isDashboardElement(element) {
+        if (!element || !element.matches) return false;
+        for (var ancestor = element; ancestor; ancestor = ancestor.parentElement) {
+            if (ancestor.matches("#workspace-dashboard")) return true;
+        }
+        return false;
+    }
+
+    function dashboardElementsWithin(root, selector) {
+        if (!root || !root.matches || !isDashboardElement(root)) return [];
+        var elements = [];
+        if (root.matches(selector)) elements.push(root);
+        if (root.querySelectorAll) {
+            root.querySelectorAll(selector).forEach(function (element) {
+                if (isDashboardElement(element)) elements.push(element);
+            });
+        }
+        return elements;
+    }
+
+    function projectStoredWorkspaceState(newNode) {
+        var expandedKey = storedSessionValue(EXPANDED_WORKSPACE_KEY);
+        if (!expandedKey) return;
+        dashboardElementsWithin(
+            newNode,
+            "[data-workspace-row], [data-row-toggle], .bw-row-details",
+        ).forEach(function (element) {
+            if ((element.dataset.workspaceKey || "") !== expandedKey) return;
+            if (element.matches("[data-workspace-row]")) {
+                element.classList.add("is-expanded");
+            } else if (element.matches("[data-row-toggle]")) {
+                element.setAttribute("aria-expanded", "true");
+            } else if (element.matches(".bw-row-details")) {
+                element.hidden = false;
+                element.classList.add("is-expanded");
+            }
+        });
+    }
+
+    function projectStoredEventState(newNode) {
+        var eventKeys = storedEventKeys();
+        if (!eventKeys.length) return;
+        dashboardElementsWithin(newNode, "[data-event-extra], [data-events-toggle]").forEach(
+            function (element) {
+                var panel = element.closest(".bw-row-details");
+                var key = panel && panel.dataset ? panel.dataset.workspaceKey || "" : "";
+                if (eventKeys.indexOf(key) === -1) return;
+                element.hidden = element.matches("[data-events-toggle]");
+            },
+        );
+    }
+
+    function transferMatchedDashboardState(oldNode, newNode) {
+        if (!isDashboardElement(oldNode) || !isDashboardElement(newNode)) return;
+        if (oldNode.matches("[data-workspace-row]")) {
+            newNode.classList.toggle("is-expanded", oldNode.classList.contains("is-expanded"));
+        } else if (oldNode.matches("[data-row-toggle]")) {
+            newNode.setAttribute(
+                "aria-expanded",
+                oldNode.getAttribute("aria-expanded") === "true" ? "true" : "false",
+            );
+        } else if (oldNode.matches(".bw-row-details")) {
+            newNode.hidden = oldNode.hidden;
+            newNode.classList.toggle("is-expanded", oldNode.classList.contains("is-expanded"));
+        }
+        projectStoredEventState(newNode);
+    }
+
+    function projectAddedDashboardState(newNode) {
+        if (!isDashboardElement(newNode)) return;
+        projectStoredWorkspaceState(newNode);
+        projectStoredEventState(newNode);
+    }
+
+    function installMorphCallbacks() {
+        if (!window.Idiomorph || !window.Idiomorph.defaults) return;
+        var callbacks = window.Idiomorph.defaults.callbacks;
+        var previousMorphed = callbacks.beforeNodeMorphed;
+        var previousAdded = callbacks.beforeNodeAdded;
+
+        callbacks.beforeNodeMorphed = function (oldNode, newNode) {
+            if (previousMorphed && previousMorphed(oldNode, newNode) === false) return false;
+            transferMatchedDashboardState(oldNode, newNode);
+            return true;
+        };
+        callbacks.beforeNodeAdded = function (newNode) {
+            if (previousAdded && previousAdded(newNode) === false) return false;
+            projectAddedDashboardState(newNode);
+            return true;
+        };
     }
 
     function applyTheme(theme) {
@@ -151,42 +242,31 @@
         updateDeleteSelectedButton(scope);
     }
 
-    function bindDeletionSelection(root) {
-        var scope = root || document;
-        clearSelectionUnlessEditing(scope);
-        deletionCheckboxes(scope).forEach(function (checkbox) {
-            if (checkbox.dataset.deletionBound === "1") return;
-            checkbox.dataset.deletionBound = "1";
-            checkbox.addEventListener("change", function () {
-                var key = checkbox.dataset.workspaceKey || "";
-                if (key && checkbox.checked && deletionCheckboxIsEligible(checkbox)) {
-                    selectedWorkspaceKeys.add(key);
-                } else {
-                    if (key) selectedWorkspaceKeys.delete(key);
-                    if (!deletionCheckboxIsEligible(checkbox)) checkbox.checked = false;
-                }
-                updateDeleteSelectedButton(scope);
-            });
-        });
+    function updateWorkspaceSelection(checkbox) {
+        var scope = checkbox.closest(".bw-dashboard") || document;
+        var key = checkbox.dataset.workspaceKey || "";
+        if (key && checkbox.checked && deletionCheckboxIsEligible(checkbox)) {
+            selectedWorkspaceKeys.add(key);
+        } else {
+            if (key) selectedWorkspaceKeys.delete(key);
+            if (!deletionCheckboxIsEligible(checkbox)) checkbox.checked = false;
+        }
+        updateDeleteSelectedButton(scope);
+    }
 
-        scope.querySelectorAll("[data-select-visible-status]").forEach(function (button) {
-            if (button.dataset.deletionBound === "1") return;
-            button.dataset.deletionBound = "1";
-            button.addEventListener("click", function () {
-                var status = button.dataset.selectVisibleStatus || "";
-                deletionCheckboxes(scope).forEach(function (checkbox) {
-                    var key = checkbox.dataset.workspaceKey || "";
-                    if (
-                        key &&
-                        checkbox.dataset.workspaceStatus === status &&
-                        deletionCheckboxIsEligible(checkbox)
-                    ) {
-                        checkbox.checked = true;
-                        selectedWorkspaceKeys.add(key);
-                    }
-                });
-                updateDeleteSelectedButton(scope);
-            });
+    function selectVisibleStatus(button) {
+        var scope = button.closest(".bw-dashboard") || document;
+        var status = button.dataset.selectVisibleStatus || "";
+        deletionCheckboxes(scope).forEach(function (checkbox) {
+            var key = checkbox.dataset.workspaceKey || "";
+            if (
+                key &&
+                checkbox.dataset.workspaceStatus === status &&
+                deletionCheckboxIsEligible(checkbox)
+            ) {
+                checkbox.checked = true;
+                selectedWorkspaceKeys.add(key);
+            }
         });
         updateDeleteSelectedButton(scope);
     }
@@ -299,77 +379,95 @@
     // Expansion state is per browser tab via sessionStorage. HTMX refreshes can
     // redraw the table without turning one user's expanded row into server state.
     function restoreExpandedState(root) {
+        var scope = root || document;
         var key = storedSessionValue(EXPANDED_WORKSPACE_KEY);
         if (key) {
-            openRowByKey(key, false);
+            var button = findByWorkspaceKey(scope, "[data-row-toggle]", key);
+            var panel = button && document.getElementById(button.getAttribute("aria-controls"));
+            var row = findByWorkspaceKey(scope, "[data-workspace-row]", key);
+            if (
+                button &&
+                panel &&
+                (panel.hidden ||
+                    !panel.classList.contains("is-expanded") ||
+                    button.getAttribute("aria-expanded") !== "true" ||
+                    (row && !row.classList.contains("is-expanded")))
+            ) {
+                openRowByKey(key, false);
+            }
         }
         storedEventKeys().forEach(function (eventKey) {
-            var panel = findByWorkspaceKey(root || document, ".bw-row-details", eventKey);
-            if (!panel) return;
-            panel.querySelectorAll("[data-event-extra]").forEach(function (line) {
-                line.hidden = false;
+            var eventPanel = findByWorkspaceKey(scope, ".bw-row-details", eventKey);
+            if (!eventPanel) return;
+            eventPanel.querySelectorAll("[data-event-extra]").forEach(function (line) {
+                if (line.hidden) line.hidden = false;
             });
-            panel.querySelectorAll("[data-events-toggle]").forEach(function (button) {
-                button.hidden = true;
-            });
-        });
-    }
-
-    function bindRows(root) {
-        (root || document).querySelectorAll("[data-row-toggle]").forEach(function (button) {
-            if (button.dataset.bound === "1") return;
-            button.dataset.bound = "1";
-            button.addEventListener("click", function (event) {
-                event.stopPropagation();
-                var target = document.getElementById(button.getAttribute("aria-controls"));
-                if (!target) return;
-                var open = target.hidden;
-                if (open) {
-                    openRowByKey(button.dataset.workspaceKey, true);
-                } else {
-                    closeRows(true);
-                }
-            });
-        });
-
-        (root || document).querySelectorAll("[data-workspace-row]").forEach(function (row) {
-            if (row.dataset.bound === "1") return;
-            row.dataset.bound = "1";
-            row.addEventListener("click", function (event) {
-                if (event.target.closest("a, button, input, select, label")) return;
-                var toggle = row.querySelector("[data-row-toggle]");
-                if (toggle) toggle.click();
+            eventPanel.querySelectorAll("[data-events-toggle]").forEach(function (eventButton) {
+                if (!eventButton.hidden) eventButton.hidden = true;
             });
         });
     }
 
-    function bindEventToggles(root) {
-        (root || document).querySelectorAll("[data-events-toggle]").forEach(function (button) {
-            if (button.dataset.bound === "1") return;
-            button.dataset.bound = "1";
-            button.addEventListener("click", function (event) {
-                event.stopPropagation();
-                var container = button.closest(".bw-events");
-                if (!container) return;
-                container.querySelectorAll("[data-event-extra]").forEach(function (line) {
-                    line.hidden = false;
-                });
-                button.hidden = true;
-                var panel = button.closest(".bw-row-details");
-                if (panel) {
-                    rememberEventKey(panel.dataset.workspaceKey);
-                }
-            });
-        });
+    function toggleRow(button) {
+        var target = document.getElementById(button.getAttribute("aria-controls"));
+        if (!target) return;
+        if (target.hidden) {
+            openRowByKey(button.dataset.workspaceKey, true);
+        } else {
+            closeRows(true);
+        }
     }
 
-    function bindThemeToggle() {
-        var toggle = document.querySelector("[data-theme-toggle]");
-        if (!toggle || toggle.dataset.bound === "1") return;
-        toggle.dataset.bound = "1";
-        toggle.addEventListener("click", function () {
+    function expandRecentEvents(button) {
+        var container = button.closest(".bw-events");
+        if (!container) return;
+        container.querySelectorAll("[data-event-extra]").forEach(function (line) {
+            line.hidden = false;
+        });
+        button.hidden = true;
+        var panel = button.closest(".bw-row-details");
+        if (panel) {
+            rememberEventKey(panel.dataset.workspaceKey);
+        }
+    }
+
+    function handleBodyClick(event) {
+        var themeToggle = event.target.closest("[data-theme-toggle]");
+        if (themeToggle) {
             applyTheme(document.documentElement.classList.contains("bw-theme-dark") ? "light" : "dark");
-        });
+            return;
+        }
+
+        var rowToggle = event.target.closest("[data-row-toggle]");
+        if (rowToggle) {
+            event.stopPropagation();
+            toggleRow(rowToggle);
+            return;
+        }
+
+        var eventToggle = event.target.closest("[data-events-toggle]");
+        if (eventToggle) {
+            event.stopPropagation();
+            expandRecentEvents(eventToggle);
+            return;
+        }
+
+        var statusButton = event.target.closest("[data-select-visible-status]");
+        if (statusButton) {
+            selectVisibleStatus(statusButton);
+            return;
+        }
+
+        var row = event.target.closest("[data-workspace-row]");
+        if (row && !event.target.closest("a, button, input, select, label")) {
+            var toggle = row.querySelector("[data-row-toggle]");
+            if (toggle) toggleRow(toggle);
+        }
+    }
+
+    function handleBodyChange(event) {
+        var checkbox = event.target.closest("[data-delete-workspace]");
+        if (checkbox) updateWorkspaceSelection(checkbox);
     }
 
     function isRestorableControl(element) {
@@ -461,8 +559,8 @@
         return match;
     }
 
-    // Auto-refresh replaces the dashboard fragment. Capture the focused control
-    // so in-progress search/filter typing survives the swap.
+    // Capture stable fallback identity for the focused dashboard control.
+    // Retained controls are left to node identity; this lifecycle never rewrites them.
     function captureActiveControl(dashboard) {
         var active = document.activeElement;
         if (!isRestorableControl(active) || !dashboard || !dashboard.contains(active)) return null;
@@ -470,20 +568,21 @@
         var controlIndex = controls.indexOf(active);
         if (controlIndex < 0) return null;
         return {
+            node: active,
             controlIndex: controlIndex,
             workspaceKey: workspaceKeyForElement(active),
             discriminator: controlDiscriminator(active),
             name: active.name || "",
             tagName: active.tagName,
             type: active.type || "",
-            value: active.value,
             selectionStart: typeof active.selectionStart === "number" ? active.selectionStart : null,
             selectionEnd: typeof active.selectionEnd === "number" ? active.selectionEnd : null,
         };
     }
 
-    function restoreActiveControl(root, snapshot) {
+    function restoreActiveControlIfLost(root, snapshot) {
         if (!snapshot) return;
+        if (snapshot.node && snapshot.node.isConnected) return;
         var control = findControlBySnapshot(root || document, snapshot);
         if (control && !controlCanReceiveFocus(control, root || document)) control = null;
         var exactMatch = Boolean(control);
@@ -493,7 +592,6 @@
             var fallbackIndex = Math.min(Math.max(snapshot.controlIndex || 0, 0), controls.length - 1);
             control = controls[fallbackIndex];
         }
-        if (exactMatch) control.value = snapshot.value;
         control.focus({ preventScroll: true });
         if (!exactMatch) return;
         if (
@@ -545,7 +643,7 @@
         var active = document.activeElement;
         if (active && dashboard.contains(active)) {
             var activeWorkspace = active.closest("[data-workspace-row], .bw-row-details");
-            var activeAnchor = anchorSnapshot(activeWorkspace);
+            var activeAnchor = isInViewport(activeWorkspace) && anchorSnapshot(activeWorkspace);
             if (activeAnchor) return activeAnchor;
         }
 
@@ -567,42 +665,20 @@
     }
 
     function captureRefreshState(event) {
-        var owner = swapOwner(event);
-        if (!owner || owner.classList.contains("bw-admin-panel")) return null;
+        var frame = swapOwner(event);
+        if (!frame || frame.classList.contains("bw-admin-panel")) return null;
         var dashboard = dashboardForSwap(event);
-        if (!dashboard) {
-            return {
-                owner: owner,
-                anchor: null,
-                scrollX: window.scrollX,
-                scrollY: window.scrollY,
-                activeControl: null,
-                initial: true,
-            };
-        }
         return {
-            owner: owner,
-            anchor: visibleWorkspaceAnchor(dashboard),
-            scrollX: window.scrollX,
-            scrollY: window.scrollY,
-            activeControl: captureActiveControl(dashboard),
-            initial: false,
+            frame: frame,
+            viewport: dashboard
+                ? {
+                      anchor: visibleWorkspaceAnchor(dashboard),
+                      scrollY: window.scrollY,
+                  }
+                : null,
+            activeControl: dashboard ? captureActiveControl(dashboard) : null,
+            applied: false,
         };
-    }
-
-    function beginDashboardRestoration(owner) {
-        restorationCounts.set(owner, (restorationCounts.get(owner) || 0) + 1);
-        owner.classList.add("is-restoring-dashboard-state");
-    }
-
-    function endDashboardRestoration(owner) {
-        var remaining = (restorationCounts.get(owner) || 1) - 1;
-        if (remaining > 0) {
-            restorationCounts.set(owner, remaining);
-            return;
-        }
-        restorationCounts.delete(owner);
-        owner.classList.remove("is-restoring-dashboard-state");
     }
 
     function matchingWorkspaceElement(root, anchor) {
@@ -615,33 +691,37 @@
         return preferred;
     }
 
-    function restoreViewport(snapshot, root) {
+    function restoreViewport(root, snapshot) {
         if (!snapshot) return;
         var anchor = snapshot.anchor;
         var restoredAnchor = anchor && matchingWorkspaceElement(root || document, anchor);
         if (restoredAnchor) {
             var currentTop = restoredAnchor.getBoundingClientRect().top;
-            window.scrollBy(0, currentTop - anchor.top);
+            var delta = currentTop - anchor.top;
+            if (delta !== 0) {
+                window.scrollBy({ behavior: "instant", left: 0, top: delta });
+            }
             return;
         }
 
-        var documentHeight = Math.max(
-            document.documentElement ? document.documentElement.scrollHeight || 0 : 0,
-            document.body ? document.body.scrollHeight || 0 : 0,
+        var documentHeight = document.documentElement ? document.documentElement.scrollHeight || 0 : 0;
+        var fallbackTop = Math.max(
+            0,
+            Math.min(snapshot.scrollY, documentHeight - window.innerHeight),
         );
-        var maxDocumentScrollY = Math.max(0, documentHeight - window.innerHeight);
-        window.scrollTo(snapshot.scrollX, Math.min(snapshot.scrollY, maxDocumentScrollY));
+        window.scrollTo({
+            behavior: "instant",
+            left: 0,
+            top: fallbackTop,
+        });
     }
 
-    function boot(root, restoreState) {
+    function enhanceDashboard(root) {
         var scope = root || document;
-        bindThemeToggle();
-        bindRows(scope);
-        bindEventToggles(scope);
-        bindDeletionSelection(scope);
+        clearSelectionUnlessEditing(scope);
+        restoreDeletionSelection(scope);
         localizeEventTimes(scope);
         fitNames(scope);
-        if (restoreState) restoreExpandedState(scope);
     }
 
     function xhrForEvent(event) {
@@ -650,12 +730,37 @@
         return xhr && (typeof xhr === "object" || typeof xhr === "function") ? xhr : null;
     }
 
+    function applyRefreshTransaction(xhr, frame) {
+        var snapshot = xhr ? refreshTransactions.get(xhr) : null;
+        if (!snapshot || snapshot.applied || frame !== snapshot.frame) return;
+        snapshot.applied = true;
+
+        try {
+            enhanceDashboard(frame);
+            restoreExpandedState(frame);
+            restoreActiveControlIfLost(frame, snapshot.activeControl);
+            restoreViewport(frame, snapshot.viewport);
+        } finally {
+            refreshTransactions.delete(xhr);
+        }
+    }
+
+    function discardRefreshTransaction(event) {
+        var xhr = xhrForEvent(event);
+        if (xhr) refreshTransactions.delete(xhr);
+    }
+
+    installMorphCallbacks();
+
     document.addEventListener("DOMContentLoaded", function () {
         applyTheme(storedTheme());
-        boot(document, true);
+        enhanceDashboard(document);
+        restoreExpandedState(document);
     });
 
     if (document.body) {
+        document.body.addEventListener("click", handleBodyClick);
+        document.body.addEventListener("change", handleBodyChange);
         document.body.addEventListener("htmx:beforeRequest", function (event) {
             if (isDashboardAutoRefresh(event) && userIsEditingDashboard()) {
                 event.preventDefault();
@@ -673,28 +778,23 @@
             }
             var xhr = xhrForEvent(event);
             if (!xhr || detail.shouldSwap !== true || detail.isError) return;
+            if (refreshTransactions.has(xhr)) return;
             var snapshot = captureRefreshState(event);
             if (snapshot) {
-                beginDashboardRestoration(snapshot.owner);
                 refreshTransactions.set(xhr, snapshot);
             }
         });
         document.body.addEventListener("htmx:afterSwap", function (event) {
-            var xhr = xhrForEvent(event);
-            var snapshot = xhr ? refreshTransactions.get(xhr) : null;
-            if (!snapshot || swapOwner(event) !== snapshot.owner) return;
-            boot(event.target, true);
-            if (!snapshot.initial) restoreViewport(snapshot, event.target);
+            applyRefreshTransaction(xhrForEvent(event), swapOwner(event));
         });
-        document.body.addEventListener("htmx:afterSettle", function (event) {
-            var xhr = xhrForEvent(event);
-            var snapshot = xhr ? refreshTransactions.get(xhr) : null;
-            if (!snapshot) return;
-            refreshTransactions.delete(xhr);
-            endDashboardRestoration(snapshot.owner);
-            if (swapOwner(event) !== snapshot.owner) return;
-            restoreDeletionSelection(event.target);
-            restoreActiveControl(event.target, snapshot.activeControl);
+        [
+            "htmx:responseError",
+            "htmx:swapError",
+            "htmx:sendAbort",
+            "htmx:sendError",
+            "htmx:timeout",
+        ].forEach(function (eventName) {
+            document.body.addEventListener(eventName, discardRefreshTransaction);
         });
     }
 })();

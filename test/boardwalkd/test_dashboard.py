@@ -1,7 +1,9 @@
 import hashlib
 import importlib.resources
+import re
 from collections import deque
 from datetime import UTC, datetime, timedelta
+from html.parser import HTMLParser
 from types import SimpleNamespace
 from typing import cast
 from urllib.parse import parse_qs, urlparse
@@ -567,6 +569,280 @@ def render_workspace_partial(dashboard, workspaces=None, edit=False, deletion_is
         squeeze=lambda value: value,
         xsrf_form_html=lambda: "",
     ).decode()
+
+
+def test_reserved_all_group_is_only_the_global_tab():
+    workspaces = {
+        "reserved-group-workspace": ws(group="All", current_host="node-reserved"),
+        "alpha-workspace": ws(group="alpha", current_host="node-alpha"),
+    }
+    dashboard = build_dashboard(workspaces, DashboardFilters())
+
+    assert [(group.label, group.count) for group in dashboard.groups] == [
+        ("All", 2),
+        ("alpha", 1),
+    ]
+
+    html = render_workspace_partial(dashboard, workspaces)
+    all_group_key = hashlib.sha256(b"All").hexdigest()
+    extracted_id_values = re.findall(r'\bid="([^"]+)"', html)
+
+    assert html.count(f'id="workspace-group-tab-{all_group_key}"') == 1
+    assert len(extracted_id_values) == len(set(extracted_id_values))
+
+
+class RenderedElementCollector(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.elements = []
+
+    def handle_starttag(self, tag, attrs):
+        self.elements.append({"tag": tag, **dict(attrs)})
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+
+
+def rendered_elements(html):
+    parser = RenderedElementCollector()
+    parser.feed(html)
+    return parser.elements
+
+
+def test_index_template_initial_frame_uses_morph_swap():
+    loader = Loader(str(importlib.resources.files("boardwalkd").joinpath("templates")))
+    template = loader.load("index.html")
+    html = template.generate(
+        title="Index",
+        edit=False,
+        workspaces_url="/workspaces",
+        handler=SimpleNamespace(settings={}),
+        static_url=lambda value: f"/static/{value}",
+        server_version=lambda: "test",
+        xsrf_form_html=lambda: "",
+        _tt_modules=SimpleNamespace(xsrf_form_html=lambda: ""),
+    ).decode()
+
+    frame = next(element for element in rendered_elements(html) if element.get("class") == "bw-frame")
+
+    assert frame["hx-trigger"] == "load"
+    assert frame["hx-swap"] == "morph:innerHTML"
+
+
+@pytest.mark.parametrize("edit", (False, True))
+def test_workspace_partial_frame_actions_use_morph_swap_and_hx_sync(edit):
+    now = datetime(2026, 7, 22, 12, 0, tzinfo=UTC)
+    workspaces = {
+        "caught-active": ws(group="alpha", caught=True, has_mutex=False, last_seen=now),
+        "deletable": ws(group="beta", has_mutex=False),
+        "mutexed": ws(group="beta", has_mutex=True),
+    }
+    dashboard = build_dashboard(workspaces, DashboardFilters(), now=now)
+    elements = rendered_elements(render_workspace_partial(dashboard, workspaces, edit=edit))
+    frame_targets = [element for element in elements if element.get("hx-target") == "closest .bw-frame"]
+    polls = [element for element in elements if element.get("hx-trigger") == "every 8s"]
+    deliberate_actions = [element for element in frame_targets if element not in polls]
+
+    assert len(polls) == 1
+    assert polls[0]["id"] == "workspace-dashboard"
+    assert polls[0]["hx-swap"] == "morph:innerHTML"
+    assert polls[0]["hx-sync"] == "closest .bw-frame:drop"
+    assert deliberate_actions
+    assert all(element.get("hx-swap") == "morph:innerHTML" for element in deliberate_actions)
+    assert all(element.get("hx-sync") == "closest .bw-frame:replace" for element in deliberate_actions)
+    assert not any(element.get("hx-swap") == "innerHTML" for element in frame_targets)
+
+    deliberate_ids = {element.get("id") for element in deliberate_actions}
+    deliberate_classes = {
+        class_name for element in deliberate_actions for class_name in element.get("class", "").split()
+    }
+    assert {
+        "workspace-search-form",
+        "workspace-status-filter-form",
+        "workspace-source-filter-form",
+        "workspace-edit-toggle",
+    }.issubset(deliberate_ids)
+    assert {"bw-tab", "bw-sort-arrow", "bw-button-catch", "bw-button-release"}.issubset(deliberate_classes)
+    if edit:
+        assert "bw-bulk-delete-form" in deliberate_ids
+        assert any("/semaphores/has_mutex" in element.get("hx-delete", "") for element in deliberate_actions)
+        assert any(
+            element.get("hx-post", "").startswith("/workspaces/delete") and element.get("hx-vals")
+            for element in deliberate_actions
+        )
+
+
+def test_component_local_and_non_frame_swaps_remain_outside_morph_swap_cutover():
+    now = datetime(2026, 7, 22, 12, 0, tzinfo=UTC)
+    workspaces = {"caught-active": ws(group="alpha", caught=True, has_mutex=False, last_seen=now)}
+    dashboard = build_dashboard(workspaces, DashboardFilters(), now=now)
+    dashboard_elements = rendered_elements(render_workspace_partial(dashboard, workspaces))
+    cleanup_controls = [
+        element for element in dashboard_elements if element.get("hx-target", "").startswith("#remote-")
+    ]
+
+    assert len(cleanup_controls) == 2
+    assert all(element.get("hx-swap") == "outerHTML" for element in cleanup_controls)
+    assert all("hx-sync" not in element for element in cleanup_controls)
+
+    loader = Loader(str(importlib.resources.files("boardwalkd").joinpath("templates")))
+    user = SimpleNamespace(email="operator@example.com", enabled=True, roles={"admin"})
+    admin_roles = (
+        loader.load("admin_user_roles.html")
+        .generate(
+            user=user,
+            valid_user_roles=("admin", "operator"),
+            current_user="viewer@example.com",
+            owner="owner@example.com",
+            sha256=lambda value: hashlib.sha256(value.encode()).hexdigest(),
+        )
+        .decode()
+    )
+    admin_enable = (
+        loader.load("admin_user_enable.html")
+        .generate(
+            user=user,
+            current_user="viewer@example.com",
+            owner="owner@example.com",
+            url_escape=lambda value: value,
+        )
+        .decode()
+    )
+    workspace_events = (
+        loader.load("workspace_events.html")
+        .generate(
+            title="Events",
+            workspace_name="caught-active",
+            handler=SimpleNamespace(settings={}),
+            static_url=lambda value: f"/static/{value}",
+            server_version=lambda: "test",
+            xsrf_form_html=lambda: "",
+            _tt_modules=SimpleNamespace(xsrf_form_html=lambda: ""),
+        )
+        .decode()
+    )
+
+    role_controls = [
+        element
+        for element in rendered_elements(admin_roles)
+        if element.get("hx-target", "").startswith("#roles-btn-group-")
+    ]
+    enable_control = next(element for element in rendered_elements(admin_enable) if element.get("hx-delete"))
+    event_poll = next(
+        element
+        for element in rendered_elements(workspace_events)
+        if element.get("class") is None and element.get("hx-get", "").endswith("/events/table")
+    )
+
+    assert role_controls
+    assert all(element.get("hx-swap") == "innerHTML" for element in role_controls)
+    assert enable_control["hx-swap"] == "outerHTML"
+    assert event_poll["hx-swap"] == "innerHTML"
+
+
+def test_workspace_partial_dashboard_identity_uses_stable_unique_ids():
+    now = datetime(2026, 7, 22, 12, 0, tzinfo=UTC)
+    workspaces = {
+        "first-workspace": ws(
+            group="alpha",
+            caught=True,
+            has_mutex=False,
+            last_seen=now,
+        ),
+        "second-workspace": ws(
+            group="beta",
+            has_mutex=False,
+        ),
+    }
+    dashboard = build_dashboard(workspaces, DashboardFilters(), now=now)
+
+    html = render_workspace_partial(dashboard, workspaces, edit=True)
+    first_key = hashlib.sha256(b"first-workspace").hexdigest()
+    second_key = hashlib.sha256(b"second-workspace").hexdigest()
+    group_keys = {label: hashlib.sha256(label.encode()).hexdigest() for label in ("All", "alpha", "beta")}
+    extracted_id_values = re.findall(r'\bid="([^"]+)"', html)
+
+    assert 'id="workspace-dashboard"' in html
+    assert 'id="workspace-search-form"' in html
+    assert 'id="workspace-search"' in html
+    assert 'id="workspace-search-submit"' in html
+    assert 'id="workspace-status-filter-form"' in html
+    assert 'id="workspace-status-filter"' in html
+    assert 'id="workspace-source-filter-form"' in html
+    assert 'id="workspace-source-filter"' in html
+    assert 'id="workspace-edit-toggle"' in html
+    assert 'id="workspace-select-visible-done"' in html
+    assert 'id="workspace-select-visible-stale"' in html
+    assert 'id="workspace-delete-selected"' in html
+    for group_key in group_keys.values():
+        assert f'id="workspace-group-tab-{group_key}"' in html
+    assert {lane.key for lane in dashboard.lanes} == {"caught", "inactive"}
+    for lane_key in (lane.key for lane in dashboard.lanes):
+        assert f'id="workspace-lane-{lane_key}"' in html
+        for sort_key in ("workspace", "updated", "current_host", "source", "status"):
+            control_key = hashlib.sha256(f"{lane_key}:{sort_key}".encode()).hexdigest()
+            assert f'id="workspace-sort-control-{control_key}"' in html
+    assert f'id="workspace-row-{first_key}"' in html
+    assert f'id="workspace-toggle-{first_key}"' in html
+    assert f'id="workspace-details-{first_key}"' in html
+    assert f'id="workspace-delete-{first_key}"' in html
+    assert f'aria-controls="workspace-details-{first_key}"' in html
+    assert f'id="workspace-row-{second_key}"' in html
+    assert f'id="workspace-toggle-{second_key}"' in html
+    assert f'id="workspace-details-{second_key}"' in html
+    assert f'id="workspace-delete-{second_key}"' in html
+    assert all("first-workspace" not in id_value for id_value in extracted_id_values)
+    assert all("second-workspace" not in id_value for id_value in extracted_id_values)
+    assert len(extracted_id_values) == len(set(extracted_id_values))
+
+
+def test_workspace_partial_dashboard_identity_keeps_server_truth_authoritative():
+    now = datetime(2026, 7, 22, 12, 0, tzinfo=UTC)
+    workspace_name = "changing-workspace"
+    workspace_key = hashlib.sha256(workspace_name.encode()).hexdigest()
+    before_workspaces = {
+        workspace_name: ws(
+            group="alpha",
+            caught=True,
+            has_mutex=False,
+            last_seen=now,
+            events=[WorkspaceEvent(severity="info", message="waiting for release", create_time=now)],
+            progress_hosts_completed="1",
+            progress_hosts_total="4",
+        )
+    }
+    before_dashboard = build_dashboard(before_workspaces, DashboardFilters(), now=now)
+
+    before_html = render_workspace_partial(before_dashboard, before_workspaces)
+
+    after_workspaces = {
+        workspace_name: ws(
+            group="beta",
+            has_mutex=False,
+            events=[WorkspaceEvent(severity="success", message="server says complete", create_time=now)],
+            progress_hosts_completed="4",
+            progress_hosts_total="4",
+        )
+    }
+    after_dashboard = build_dashboard(after_workspaces, DashboardFilters(), now=now)
+
+    after_html = render_workspace_partial(after_dashboard, after_workspaces)
+
+    stable_id = f'id="workspace-row-{workspace_key}"'
+    assert stable_id in before_html
+    assert stable_id in after_html
+    assert 'class="bw-row status-caught"' in before_html
+    assert 'id="workspace-lane-caught"' in before_html
+    assert '<progress value="1" max="4"></progress>' in before_html
+    assert "waiting for release" in before_html
+    assert "Release the workflow catch" in before_html
+    assert "Catch the workflow before" not in before_html
+    assert 'class="bw-row status-done"' in after_html
+    assert 'id="workspace-lane-inactive"' in after_html
+    assert '<progress value="4" max="4"></progress>' in after_html
+    assert "server says complete" in after_html
+    assert "Catch the workflow before" in after_html
+    assert "Release the workflow catch" not in after_html
 
 
 def test_workspace_partial_renders_progress_bar_for_active_ws_when_hosts_not_reported():
@@ -1223,6 +1499,8 @@ def test_base_template_renders_theme_brand_links_and_scripts():
     assert "Switch to light mode" in html
     assert "/static/boardwalkd.js" in html
     assert "<!-- xsrf-cookie-seed -->" in html
-    htmx_xsrf_header = '<body hx-headers=\'js:{"X-XSRFToken": getCookie("_xsrf")}\'>'
+    htmx_xsrf_header = '<body hx-ext="morph" hx-headers=\'js:{"X-XSRFToken": getCookie("_xsrf")}\'>'
     assert htmx_xsrf_header in html
     assert html.index("xsrf-cookie-seed") < html.index(htmx_xsrf_header)
+    assert html.index("/static/htmx.min.js") < html.index("/static/idiomorph-ext.min.js")
+    assert html.index("/static/idiomorph-ext.min.js") < html.index("/static/boardwalkd.js")

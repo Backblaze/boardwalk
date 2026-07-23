@@ -923,13 +923,6 @@ a {
     border-bottom-color: color-mix(in srgb, var(--bw-brand) 34%, var(--bw-line));
 }
 
-.bw-frame.is-restoring-dashboard-state .bw-row,
-.bw-frame.is-restoring-dashboard-state .bw-expand,
-.bw-frame.is-restoring-dashboard-state .bw-expand span[aria-hidden="true"],
-.bw-frame.is-restoring-dashboard-state .bw-row-details {
-    transition: none;
-}
-
 .bw-row-details.status-caught {
     box-shadow: inset 3px 0 0 var(--bw-caught);
 }

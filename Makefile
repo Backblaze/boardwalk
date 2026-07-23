@@ -79,12 +79,23 @@ format:
 
 # Installs/updates JS/CSS dependencies in boardwalkd
 BOOTSTRAP_VERSION := 5.2.2
-HTMX_VERSION := 1.8.2
+HTMX_VERSION := 2.0.10
+IDIOMORPH_VERSION := 0.7.4
+
 .PHONY: install-web-deps
 install-web-deps:
-	curl "https://unpkg.com/htmx.org@$(HTMX_VERSION)/dist/htmx.min.js" -o src/boardwalkd/static/htmx.min.js
-	curl "https://cdn.jsdelivr.net/npm/bootstrap@$(BOOTSTRAP_VERSION)/dist/css/bootstrap.min.css" -o src/boardwalkd/static/bootstrap.min.css
-	curl "https://cdn.jsdelivr.net/npm/bootstrap@$(BOOTSTRAP_VERSION)/dist/js/bootstrap.bundle.min.js" -o src/boardwalkd/static/bootstrap.bundle.min.js
+	curl --fail --location \
+		"https://unpkg.com/htmx.org@$(HTMX_VERSION)/dist/htmx.min.js" \
+		--output src/boardwalkd/static/htmx.min.js
+	curl --fail --location \
+		"https://unpkg.com/idiomorph@$(IDIOMORPH_VERSION)/dist/idiomorph-ext.min.js" \
+		--output src/boardwalkd/static/idiomorph-ext.min.js
+	curl --fail --location \
+		"https://cdn.jsdelivr.net/npm/bootstrap@$(BOOTSTRAP_VERSION)/dist/css/bootstrap.min.css" \
+		--output src/boardwalkd/static/bootstrap.min.css
+	curl --fail --location \
+		"https://cdn.jsdelivr.net/npm/bootstrap@$(BOOTSTRAP_VERSION)/dist/js/bootstrap.bundle.min.js" \
+		--output src/boardwalkd/static/bootstrap.bundle.min.js
 
 # Render all d2 diagrams in ./diagrams to PNG
 .PHONY: render-d2
@@ -100,7 +111,10 @@ test: test-js test-pytest test-ruff test-pyright test-semgrep test-ansible-lint
 
 .PHONY: test-js
 test-js:
-	node --test test/boardwalkd/test_boardwalkd_js.mjs
+	npm ci --ignore-scripts
+	node --test \
+		test/boardwalkd/test_boardwalkd_js.mjs \
+		test/boardwalkd/test_boardwalkd_morph.mjs
 
 .PHONY: test-ansible-lint
 test-ansible-lint:
