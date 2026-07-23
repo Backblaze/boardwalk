@@ -1,12 +1,15 @@
 {% set filters = dashboard.filters %}
-<div class="bw-dashboard" hx-get="{{ partial_url(filters, edit=edit) }}" hx-trigger="every 8s"
-    hx-target="closest .bw-frame" hx-swap="innerHTML">
+<div class="bw-dashboard" id="workspace-dashboard"
+    hx-get="{{ partial_url(filters, edit=edit) }}" hx-trigger="every 8s"
+    hx-target="closest .bw-frame" hx-swap="morph:innerHTML"
+    hx-sync="closest .bw-frame:drop">
     <nav class="bw-tabs" aria-label="Workspace groups">
         {% for group in dashboard.groups %}
-        <a class="bw-tab{% if group.active %} is-active{% end %}"
+        <a class="bw-tab{% if group.active %} is-active{% end %}" id="workspace-group-tab-{{ sha256(group.label) }}"
             href="{{ canonical_url(filters, edit=edit, group=group.label) # nosemgrep: boardwalk.html-templates.security.var-in-href }}"
             hx-get="{{ partial_url(filters, edit=edit, push_url=True, group=group.label) }}"
-            hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false">
+            hx-target="closest .bw-frame" hx-swap="morph:innerHTML"
+            hx-sync="closest .bw-frame:replace" hx-push-url="false">
             <span>{{ group.label }}</span>
             <span class="bw-tab-count">{{ group.count }}</span>
         </a>
@@ -14,8 +17,9 @@
     </nav>
 
     <div class="bw-filterbar">
-        <form class="bw-search-form" action="/" method="get" hx-get="/workspaces"
-            hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
+        <form class="bw-search-form" id="workspace-search-form" action="/" method="get" hx-get="/workspaces"
+            hx-target="closest .bw-frame" hx-swap="morph:innerHTML"
+            hx-sync="closest .bw-frame:replace" hx-push-url="false"
             hx-vals='{"push_url":"1"}'>
             <input type="hidden" name="group" value="{{ filters.group }}">
             <input type="hidden" name="status" value="{{ filters.status }}">
@@ -27,14 +31,15 @@
             {% end %}
             <label class="bw-field bw-field-search">
                 <span>Search</span>
-                <input class="bw-input" type="search" name="search" value="{{ filters.search }}"
+                <input class="bw-input" id="workspace-search" type="search" name="search" value="{{ filters.search }}"
                     placeholder="Workspace, host, limit, user, build">
             </label>
-            <button type="submit" class="bw-button bw-button-primary">Search</button>
+            <button type="submit" class="bw-button bw-button-primary" id="workspace-search-submit">Search</button>
         </form>
 
-        <form class="bw-select-form" action="/" method="get" hx-get="/workspaces"
-            hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
+        <form class="bw-select-form" id="workspace-status-filter-form" action="/" method="get" hx-get="/workspaces"
+            hx-target="closest .bw-frame" hx-swap="morph:innerHTML"
+            hx-sync="closest .bw-frame:replace" hx-push-url="false"
             hx-vals='{"push_url":"1"}'>
             <input type="hidden" name="group" value="{{ filters.group }}">
             <input type="hidden" name="search" value="{{ filters.search }}">
@@ -46,7 +51,8 @@
             {% end %}
             <label class="bw-field">
                 <span>Status</span>
-                <select class="bw-select" name="status" onchange="this.form.requestSubmit()">
+                <select class="bw-select" id="workspace-status-filter" name="status"
+                    onchange="this.form.requestSubmit()">
                     <option value="all" {% if filters.status == "all" %}selected{% end %}>All</option>
                     <option value="running" {% if filters.status == "running" %}selected{% end %}>Running</option>
                     <option value="caught" {% if filters.status == "caught" %}selected{% end %}>Caught</option>
@@ -58,8 +64,9 @@
             </label>
         </form>
 
-        <form class="bw-select-form" action="/" method="get" hx-get="/workspaces"
-            hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
+        <form class="bw-select-form" id="workspace-source-filter-form" action="/" method="get" hx-get="/workspaces"
+            hx-target="closest .bw-frame" hx-swap="morph:innerHTML"
+            hx-sync="closest .bw-frame:replace" hx-push-url="false"
             hx-vals='{"push_url":"1"}'>
             <input type="hidden" name="group" value="{{ filters.group }}">
             <input type="hidden" name="search" value="{{ filters.search }}">
@@ -71,7 +78,8 @@
             {% end %}
             <label class="bw-field">
                 <span>Source</span>
-                <select class="bw-select" name="source" onchange="this.form.requestSubmit()">
+                <select class="bw-select" id="workspace-source-filter" name="source"
+                    onchange="this.form.requestSubmit()">
                     <option value="all" {% if filters.source == "all" %}selected{% end %}>All</option>
                     <option value="jenkins" {% if filters.source == "jenkins" %}selected{% end %}>Jenkins</option>
                     <option value="deployment" {% if filters.source == "deployment" %}selected{% end %}>Deployment</option>
@@ -81,14 +89,54 @@
         </form>
 
         <div class="bw-filter-actions">
+            {% if edit or deletion_issues %}
+            <form id="bw-bulk-delete-form" class="bw-bulk-delete-form" aria-label="Bulk workspace deletion"
+                action="{{ action_url('/workspaces/delete', filters, edit=edit) }}" method="post"
+                {% if edit %}data-bulk-delete-form{% end %}
+                hx-post="{{ action_url('/workspaces/delete', filters, edit=edit) }}"
+                hx-target="closest .bw-frame" hx-swap="morph:innerHTML"
+                hx-sync="closest .bw-frame:replace" hx-push-url="false">
+                {% if edit %}
+                <button type="button" class="bw-button bw-button-secondary"
+                    id="workspace-select-visible-done" data-select-visible-status="done">
+                    Select visible done
+                </button>
+                <button type="button" class="bw-button bw-button-secondary"
+                    id="workspace-select-visible-stale" data-select-visible-status="stale">
+                    Select visible stale
+                </button>
+                <button type="submit" class="bw-button bw-button-danger"
+                    id="workspace-delete-selected" data-delete-selected disabled>
+                    Delete selected (<span data-delete-count>0</span>)
+                </button>
+                <span class="bw-sr-only" data-delete-count-live aria-live="polite">Delete selected (0)</span>
+                {% end %}
+                <div class="bw-delete-result{% if deletion_issues %} bw-notice{% end %}" data-delete-result
+                    {% if deletion_issues %}role="alert" aria-live="assertive"
+                    data-dashboard-error="workspace-deletion"{% else %}role="status" aria-live="polite"{% end %}>
+                    {% if deletion_issues %}
+                    <div class="bw-notice-title">Workspace deletion was not completed</div>
+                    <ul>
+                        {% for issue in deletion_issues %}
+                        <li>{{ issue }}</li>
+                        {% end %}
+                    </ul>
+                    {% end %}
+                </div>
+            </form>
+            {% end %}
             {% if edit %}
-            <a class="bw-button bw-button-secondary" href="{{ canonical_url(filters) # nosemgrep: boardwalk.html-templates.security.var-in-href }}"
+            <a class="bw-button bw-button-secondary" id="workspace-edit-toggle"
+                href="{{ canonical_url(filters) # nosemgrep: boardwalk.html-templates.security.var-in-href }}"
                 hx-get="{{ partial_url(filters, push_url=True) }}" hx-target="closest .bw-frame"
-                hx-swap="innerHTML" hx-push-url="false">Exit edit</a>
+                hx-swap="morph:innerHTML" hx-sync="closest .bw-frame:replace"
+                hx-push-url="false">Exit edit</a>
             {% else %}
-            <a class="bw-button bw-button-secondary" href="{{ canonical_url(filters, edit=True) # nosemgrep: boardwalk.html-templates.security.var-in-href }}"
+            <a class="bw-button bw-button-secondary" id="workspace-edit-toggle"
+                href="{{ canonical_url(filters, edit=True) # nosemgrep: boardwalk.html-templates.security.var-in-href }}"
                 hx-get="{{ partial_url(filters, edit=True, push_url=True) }}" hx-target="closest .bw-frame"
-                hx-swap="innerHTML" hx-push-url="false">Edit</a>
+                hx-swap="morph:innerHTML" hx-sync="closest .bw-frame:replace"
+                hx-push-url="false">Edit</a>
             {% end %}
         </div>
     </div>
@@ -121,7 +169,7 @@
         {% end %}
 
         {% for lane in dashboard.lanes %}
-        <section class="bw-lane bw-lane-{{ lane.key }}">
+        <section class="bw-lane bw-lane-{{ lane.key }}" id="workspace-lane-{{ lane.key }}">
             <div class="bw-lane-header">
                 <h2>{{ lane.label }}</h2>
                 <span>{{ lane.count }} workspace{% if lane.count != 1 %}s{% end %}</span>
@@ -133,9 +181,11 @@
                         <span class="bw-sort">
                             <span class="bw-sort-label">Workspace</span>
                             <a class="bw-sort-arrow{% if filters.sort == 'workspace' %} is-active{% end %}"
+                                id="workspace-sort-control-{{ sha256(lane.key + ':workspace') }}"
                                 href="{{ sort_url('/', filters, 'workspace', edit=edit) # nosemgrep: boardwalk.html-templates.security.var-in-href }}"
                                 hx-get="{{ sort_url('/workspaces', filters, 'workspace', edit=edit, push_url='1') }}"
-                                hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
+                                hx-target="closest .bw-frame" hx-swap="morph:innerHTML"
+                                hx-sync="closest .bw-frame:replace" hx-push-url="false"
                                 aria-label="{% if filters.sort == 'workspace' %}Workspace sorted {{ filters.direction }}; switch sort direction{% else %}Workspace sorted by default; sort by workspace{% end %}">
                                 <span aria-hidden="true">{% if filters.sort == 'workspace' %}{% if filters.direction == 'asc' %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
                             </a>
@@ -143,9 +193,11 @@
                         <span class="bw-sort bw-sort-subtle">
                             <span class="bw-sort-label">Latest</span>
                             <a class="bw-sort-arrow{% if filters.sort == 'updated' %} is-active{% end %}"
+                                id="workspace-sort-control-{{ sha256(lane.key + ':updated') }}"
                                 href="{{ sort_url('/', filters, 'updated', edit=edit) # nosemgrep: boardwalk.html-templates.security.var-in-href }}"
                                 hx-get="{{ sort_url('/workspaces', filters, 'updated', edit=edit, push_url='1') }}"
-                                hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
+                                hx-target="closest .bw-frame" hx-swap="morph:innerHTML"
+                                hx-sync="closest .bw-frame:replace" hx-push-url="false"
                                 aria-label="{% if filters.sort == 'updated' %}Latest event sorted {{ filters.direction }}; switch sort direction{% else %}Latest event sorted by default; sort by latest event{% end %}">
                                 <span aria-hidden="true">{% if filters.sort == 'updated' %}{% if filters.direction == 'asc' %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
                             </a>
@@ -155,9 +207,11 @@
                     <span class="bw-sort">
                         <span class="bw-sort-label">Current host</span>
                         <a class="bw-sort-arrow{% if filters.sort == 'current_host' %} is-active{% end %}"
+                            id="workspace-sort-control-{{ sha256(lane.key + ':current_host') }}"
                             href="{{ sort_url('/', filters, 'current_host', edit=edit) # nosemgrep: boardwalk.html-templates.security.var-in-href }}"
                             hx-get="{{ sort_url('/workspaces', filters, 'current_host', edit=edit, push_url='1') }}"
-                            hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
+                            hx-target="closest .bw-frame" hx-swap="morph:innerHTML"
+                            hx-sync="closest .bw-frame:replace" hx-push-url="false"
                             aria-label="{% if filters.sort == 'current_host' %}Current host sorted {{ filters.direction }}; switch sort direction{% else %}Current host sorted by default; sort by current host{% end %}">
                             <span aria-hidden="true">{% if filters.sort == 'current_host' %}{% if filters.direction == 'asc' %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
                         </a>
@@ -165,9 +219,11 @@
                     <span class="bw-sort">
                         <span class="bw-sort-label">Source</span>
                         <a class="bw-sort-arrow{% if filters.sort == 'source' %} is-active{% end %}"
+                            id="workspace-sort-control-{{ sha256(lane.key + ':source') }}"
                             href="{{ sort_url('/', filters, 'source', edit=edit) # nosemgrep: boardwalk.html-templates.security.var-in-href }}"
                             hx-get="{{ sort_url('/workspaces', filters, 'source', edit=edit, push_url='1') }}"
-                            hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
+                            hx-target="closest .bw-frame" hx-swap="morph:innerHTML"
+                            hx-sync="closest .bw-frame:replace" hx-push-url="false"
                             aria-label="{% if filters.sort == 'source' %}Source sorted {{ filters.direction }}; switch sort direction{% else %}Source sorted by default; sort by source{% end %}">
                             <span aria-hidden="true">{% if filters.sort == 'source' %}{% if filters.direction == 'asc' %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
                         </a>
@@ -175,9 +231,11 @@
                     <span class="bw-sort">
                         <span class="bw-sort-label">Status</span>
                         <a class="bw-sort-arrow{% if filters.sort == 'status' %} is-active{% end %}"
+                            id="workspace-sort-control-{{ sha256(lane.key + ':status') }}"
                             href="{{ sort_url('/', filters, 'status', edit=edit) # nosemgrep: boardwalk.html-templates.security.var-in-href }}"
                             hx-get="{{ sort_url('/workspaces', filters, 'status', edit=edit, push_url='1') }}"
-                            hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
+                            hx-target="closest .bw-frame" hx-swap="morph:innerHTML"
+                            hx-sync="closest .bw-frame:replace" hx-push-url="false"
                             aria-label="{% if filters.sort == 'status' %}Status sorted {{ filters.direction }}; switch sort direction{% else %}Status sorted by default; sort by status{% end %}">
                             <span aria-hidden="true">{% if filters.sort == 'status' %}{% if filters.direction == 'asc' %}&uarr;{% else %}&darr;{% end %}{% else %}&#8597;{% end %}</span>
                         </a>
@@ -190,10 +248,36 @@
         {% set workspace = workspaces.get(row.name) %}
         {% set detail_id = "workspace-details-" + sha256(row.name) %}
         {% set workspace_key = sha256(row.name) %}
-        <div class="bw-row status-{{ row.status }}" role="row" data-workspace-row
+        <div class="bw-row status-{{ row.status }}" id="workspace-row-{{ workspace_key }}"
+            role="row" data-workspace-row
             data-workspace-key="{{ workspace_key }}">
-            <div class="bw-cell-main" role="cell">
+            <div class="bw-cell-main{% if edit %} is-editable{% end %}" role="cell">
+                {% if edit %}
+                {% if not row.worker_connected and not workspace.semaphores.has_mutex %}
+                <input class="bw-delete-checkbox" id="workspace-delete-{{ workspace_key }}"
+                    type="checkbox" name="workspace"
+                    value="{{ row.name }}" form="bw-bulk-delete-form" data-delete-workspace
+                    data-workspace-key="{{ workspace_key }}"
+                    data-workspace-status="{{ row.status }}"
+                    aria-label="Select {{ row.name }} for deletion">
+                {% else %}
+                {% if row.worker_connected %}
+                {% set deletion_reason = "Connected worker prevents deletion" %}
+                {% else %}
+                {% set deletion_reason = "Server-side mutex prevents deletion" %}
+                {% end %}
+                <input class="bw-delete-checkbox" id="workspace-delete-{{ workspace_key }}"
+                    type="checkbox" name="workspace"
+                    value="{{ row.name }}" form="bw-bulk-delete-form" data-delete-workspace
+                    data-workspace-key="{{ workspace_key }}"
+                    data-workspace-status="{{ row.status }}"
+                    aria-label="Select {{ row.name }} for deletion" disabled
+                    title="{{ deletion_reason }}" aria-describedby="delete-reason-{{ workspace_key }}">
+                <span id="delete-reason-{{ workspace_key }}" class="bw-sr-only">{{ deletion_reason }}</span>
+                {% end %}
+                {% end %}
                 <button type="button" class="bw-expand" data-row-toggle data-workspace-key="{{ workspace_key }}"
+                    id="workspace-toggle-{{ workspace_key }}"
                     aria-controls="{{ detail_id }}" aria-expanded="false" title="Expand {{ row.name }}">
                     <span aria-hidden="true">›</span>
                     <span class="bw-sr-only">Expand {{ row.name }}</span>
@@ -324,21 +408,35 @@
                 </div>
                 {% if row.events %}
                 {% for event in row.events[:6] %}
-                <div class="bw-event-line severity-{{ event.severity }}" title="{{ event.create_time }}">
-                    <span>{{ event.severity }}</span>
+                {% set display_time = event_time(event.create_time) %}
+                <div class="bw-event-line severity-{{ event.severity }}"
+                    title="{{ display_time['datetime'] }}">
+                    {% if display_time['datetime'] %}
+                    <time class="bw-event-time" data-event-time datetime="{{ display_time['datetime'] }}" title="{{ display_time['accessible'] }}" aria-label="{{ display_time['accessible'] }}">{{ display_time['fallback'] }}</time>
+                    {% else %}
+                    <time class="bw-event-time" data-event-time>{{ display_time['fallback'] }}</time>
+                    {% end %}
+                    <span class="bw-event-severity">{{ event.severity }}</span>
                     <span>{{ squeeze(event.message) }}</span>
                 </div>
                 {% end %}
                 {% for event in row.events[6:] %}
-                <div class="bw-event-line severity-{{ event.severity }}" title="{{ event.create_time }}" hidden
-                    data-event-extra>
-                    <span>{{ event.severity }}</span>
+                {% set display_time = event_time(event.create_time) %}
+                <div class="bw-event-line severity-{{ event.severity }}"
+                    title="{{ display_time['datetime'] }}" hidden data-event-extra>
+                    {% if display_time['datetime'] %}
+                    <time class="bw-event-time" data-event-time datetime="{{ display_time['datetime'] }}" title="{{ display_time['accessible'] }}" aria-label="{{ display_time['accessible'] }}">{{ display_time['fallback'] }}</time>
+                    {% else %}
+                    <time class="bw-event-time" data-event-time>{{ display_time['fallback'] }}</time>
+                    {% end %}
+                    <span class="bw-event-severity">{{ event.severity }}</span>
                     <span>{{ squeeze(event.message) }}</span>
                 </div>
                 {% end %}
                 {% else %}
                 <div class="bw-event-line">
-                    <span>info</span>
+                    <time class="bw-event-time" data-event-time>—</time>
+                    <span class="bw-event-severity">info</span>
                     <span>No recent events</span>
                 </div>
                 {% end %}
@@ -365,7 +463,8 @@
                 <button type="button" class="bw-button bw-button-danger"
                     title="Clears boardwalkd's server-side workspace mutex. Does not remove /opt/boardwalk.mutex from target hosts."
                     hx-delete="{{ action_url('/workspace/' + workspace_name + '/semaphores/has_mutex', filters, edit=edit) }}"
-                    hx-trigger="click" hx-target="closest .bw-frame" hx-swap="innerHTML"
+                    hx-trigger="click" hx-target="closest .bw-frame" hx-swap="morph:innerHTML"
+                    hx-sync="closest .bw-frame:replace"
                     hx-push-url="false"
                     hx-confirm="Clear boardwalkd's server-side workspace mutex for &quot;{{ workspace_name }}&quot;? This does not remove /opt/boardwalk.mutex from target hosts.">
                     Clear workspace mutex
@@ -383,8 +482,10 @@
                 </button>
                 {% else %}
                 <button type="button" class="bw-button bw-button-danger" title="Deletes the workspace data from the server"
-                    hx-post="{{ action_url('/workspace/' + workspace_name + '/delete', filters, edit=edit) }}"
-                    hx-trigger="click" hx-target="closest .bw-frame" hx-swap="innerHTML"
+                    hx-post="{{ action_url('/workspaces/delete', filters, edit=edit) }}"
+                    hx-vals='{"workspace": ["{{ workspace_name }}"]}'
+                    hx-trigger="click" hx-target="closest .bw-frame" hx-swap="morph:innerHTML"
+                    hx-sync="closest .bw-frame:replace"
                     hx-push-url="false"
                     hx-confirm="Are you sure you want to delete the workspace &quot;{{ workspace_name }}&quot; from the server?">
                     Delete workspace
