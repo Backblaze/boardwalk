@@ -1,0 +1,8 @@
+# Exclude dependency versions released within the past 7 days to avoid supply chain attacks
+minimumReleaseAge: 10080  # 7 * 24 * 60
+
+# Do not run any pre- or post-scripts that are defined in package.json files
+ignoreScripts: true
+
+# Don't allow packages with decreased trust level compared to prior releases
+trustPolicy: no-downgrade

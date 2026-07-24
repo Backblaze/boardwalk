@@ -70,14 +70,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Set up Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6.5.0
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v6.0.9 - https://github.com/pnpm/action-setup/releases/tag/v6.0.9
         with:
-          node-version: "24"
-          cache: npm
-
-      # If we need to add this for the replacement typechecker, uncomment this.
-      # - run: poetry add ansible --no-interaction
+          version: 11
+          cache: true
 
       - name: Execute JavaScript contract tests
         run: make test-js

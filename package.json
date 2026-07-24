@@ -4,6 +4,9 @@
   "engines": {
     "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
   },
+  "scripts": {
+    "test": "node --test test/boardwalkd/test_boardwalkd_js.mjs test/boardwalkd/test_boardwalkd_morph.mjs"
+  },
   "devDependencies": {
     "jsdom": "29.1.1"
   }

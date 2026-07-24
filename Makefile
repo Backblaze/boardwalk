@@ -111,10 +111,8 @@ test: test-js test-pytest test-ruff test-pyright test-semgrep test-ansible-lint
 
 .PHONY: test-js
 test-js:
-	npm ci --ignore-scripts
-	node --test \
-		test/boardwalkd/test_boardwalkd_js.mjs \
-		test/boardwalkd/test_boardwalkd_morph.mjs
+	pnpm ci --ignore-scripts
+	pnpm test
 
 .PHONY: test-ansible-lint
 test-ansible-lint:
