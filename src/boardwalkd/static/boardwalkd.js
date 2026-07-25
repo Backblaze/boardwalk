@@ -664,7 +664,18 @@
         return rowAnchor;
     }
 
+    function usesAbsoluteViewportPolicy(event) {
+        var detail = (event && event.detail) || {};
+        var element = detail.requestConfig && detail.requestConfig.elt;
+        return Boolean(
+            element &&
+                element.closest &&
+                element.closest('[data-viewport-policy="absolute"]'),
+        );
+    }
+
     function captureRefreshState(event) {
+        var absoluteViewport = usesAbsoluteViewportPolicy(event);
         var frame = swapOwner(event);
         if (!frame || frame.classList.contains("bw-admin-panel")) return null;
         var dashboard = dashboardForSwap(event);
@@ -672,7 +683,7 @@
             frame: frame,
             viewport: dashboard
                 ? {
-                      anchor: visibleWorkspaceAnchor(dashboard),
+                      anchor: absoluteViewport ? null : visibleWorkspaceAnchor(dashboard),
                       scrollY: window.scrollY,
                   }
                 : null,

@@ -652,6 +652,25 @@ def test_workspace_partial_frame_actions_use_morph_swap_and_hx_sync(edit):
     assert all(element.get("hx-sync") == "closest .bw-frame:replace" for element in deliberate_actions)
     assert not any(element.get("hx-swap") == "innerHTML" for element in frame_targets)
 
+    absolute_viewport_ids = {
+        "workspace-search-form",
+        "workspace-status-filter-form",
+        "workspace-source-filter-form",
+    }
+    absolute_viewport_controls = [
+        element
+        for element in deliberate_actions
+        if element.get("id") in absolute_viewport_ids
+        or {"bw-tab", "bw-sort-arrow"}.intersection(element.get("class", "").split())
+    ]
+    assert absolute_viewport_controls
+    assert all(element.get("data-viewport-policy") == "absolute" for element in absolute_viewport_controls)
+    semantic_viewport_controls = [
+        element for element in deliberate_actions if element not in absolute_viewport_controls
+    ]
+    assert semantic_viewport_controls
+    assert all(element.get("data-viewport-policy") is None for element in semantic_viewport_controls)
+
     deliberate_ids = {element.get("id") for element in deliberate_actions}
     deliberate_classes = {
         class_name for element in deliberate_actions for class_name in element.get("class", "").split()

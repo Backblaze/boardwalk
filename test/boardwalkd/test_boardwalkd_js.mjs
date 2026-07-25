@@ -468,15 +468,14 @@ function htmxSwap(frame, marker = null, options = {}) {
                 return name === "X-Boardwalk-Dashboard-Fragment" ? marker : null;
             },
         };
-    return {
+    const detail = {
         target: frame,
-        detail: {
-            target: frame,
-            isError,
-            shouldSwap: options.shouldSwap ?? !isError,
-            xhr,
-        },
+        isError,
+        shouldSwap: options.shouldSwap ?? !isError,
+        xhr,
     };
+    if (options.elt !== undefined) detail.requestConfig = {elt: options.elt};
+    return {target: frame, detail};
 }
 
 function htmxAfter(frame, xhr) {
@@ -1605,6 +1604,34 @@ test("collapsed workspace anchor stays fixed when a row is inserted above it", (
     const correction = 215 - 120;
     assert.deepEqual(harness.window.scrollByCalls, [[{behavior: "instant", left: 0, top: correction}]]);
     assert.equal(newAlpha.row.getBoundingClientRect().top - correction, 120);
+});
+
+test("sort swaps preserve absolute scroll instead of following a reordered workspace", () => {
+    const harness = createHarness();
+    harness.window.scrollY = 450;
+    harness.document.documentElement.scrollHeight = 2000;
+    const oldAlpha = workspace("alpha", {rowTop: 120});
+    const {frame} = dashboardFixture(harness, [oldAlpha]);
+    const sortControl = new FakeElement("a", {
+        dataset: {viewportPolicy: "absolute"},
+    });
+    const newAlpha = workspace("alpha", {rowTop: 620});
+    const replacement = harness.document.adopt(
+        new FakeElement("div", {classes: ["bw-dashboard"]}),
+    );
+    replacement.append(newAlpha.row, newAlpha.panel);
+
+    settleSwap(
+        harness,
+        frame,
+        replacement,
+        htmxSwap(frame, null, {elt: sortControl}),
+    );
+
+    assert.deepEqual(harness.window.scrollByCalls, []);
+    assert.deepEqual(harness.window.scrollToCalls, [
+        [{behavior: "instant", left: 0, top: 450}],
+    ]);
 });
 
 test("active workspace anchor wins over the first visible row", () => {
