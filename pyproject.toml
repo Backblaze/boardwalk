@@ -74,7 +74,7 @@ lint = [
     "ruff >= 0.11.13, <0.12",
 ]
 test = [
-    "pytest >= 9.0.3, <10",
+    "pytest>=9.1.1,<10",
 ]
 docs = [
     "myst-parser[linkify] >=4.0.0, <5",
