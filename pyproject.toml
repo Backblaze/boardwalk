@@ -6,7 +6,7 @@ build-backend = "uv_build"
 name = "boardwalk"
 description = "Boardwalk is a linear Ansible workflow engine"
 readme = "README.md"
-version = "0.9.2"
+version = "0.9.3"
 requires-python = ">=3.13, <4"
 license = "MIT"
 license-files = ["LICENSE", "ATTRIBUTIONS.md"]

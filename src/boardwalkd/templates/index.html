@@ -2,7 +2,7 @@
 
 {% block main %}
 <section class="bw-app" id="workspaces">
-    <div class="bw-frame" hx-get="{{ workspaces_url }}" hx-trigger="load" hx-swap="innerHTML">
+    <div class="bw-frame" hx-get="{{ workspaces_url }}" hx-trigger="load" hx-swap="morph:innerHTML">
     </div>
 </section>
 {% end %}

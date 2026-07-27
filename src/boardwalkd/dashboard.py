@@ -239,6 +239,8 @@ def _group_sort_key(group: str) -> tuple[int, str]:
 def group_counts(rows: Sequence[DashboardRow]) -> dict[str, int]:
     counts = {ALL_GROUP: len(rows)}
     for row in rows:
+        if row.group == ALL_GROUP:
+            continue
         counts[row.group] = counts.get(row.group, 0) + 1
     return counts
 
@@ -410,7 +412,7 @@ def build_dashboard(
     ]
     count_rows = [row for row in all_rows if _matches_filters(row, filters, include_group=False)]
     counts = group_counts(count_rows)
-    group_labels = sorted({row.group for row in all_rows}, key=_group_sort_key)
+    group_labels = sorted({row.group for row in all_rows if row.group != ALL_GROUP}, key=_group_sort_key)
     groups = [
         DashboardGroup(label=ALL_GROUP, count=counts[ALL_GROUP], active=filters.group in {"", ALL_GROUP}),
         *[

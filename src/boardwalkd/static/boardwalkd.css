@@ -235,6 +235,7 @@ a {
 .bw-frame {
     min-height: 240px;
     overflow: hidden;
+    overflow-anchor: none;
     background: var(--bw-bg);
     border: 1px solid var(--bw-line);
     border-radius: var(--bw-radius);
@@ -312,9 +313,29 @@ a {
 
 .bw-filter-actions {
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
     align-items: end;
+    gap: 8px;
     min-width: 0;
+}
+
+.bw-bulk-delete-form {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.bw-delete-result:empty {
+    display: none;
+}
+
+.bw-delete-result.bw-notice {
+    flex: 0 0 100%;
+    margin: 0;
 }
 
 .bw-field {
@@ -624,15 +645,7 @@ a {
 
 .bw-row.status-stale {
     color: var(--bw-fg-2);
-    opacity: 0.68;
-}
-
-.bw-row.status-stale:hover {
-    opacity: 0.84;
-}
-
-.bw-row.status-stale.is-expanded {
-    opacity: 0.92;
+    background-image: linear-gradient(90deg, color-mix(in srgb, var(--bw-idle) 12%, transparent), transparent 42%);
 }
 
 .bw-cell-main,
@@ -646,6 +659,39 @@ a {
     grid-template-columns: 32px minmax(0, 1fr);
     gap: 10px;
     align-items: center;
+}
+
+.bw-cell-main.is-editable {
+    grid-template-columns: 24px 32px minmax(0, 1fr);
+}
+
+.bw-delete-checkbox {
+    width: 16px;
+    min-width: 16px;
+    height: 16px;
+    min-height: 16px;
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--bw-brand);
+    border-radius: 4px;
+}
+
+.bw-delete-checkbox:focus-visible {
+    outline: 2px solid var(--bw-link);
+    outline-offset: 2px;
+}
+
+.bw-theme-light .bw-delete-checkbox {
+    color-scheme: light;
+}
+
+.bw-theme-dark .bw-delete-checkbox {
+    color-scheme: dark;
+}
+
+.bw-delete-checkbox:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
 }
 
 .bw-workspace-title {
@@ -872,7 +918,7 @@ a {
     border-bottom: 1px solid var(--bw-line);
 }
 
-.bw-row-details.is-expanded {
+.bw-row-details:not([hidden]) {
     background: color-mix(in srgb, var(--bw-brand) 5%, var(--bw-row-alt));
     border-bottom-color: color-mix(in srgb, var(--bw-brand) 34%, var(--bw-line));
 }
@@ -985,7 +1031,7 @@ a {
 
 .bw-event-line {
     display: grid;
-    grid-template-columns: 70px minmax(0, 1fr);
+    grid-template-columns: 8.5rem 4.5rem minmax(0, 1fr);
     gap: 12px;
     min-height: 24px;
     align-items: start;
@@ -995,7 +1041,13 @@ a {
     line-height: 1.55;
 }
 
-.bw-event-line > span:first-child {
+.bw-event-time {
+    color: var(--bw-fg-3);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.bw-event-severity {
     color: var(--bw-fg-3);
 }
 
@@ -1209,6 +1261,17 @@ a {
     .bw-filterbar,
     .bw-search-form {
         grid-template-columns: 1fr;
+    }
+
+    .bw-filter-actions,
+    .bw-bulk-delete-form {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .bw-event-line {
+        grid-template-columns: 5.75rem 4.25rem minmax(0, 1fr);
+        gap: 8px;
     }
 
     .bw-head {

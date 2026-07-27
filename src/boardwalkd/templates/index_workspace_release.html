@@ -1,6 +1,7 @@
 <button type="button" class="bw-button bw-button-release"
     hx-delete="{{ action_url('/workspace/' + workspace_name + '/semaphores/caught', filters, edit=edit) }}"
-    hx-trigger="click" hx-target="closest .bw-frame" hx-swap="innerHTML" hx-push-url="false"
+    hx-trigger="click" hx-target="closest .bw-frame" hx-swap="morph:innerHTML"
+    hx-sync="closest .bw-frame:replace" hx-push-url="false"
     title="Release the workflow catch and allow moving to next host">
     Release
 </button>

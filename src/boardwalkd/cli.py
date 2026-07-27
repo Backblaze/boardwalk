@@ -301,7 +301,10 @@ def serve(
     logger.info(f"boardwalkd, version {lib_version('boardwalk')}, is now starting...")
     logger.info(f"Log level is {loglevel}")
 
-    logger.warning("boardwalkd is running in development mode, which should not be used in a production environment")
+    if develop:
+        logger.warning(
+            "boardwalkd is running in development mode, which should not be used in a production environment"
+        )
 
     if develop_snapshot and not develop:
         raise BoardwalkException("--develop-snapshot requires --develop")
