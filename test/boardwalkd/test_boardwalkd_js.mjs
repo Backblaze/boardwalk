@@ -32,7 +32,7 @@ test("deletion checkboxes use compact theme-aware focus and disabled styles", ()
 });
 
 test("stale row styling does not dim deletion controls through parent opacity", () => {
-    const staleRules = Array.from(cssSource.matchAll(/\.bw-row\.status-stale[^\{]*\{([^}]*)\}/g));
+    const staleRules = Array.from(cssSource.matchAll(/\.bw-row\.status-stale[^{]*\{([^}]*)\}/g));
     assert.ok(staleRules.length > 0);
     for (const rule of staleRules) assert.doesNotMatch(rule[1], /\bopacity\s*:/);
     assert.match(staleRules[0][1], /background-image:\s*linear-gradient/);

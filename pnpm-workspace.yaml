@@ -6,3 +6,7 @@ ignoreScripts: true
 
 # Don't allow packages with decreased trust level compared to prior releases
 trustPolicy: no-downgrade
+
+# As per ESLint's install guide: https://eslint.org/docs/latest/use/getting-started#manual-set-up
+# nodeLinker: hoisted -- Disabled as it seems to work with this disabled?
+autoInstallPeers: true
