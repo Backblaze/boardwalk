@@ -1,5 +1,6 @@
 {
   "name": "boardwalk-js-tests",
+  "type": "module",
   "private": true,
   "engines": {
     "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
@@ -8,6 +9,9 @@
     "test": "node --test test/boardwalkd/test_boardwalkd_js.mjs test/boardwalkd/test_boardwalkd_morph.mjs"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.7.0",
+    "globals": "17.7.0",
     "jsdom": "29.1.1"
   }
 }

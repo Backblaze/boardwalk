@@ -113,6 +113,7 @@ test: test-js test-pytest test-ruff test-pyright test-semgrep test-ansible-lint
 test-js:
 	pnpm ci --ignore-scripts
 	pnpm test
+	pnpm exec eslint
 
 .PHONY: test-ansible-lint
 test-ansible-lint:

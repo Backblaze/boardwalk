@@ -1,3 +1,6 @@
+/*
+    eslint no-unused-vars: ["error", {"caughtErrors": "all", "caughtErrorsIgnorePattern": "^ignore" }]
+*/
 (function () {
     var EXPANDED_WORKSPACE_KEY = "boardwalk.expandedWorkspace";
     var EXPANDED_EVENTS_KEY = "boardwalk.expandedEvents";
@@ -7,7 +10,7 @@
     function storedTheme() {
         try {
             return localStorage.getItem("boardwalk.theme") || "dark";
-        } catch (error) {
+        } catch (ignoreErr) {
             return "dark";
         }
     }
@@ -15,7 +18,7 @@
     function rememberTheme(theme) {
         try {
             localStorage.setItem("boardwalk.theme", theme);
-        } catch (error) {
+        } catch (ignoreErr) {
             return;
         }
     }
@@ -23,7 +26,7 @@
     function storedSessionValue(key) {
         try {
             return sessionStorage.getItem(key) || "";
-        } catch (error) {
+        } catch (ignoreErr) {
             return "";
         }
     }
@@ -35,7 +38,7 @@
             } else {
                 sessionStorage.removeItem(key);
             }
-        } catch (error) {
+        } catch (ignoreErr) {
             return;
         }
     }
@@ -284,7 +287,7 @@
                 dateStyle: "full",
                 timeStyle: "long",
             });
-        } catch (error) {
+        } catch (ignoreErr) {
             compactFormatter = null;
             accessibleFormatter = null;
         }
@@ -308,7 +311,7 @@
                 node.textContent = compact;
                 node.setAttribute("title", accessible);
                 node.setAttribute("aria-label", accessible);
-            } catch (error) {
+            } catch (ignoreErr) {
                 node.textContent = originalText;
                 if (originalTitle === null) node.removeAttribute("title");
                 else node.setAttribute("title", originalTitle);

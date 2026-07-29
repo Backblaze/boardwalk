@@ -8,6 +8,11 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+  # To monitor pnpm dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
   # For keeping workflows up-to-date.
   - package-ecosystem: "github-actions"
     directory: "/"
