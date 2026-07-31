@@ -9,7 +9,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from pydantic import PrivateAttr, ValidationError, field_validator
+from pydantic import Field, PrivateAttr, ValidationError, field_validator
 
 from boardwalkd.protocol import ProtocolBaseModel, WorkspaceEvent
 
@@ -34,7 +34,7 @@ class SlackErrorAdviceRule(ProtocolBaseModel):
                 raise ValueError(f"Invalid regex pattern {pattern!r}: {e}") from e
         return patterns
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, context: Any, /) -> None:
         self._compiled_patterns = [re.compile(pattern, flags=REGEX_FLAGS) for pattern in self.patterns]
 
     def matches(self, event_message: str) -> bool:
@@ -44,7 +44,7 @@ class SlackErrorAdviceRule(ProtocolBaseModel):
 class SlackErrorAdviceConfig(ProtocolBaseModel):
     """Top-level Slack advice configuration."""
 
-    rules: list[SlackErrorAdviceRule] = []
+    rules: list[SlackErrorAdviceRule] = Field([])
 
 
 class SlackErrorAdviceConfigError(ValueError):

@@ -42,9 +42,7 @@ def list_inactive_workspaces(last_seen_seconds: int = 10) -> list[str]:
     connected worker was seen before the workspace is considered inactive.
     Defaults to 10.
     """
-    return sorted(
-        [name for name in server.state.workspaces.keys() if name not in list_active_workspaces(last_seen_seconds)]
-    )
+    return sorted([name for name in server.state.workspaces if name not in list_active_workspaces(last_seen_seconds)])
 
 
 def count_of_workspaces_caught() -> int:

@@ -885,7 +885,7 @@ def execute_workflow_jobs(host: Host, workspace: Workspace, job_kind: str, verbo
     elif job_kind == "exit":
         jobs = workflow.i_exit_jobs
     else:
-        raise Exception
+        raise BoardwalkException(f"{job_kind} is not a supported job type")
     if len(jobs) == 0:
         return
     logger.info(f"{host.name}: Running workflow {job_kind} jobs")

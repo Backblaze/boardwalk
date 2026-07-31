@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib.metadata import version as lib_version
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 from urllib.parse import ParseResult, urljoin, urlparse
 
 import tornado.auth
@@ -225,7 +225,7 @@ def ui_method_sort_events_by_date(handler: UIBaseHandler, events: deque[Workspac
     sorts them by datetime in ascending order"""
     # While we assume UTC--and the code did/does--this allows for backward compatibility
     # with older `boardwalk` client versions
-    key: Callable[[WorkspaceEvent], datetime] = lambda x: x.create_time.replace(tzinfo=UTC)  # type: ignore # noqa: E731
+    key: Callable[[WorkspaceEvent], datetime] = lambda x: x.create_time.replace(tzinfo=UTC)  # type: ignore
     return sorted(events, key=key, reverse=True)
 
 
@@ -756,7 +756,6 @@ class APIBaseHandler(tornado.web.RequestHandler):
 
     def check_xsrf_cookie(self):
         """We ignore this method on API requests"""
-        pass
 
     def get_current_user(self) -> bytes | None:
         """Decodes the API token to return the current logged in user."""
@@ -801,7 +800,7 @@ async def notify_auth_login(login_url: str, auth_context: dict[str, str | None],
                 server_url=settings["url"].geturl(),
                 slack_user_mention=slack_user_mention,
             )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- Not quite sure what errors the AsyncWebhookClient could generate, so this is fine to silence.
         logger.error(f"Could not send auth login Slack notification: {e}")
 
 
@@ -840,7 +839,7 @@ class AuthLoginApiHandler(UIBaseHandler):
 class AuthLoginApiWebsocketHandler(tornado.websocket.WebSocketHandler):
     """Socket used by CLI clients to login to the API and get an auth token"""
 
-    clients: dict[AuthLoginApiWebsocketHandler, str] = {}
+    clients: ClassVar[dict[AuthLoginApiWebsocketHandler, str]] = {}
 
     def open(self):
         def id_client() -> str:
@@ -1162,26 +1161,23 @@ class WorkspaceEventApiHandler(APIBaseHandler):
 
         app_log.info(f"worker_event: {self.request.remote_ip} {workspace} {event.severity} {event.message}")
 
-        if broadcast:
-            if self.settings["slack_webhook_url"] or self.settings["slack_error_webhook_url"]:
-                workspace_details = state.workspaces[workspace].details
-                slack_user_mention = None
-                if event.severity == "error":
-                    if workspace_details.deployment_user_email:
-                        slack_user_mention = state.users[
-                            workspace_details.deployment_user_email
-                        ].slack_cache.user_mention
-                    else:
-                        slack_user_mention = None
-                await handle_slack_broadcast(
-                    event,
-                    workspace,
-                    self.settings["slack_webhook_url"],
-                    self.settings["slack_error_webhook_url"],
-                    self.settings["url"].geturl(),
-                    error_advice=matching_error_advice(event, self.settings["slack_error_advice_rules"]),
-                    slack_user_mention=slack_user_mention,
-                )
+        if broadcast and (self.settings["slack_webhook_url"] or self.settings["slack_error_webhook_url"]):
+            workspace_details = state.workspaces[workspace].details
+            slack_user_mention = None
+            if event.severity == "error":
+                if workspace_details.deployment_user_email:
+                    slack_user_mention = state.users[workspace_details.deployment_user_email].slack_cache.user_mention
+                else:
+                    slack_user_mention = None
+            await handle_slack_broadcast(
+                event,
+                workspace,
+                self.settings["slack_webhook_url"],
+                self.settings["slack_error_webhook_url"],
+                self.settings["url"].geturl(),
+                error_advice=matching_error_advice(event, self.settings["slack_error_advice_rules"]),
+                slack_user_mention=slack_user_mention,
+            )
 
         state.flush()
 
@@ -1476,7 +1472,6 @@ async def run(
     jenkins_job_url: str = "",
 ) -> tuple[tornado.web.Application, list[HTTPServer]]:
     """Starts the tornado server and IO loop"""
-    global state
     global SLACK_SLASH_COMMAND_PREFIX
 
     app = make_app(

@@ -2,7 +2,7 @@ import json
 import re
 from datetime import UTC, datetime, timedelta
 
-import boardwalkd.server as server
+from boardwalkd import server
 from boardwalkd.dashboard import DashboardFilters, build_dashboard
 from boardwalkd.snapshot import load_inventory_context, sanitize_status_snapshot, seed_snapshot_workspaces
 from boardwalkd.state import State, WorkspaceState

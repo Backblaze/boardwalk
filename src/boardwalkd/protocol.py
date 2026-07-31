@@ -248,8 +248,8 @@ class Client:
             if e.code == 421:
                 # The server URL is probably incorrect
                 raise ConnectionRefusedError
-            else:
-                raise e
+            else:  # Reraise
+                raise
 
     def workspace_delete_mutex(self, workspace_name: str):
         """Deletes a workspace mutex"""
@@ -261,8 +261,8 @@ class Client:
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
-            else:
-                raise e
+            else:  # Reraise
+                raise
 
     def workspace_get_details(self, workspace_name: str) -> WorkspaceDetails:
         """Queries the server for workspace details"""
@@ -273,8 +273,8 @@ class Client:
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
-            else:
-                raise e
+            else:  # Reraise
+                raise
 
         details = WorkspaceDetails()
         return details.model_validate_json(request.body)
@@ -290,8 +290,8 @@ class Client:
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
-            else:
-                raise e
+            else:  # Reraise
+                raise
 
     def workspace_post_clear_remote_state_request(self, workspace_name: str):
         """Requests that a worker remove the host's remote Boardwalk state fact."""
@@ -304,8 +304,8 @@ class Client:
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
-            else:
-                raise e
+            else:  # Reraise
+                raise
 
     def workspace_post_clear_remote_mutex_request(self, workspace_name: str):
         """Requests that a worker remove the host's remote Boardwalk mutex."""
@@ -318,8 +318,8 @@ class Client:
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
-            else:
-                raise e
+            else:  # Reraise
+                raise
 
     def workspace_delete_clear_remote_mutex_request(self, workspace_name: str):
         """Clears a pending remote mutex cleanup request."""
@@ -331,8 +331,8 @@ class Client:
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
-            else:
-                raise e
+            else:  # Reraise
+                raise
 
     def workspace_delete_clear_remote_state_request(self, workspace_name: str):
         """Clears a pending remote state cleanup request."""
@@ -344,8 +344,8 @@ class Client:
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
-            else:
-                raise e
+            else:  # Reraise
+                raise
 
     def workspace_post_details(self, workspace_name: str, workspace_details: WorkspaceDetails):
         """Updates the workspace details at the server"""
@@ -358,8 +358,8 @@ class Client:
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
-            else:
-                raise e
+            else:  # Reraise
+                raise
 
     def workspace_post_heartbeat(self, workspace_name: str):
         """Posts a heartbeat to the server. This method will not automatically
@@ -374,8 +374,8 @@ class Client:
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
-            else:
-                raise e
+            else:  # Reraise
+                raise
 
     def workspace_heartbeat_keepalive(self, workspace_name: str, quit: threading.Event) -> None:
         """Tries to post a heartbeat to the server every 5 seconds"""
@@ -393,7 +393,6 @@ class Client:
                 socket.gaierror,
             ) as e:
                 logger.debug(f"Heartbeat keepalive error {e.__class__.__qualname__}")
-                pass
             time.sleep(5)  # nosemgrep: python.lang.best-practice.sleep.arbitrary-sleep
 
     def workspace_heartbeat_keepalive_connect(self, workspace_name: str) -> threading.Event:
@@ -425,8 +424,8 @@ class Client:
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
-            else:
-                raise e
+            else:  # Reraise
+                raise
 
     def workspace_queue_event(
         self,
@@ -472,8 +471,8 @@ class Client:
                 raise WorkspaceNotFound
             if e.code == 409:
                 raise WorkspaceHasMutex
-            else:
-                raise e
+            else:  # Reraise
+                raise
 
     def workspace_get_semaphores(self, workspace_name: str) -> WorkspaceSemaphores:
         """Queries the server for workspace semaphores"""
@@ -482,8 +481,8 @@ class Client:
         except HTTPError as e:
             if e.code == 404:
                 raise WorkspaceNotFound
-            else:
-                raise e
+            else:  # Reraise
+                raise
 
         semaphores = WorkspaceSemaphores()
         return semaphores.parse_raw(request.body)

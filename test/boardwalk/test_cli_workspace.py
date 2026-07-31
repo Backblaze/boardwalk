@@ -63,16 +63,12 @@ def test_workspace_list_alerts_if_class_abstract(
     assert result.exit_code == 0
     if warning_on_stderr_expected:
         assert any(
-            [
-                f"Workspace {command_arguments[2]} seems to be sourced from abc.py." in message
-                for message in caplog.messages
-            ]
+            f"Workspace {command_arguments[2]} seems to be sourced from abc.py." in message
+            for message in caplog.messages
         )
         assert any(
-            [
-                "One or more classes couldn't have their exact source module identified" in message
-                for message in caplog.messages
-            ]
+            "One or more classes couldn't have their exact source module identified" in message
+            for message in caplog.messages
         )
     else:
         assert len(caplog.messages) == 0

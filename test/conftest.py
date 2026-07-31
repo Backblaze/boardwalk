@@ -76,7 +76,7 @@ async def spawn_boardwalkd_server(anyio_backend, free_tcp_port: int):
             "url": url,
             "workspace_status_json": True,
         }
-        app, http_servers = await boardwalkd_run(**run_kwargs)
+        _app, http_servers = await boardwalkd_run(**run_kwargs)
 
         await asyncio.sleep(0.5)
 

@@ -90,7 +90,7 @@ def _inventory_labels_for_pattern(pattern: Any, inventory: Mapping[str, Any] | N
     labels: set[str] = set()
     for raw_part in str(pattern).split(":"):
         part = raw_part.strip()
-        if not part or part.startswith("!") or part.startswith("&"):
+        if not part or part.startswith(("!", "&")):
             continue
         labels.update(_inventory_labels_for_group(part, parents))
     return labels

@@ -119,10 +119,10 @@ from boardwalk import Job, PlaybookJob, TaskJob, Workflow, Workspace, WorkspaceC
 zabbix_api_token = "NotARealToken"
 
 __all__ = [
-    "TaskJobWithOptionsShouldSucceedWorkspace",
     "PlaybookJobWithOptionsShouldSucceedWorkspace",
-    "TaskJobWithPreconditionsShouldSucceedIfHostIsMacOSXWorkspace",
+    "TaskJobWithOptionsShouldSucceedWorkspace",
     "TaskJobWithPreconditionsShouldBeSkippedIfHostIsMacOSXWorkspace",
+    "TaskJobWithPreconditionsShouldSucceedIfHostIsMacOSXWorkspace",
 ]
 
 

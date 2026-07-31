@@ -44,14 +44,13 @@ def test_version():
         (
             "Missing required parameters to serve boardwalkd: --port/--tls-port",
             [r'--host-header-pattern="(localhost|127\.0\.0\.1)"', '--url="http://localhost:8888"'],
-            2,
+            1,
         ),  # type: ignore
     ],
 )
-async def test_incomplete_serve_command(
-    msg: str, options: list[str], expected_rc: int, command: list[str] = ["boardwalkd", "serve"]
-):
+async def test_incomplete_serve_command(msg: str, options: list[str], expected_rc: int):
     """Running `boardwalkd serve` without the required parameters shouldn't succeed."""
+    command: list[str] = ["boardwalkd", "serve"]
     command.extend(options)
     async with create_task_group():
         with fail_after(delay=10) as scope:
@@ -106,7 +105,8 @@ def test_serve_passes_demo_to_server_run():
 def test_serve_passes_develop_snapshot_to_server_run():
     runner = CliRunner()
     with runner.isolated_filesystem():
-        open("snapshot.json", "w").write('{"workspaces": []}')
+        with open("snapshot.json", "w") as fd:
+            fd.write('{"workspaces": []}')
         result, run_mock = invoke_serve_with_run_mock(
             [
                 "--develop",
@@ -126,7 +126,8 @@ def test_serve_passes_develop_snapshot_to_server_run():
 def test_serve_rejects_develop_snapshot_without_develop():
     runner = CliRunner()
     with runner.isolated_filesystem():
-        open("snapshot.json", "w").write('{"workspaces": []}')
+        with open("snapshot.json", "w") as fd:
+            fd.write('{"workspaces": []}')
         result = runner.invoke(
             cli=cli.serve,
             args=[
@@ -144,7 +145,8 @@ def test_serve_rejects_develop_snapshot_without_develop():
 def test_serve_rejects_demo_with_develop_snapshot():
     runner = CliRunner()
     with runner.isolated_filesystem():
-        open("snapshot.json", "w").write('{"workspaces": []}')
+        with open("snapshot.json", "w") as fd:
+            fd.write('{"workspaces": []}')
         result = runner.invoke(
             cli=cli.serve,
             args=[
@@ -164,30 +166,30 @@ def test_serve_rejects_demo_with_develop_snapshot():
 def test_sanitize_status_snapshot_command_writes_redacted_snapshot():
     runner = CliRunner()
     with runner.isolated_filesystem():
-        open("raw.json", "w").write(
-            """
+        with open("raw.json", "w") as fd:
+            fd.write("""
             {
-              "workspaces": [{
-                "name": "real_workspace",
-                "semaphores": {"caught": true, "has_mutex": true},
-                "details": {
-                  "current_host": "node-alpha-a",
-                  "ui_group": "alpha",
-                  "worker_hostname": "worker-prod-01",
-                  "worker_username": "operator-a",
-                  "worker_connected": true
-                },
-                "last_seen": "2026-06-03T00:00:00+00:00"
-              }]
+                "workspaces": [{
+                    "name": "real_workspace",
+                    "semaphores": {"caught": true, "has_mutex": true},
+                    "details": {
+                        "current_host": "node-alpha-a",
+                        "ui_group": "alpha",
+                        "worker_hostname": "worker-prod-01",
+                        "worker_username": "operator-a",
+                        "worker_connected": true
+                    },
+                    "last_seen": "2026-06-03T00:00:00+00:00"
+                }]
             }
-            """
-        )
+            """)
 
         result = runner.invoke(
             cli=cli.sanitize_status_snapshot,
             args=["raw.json", "sanitized.json", "--captured-at=2026-06-03T00:00:03+00:00"],
         )
-        text = open("sanitized.json").read()
+        with open("sanitized.json") as fd:
+            text = fd.read()
 
     assert result.exit_code == 0
     assert "snapshot_alpha_001" in text
@@ -201,24 +203,23 @@ def test_sanitize_status_snapshot_command_writes_redacted_snapshot():
 def test_sanitize_status_snapshot_command_can_preserve_identifiers_for_private_replay():
     runner = CliRunner()
     with runner.isolated_filesystem():
-        open("raw.json", "w").write(
-            """
+        with open("raw.json", "w") as fd:
+            fd.write("""
             {
-              "workspaces": [{
-                "name": "real_workspace",
-                "semaphores": {"caught": true, "has_mutex": true},
-                "details": {
-                  "current_host": "node-alpha-a",
-                  "host_pattern": "nodes_alpha",
-                  "worker_hostname": "worker-prod-01",
-                  "worker_username": "operator-a",
-                  "worker_connected": true
-                },
-                "last_seen": "2026-06-03T00:00:00+00:00"
-              }]
+                "workspaces": [{
+                    "name": "real_workspace",
+                    "semaphores": {"caught": true, "has_mutex": true},
+                    "details": {
+                        "current_host": "node-alpha-a",
+                        "host_pattern": "nodes_alpha",
+                        "worker_hostname": "worker-prod-01",
+                        "worker_username": "operator-a",
+                        "worker_connected": true
+                    },
+                    "last_seen": "2026-06-03T00:00:00+00:00"
+                }]
             }
-            """
-        )
+            """)
 
         result = runner.invoke(
             cli=cli.sanitize_status_snapshot,
@@ -229,7 +230,8 @@ def test_sanitize_status_snapshot_command_can_preserve_identifiers_for_private_r
                 "--preserve-identifiers",
             ],
         )
-        text = open("private-replay.json").read()
+        with open("private-replay.json") as fd:
+            text = fd.read()
 
     assert result.exit_code == 0
     assert "real_workspace" in text
@@ -242,30 +244,28 @@ def test_sanitize_status_snapshot_command_can_preserve_identifiers_for_private_r
 def test_sanitize_status_snapshot_command_can_enrich_groups_from_inventory_json():
     runner = CliRunner()
     with runner.isolated_filesystem():
-        open("raw.json", "w").write(
-            """
+        with open("raw.json", "w") as fd:
+            fd.write("""
             {
-              "workspaces": [{
-                "name": "storage_workspace",
-                "semaphores": {"caught": true, "has_mutex": true},
-                "details": {
-                  "host_pattern": "storage_001:!storage_nonprod",
-                  "worker_connected": true
-                },
-                "last_seen": "2026-06-03T00:00:00+00:00"
-              }]
+                "workspaces": [{
+                    "name": "storage_workspace",
+                    "semaphores": {"caught": true, "has_mutex": true},
+                    "details": {
+                        "host_pattern": "storage_001:!storage_nonprod",
+                        "worker_connected": true
+                    },
+                    "last_seen": "2026-06-03T00:00:00+00:00"
+                }]
             }
-            """
-        )
-        open("inventory.json", "w").write(
-            """
+            """)
+        with open("inventory.json", "w") as fd:
+            fd.write("""
             {
-              "_meta": {"hostvars": {}},
-              "storage_001": {"hosts": ["node-alpha-a"]},
-              "storage_alpha": {"children": ["storage_001"]}
+                "_meta": {"hostvars": {}},
+                "storage_001": {"hosts": ["node-alpha-a"]},
+                "storage_alpha": {"children": ["storage_001"]}
             }
-            """
-        )
+            """)
 
         result = runner.invoke(
             cli=cli.sanitize_status_snapshot,
@@ -277,7 +277,8 @@ def test_sanitize_status_snapshot_command_can_enrich_groups_from_inventory_json(
                 "--inventory-json=inventory.json",
             ],
         )
-        text = open("private-replay.json").read()
+        with open("private-replay.json") as fd:
+            text = fd.read()
 
     assert result.exit_code == 0
     assert "storage_workspace" in text

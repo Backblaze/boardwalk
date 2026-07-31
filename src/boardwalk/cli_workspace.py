@@ -143,7 +143,7 @@ def workspace_list(jobs: bool = False, config: bool = False, workspace: str | No
             workspace_config: WorkspaceConfig = workspace_class_instance.config()
 
             # Process the workflow data
-            workflow: Workflow = getattr(workspace_config, "workflow")
+            workflow: Workflow = workspace_config.workflow
 
             workspace_configuration_detail_table = Table(show_header=False, box=None)
 
