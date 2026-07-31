@@ -10,7 +10,7 @@ from importlib.metadata import version as lib_version
 from typing import TYPE_CHECKING
 
 import click
-from loguru import logger  # noqa: F401
+from loguru import logger
 
 from boardwalk.app_exceptions import BoardwalkException
 from boardwalk.cli_catch import catch, release

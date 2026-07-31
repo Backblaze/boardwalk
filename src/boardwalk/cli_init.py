@@ -29,7 +29,6 @@ if TYPE_CHECKING:
     class runnerKwargs(TypedDict, total=False):
         gather_facts: bool
         hosts: str
-        hosts: str
         invocation_msg: str
         limit: str
         tasks: AnsibleTasksType
@@ -87,7 +86,7 @@ def init(ctx: click.Context, limit: str, retry: bool):
     if retry:
         if not retry_file_path.exists():
             raise BoardwalkException("No retry file exists")
-        runner_kwargs["limit"] = f"@{str(retry_file_path)}"
+        runner_kwargs["limit"] = f"@{retry_file_path!s}"
 
     # Save the host pattern we are initializing with. If the pattern changes after
     # this point, other operations will need the state reset and init to be re-done

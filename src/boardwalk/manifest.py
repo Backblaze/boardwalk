@@ -84,7 +84,7 @@ def get_ws() -> Workspace:
 
     # If somehow the active workspace name did not get set, we panic
     if not active_workspace_name:
-        raise Exception("active_workspace_name is not set but it should have been")
+        raise BoardwalkException("active_workspace_name is not set but it should have been")
 
     # Ensure the active Workspace name actually exists.
     if Workspace.exists(active_workspace_name):
@@ -118,15 +118,15 @@ class BaseJob:
     The base class for Jobs
     """
 
-    def __init__(self, options: dict[str, Any] = dict()):
+    def __init__(self, options: dict[str, Any]):
         self.name = self.__class__.__name__
         self._check_options(options)
-        self.options = options
+        self.options = options if options is not None else {}
         """Optional dict of options that can be leveraged inside the class"""
 
     def required_options(self) -> tuple[str]:
         """Optional user method. Defines any required Job input options"""
-        return tuple()  # type: ignore
+        return ()  # type: ignore
 
     def preconditions(self, facts: AnsibleFacts, inventory_vars: InventoryHostVars) -> bool:
         """Optional user method. Return True if preconditions are met, else return False"""
@@ -157,8 +157,9 @@ class BaseJob:
 class TaskJob(BaseJob):
     """Defines a single Job as methods, used to execute Tasks"""
 
-    def __init__(self, options: dict[str, Any] = dict()):
-        super().__init__(options=options)
+    def __init__(self, options: dict[str, Any] | None = None):
+        _options = options if options is not None else {}
+        super().__init__(options=_options)
         self.job_type = JobTypes.TASK
 
     def tasks(self) -> AnsibleTasksType:
@@ -174,19 +175,21 @@ class Job(TaskJob):
     Deprecated in favor of TaskJob.
     """
 
-    def __init__(self, options: dict[str, Any] = dict()):
+    def __init__(self, options: dict[str, Any] | None = None):
+        _options = options if options is not None else {}
         warnings.warn(
             "The job type Job is deprecated, and will be removed in a future release. Use TaskJob or PlaybookJob, as appropriate.",
             DeprecationWarning,
         )
-        super().__init__(options=options)
+        super().__init__(options=_options)
 
 
 class PlaybookJob(BaseJob):
     """Defines a single Job as methods, used to execute Playbooks"""
 
-    def __init__(self, options: dict[str, Any] = dict()):
-        super().__init__(options=options)
+    def __init__(self, options: dict[str, Any] | None = None):
+        _options = options if options is not None else {}
+        super().__init__(options=_options)
         self.job_type = JobTypes.PLAYBOOK
         self.extra_vars = options
 
@@ -225,10 +228,10 @@ class Workflow(ABC):
     def __init__(self):
         # If user-provided Jobs as a single Job, convert to tuple
         workflow_jobs = self.jobs()
-        if isinstance(workflow_jobs, TaskJob) or isinstance(workflow_jobs, PlaybookJob):
+        if isinstance(workflow_jobs, (TaskJob, PlaybookJob)):
             workflow_jobs = (workflow_jobs,)
         workflow_exit_jobs = self.exit_jobs()
-        if isinstance(workflow_exit_jobs, TaskJob) or isinstance(workflow_exit_jobs, PlaybookJob):
+        if isinstance(workflow_exit_jobs, (TaskJob, PlaybookJob)):
             workflow_exit_jobs = (workflow_exit_jobs,)
         # self._jobs is the list of initialized Jobs.
         self.i_jobs = workflow_jobs
@@ -285,7 +288,7 @@ class WorkspaceConfig:
     :param workflow: The workflow the workspace uses
     """
 
-    valid_sort_orders = ["ascending", "descending", "shuffle"]
+    valid_sort_orders: frozenset[str] = frozenset(["ascending", "descending", "shuffle"])
 
     def __init__(
         self,
@@ -376,11 +379,12 @@ class Workspace(ABC):
         """Flush workspace state to disk"""
         # The statefile is first written to a temp file so that failures in flushing
         # will not corrupt an existing statefile
-        tf = NamedTemporaryFile(mode="wb", delete=False, dir=self.path, prefix="statefile.json.").name
-        with open(tf, mode="w") as fd:
+        with open(
+            NamedTemporaryFile(mode="wb", delete=False, dir=self.path, prefix="statefile.json.").name, mode="w"
+        ) as fd:
             q = self.state.model_dump_json()
             fd.write(q)
-        os.rename(src=tf, dst=self.path.joinpath("statefile.json"))
+        os.rename(src=fd.name, dst=self.path.joinpath("statefile.json"))
 
     def reset(self):
         """Resets active workspace. Configuration is retained but other state is lost"""
@@ -459,9 +463,7 @@ class Workspace(ABC):
         workspace_names: list[str] = []
         for workspace in Workspace.__subclasses__():
             workspace_names.append(workspace.__qualname__)
-        if name in workspace_names:
-            return True
-        return False
+        return name in workspace_names
 
     @staticmethod
     def fetch_subclass(name: str) -> Callable[..., Workspace]:

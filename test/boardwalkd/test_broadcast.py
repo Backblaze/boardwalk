@@ -1,6 +1,6 @@
 import pytest
 
-import boardwalkd.broadcast as broadcast
+from boardwalkd import broadcast
 from boardwalkd.broadcast import handle_auth_login_broadcast
 
 

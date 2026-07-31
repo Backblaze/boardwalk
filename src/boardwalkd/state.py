@@ -29,7 +29,7 @@ class CachedSlackData(StateBaseModel):
     user_id: str | None = None
     real_name: str | None = None
 
-    @computed_field(exclude_if=lambda v: 1 == 1)
+    @computed_field(exclude_if=lambda v: True)
     @property
     def user_mention(self) -> str | None:
         """Property that returns the user-mention string for this :class:`User`.

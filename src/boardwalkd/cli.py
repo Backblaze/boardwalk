@@ -20,9 +20,9 @@ from boardwalkd.slack_error_advice import SlackErrorAdviceConfigError, parse_sla
 from boardwalkd.snapshot import load_inventory_context
 from boardwalkd.snapshot import sanitize_status_snapshot as sanitize_status_snapshot_data
 
-CONTEXT_SETTINGS: dict = dict(
-    auto_envvar_prefix="BOARDWALKD",
-)
+CONTEXT_SETTINGS: dict = {
+    "auto_envvar_prefix": "BOARDWALKD",
+}
 
 
 @click.group()
@@ -33,7 +33,6 @@ def cli():
 
     To see more info about any subcommand, execute `boardwalkd <subcommand> --help`
     """
-    pass
 
 
 @cli.command(context_settings=CONTEXT_SETTINGS)

@@ -50,7 +50,7 @@ class Host(BaseModel, extra="forbid"):
         check: bool = False,
         gather_facts: bool = True,
         quiet: bool = True,
-        extra_vars: dict = {},
+        extra_vars: dict | None = None,
         event_handler: Callable[[dict[str, Any]], bool] | None = None,
     ) -> Runner:
         """
@@ -67,7 +67,7 @@ class Host(BaseModel, extra="forbid"):
             check=check,
             gather_facts=gather_facts,
             quiet=quiet,
-            extra_vars=extra_vars,
+            extra_vars=extra_vars if extra_vars is not None else {},
             event_handler=event_handler,
         )
 

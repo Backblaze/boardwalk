@@ -72,10 +72,7 @@ def ansible_runner_cancel_callback(ws: Workspace):
     True to stop execution. We check for the workspace.mutex because that file
     is always supposed to be torn down on exit
     """
-    if ws.path.joinpath("workspace.mutex").exists():
-        return False
-    else:
-        return True
+    return not ws.path.joinpath("workspace.mutex").exists()
 
 
 FAILED_RUNNER_EVENTS = {
@@ -171,13 +168,14 @@ def ansible_runner_run_tasks(
     quiet: bool = True,
     timeout: int | None = None,
     verbosity: int = 0,
-    extra_vars: dict = {},
+    extra_vars: dict | None = None,
     event_handler: Callable[[dict[str, Any]], bool] | None = None,
 ) -> ansible_runner.Runner:
     """
     Wraps ansible_runner.run to run Ansible tasks with some defaults for
     Boardwalk
     """
+    extra_vars = extra_vars if extra_vars is not None else {}
     workspace = boardwalk.manifest.get_ws()
 
     runner_kwargs: RunnerKwargs = {

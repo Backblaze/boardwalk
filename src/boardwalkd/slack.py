@@ -74,12 +74,11 @@ async def update_cached_slack_data(limit: int = 200, cursor: str | None = None) 
             next_cursor = resp.get("response_metadata", {}).get("next_cursor")
             should_flush_state = False
             for member in resp.get("members", {}):
-                if email := member.get("profile", {}).get("email"):
-                    if email in STATE.users:
-                        logger.debug(f"Updating cached Slack data for {email}")
-                        STATE.users[email].slack_cache.user_id = member.get("id")
-                        STATE.users[email].slack_cache.real_name = member.get("profile", {}).get("real_name", "Unknown")
-                        should_flush_state = True
+                if (email := member.get("profile", {}).get("email")) and email in STATE.users:
+                    logger.debug(f"Updating cached Slack data for {email}")
+                    STATE.users[email].slack_cache.user_id = member.get("id")
+                    STATE.users[email].slack_cache.real_name = member.get("profile", {}).get("real_name", "Unknown")
+                    should_flush_state = True
             if should_flush_state:
                 STATE.flush()
             if next_cursor:
@@ -220,13 +219,10 @@ async def catch_release_workspaces(ack: AsyncAck, body: dict[str, Any], client: 
             DividerBlock(),
             SectionBlock(
                 text=MarkdownTextObject(
-                    text=" ".join(  # semgrep avoidance https://sg.run/Kl07 -- string-concat-in-list
-                        [
-                            "*Note*: It should go without saying that you should exercise caution prior to catching or",
-                            "releasing workspaces. Dragons might be lurking. 🐉",
-                        ]
-                    ),
-                )
+                    # nosemgrep: python.lang.correctness.common-mistakes.string-concat-in-list.string-concat-in-list
+                    text="*Note*: It should go without saying that you should exercise caution prior "
+                    "to catching or releasing workspaces. Dragons might be lurking. 🐉"
+                ),
             ),
         ],
     )
@@ -262,7 +258,7 @@ async def modal_catch_release_view_submission_event(
     _actioned_workspaces: list[str] = []
     for workspace in workspaces:
         if workspace not in rejected_workspaces:
-            STATE.workspaces[workspace].semaphores.caught = True if action == "catch" else False
+            STATE.workspaces[workspace].semaphores.caught = bool(action == "catch")
             # Record who caught the workspace(s)
             event = WorkspaceEvent(
                 severity="info",
@@ -328,7 +324,7 @@ async def modal_catch_release_view_submission_event(
                 text=f"Workspace(s) {action} successfully!",
             )
         else:  # Reraise.
-            raise e
+            raise
 
 
 @app.command(f"/{SLACK_SLASH_COMMAND_PREFIX}-list")

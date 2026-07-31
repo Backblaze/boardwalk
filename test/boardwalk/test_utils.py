@@ -12,7 +12,6 @@ from boardwalk.utils import strtobool
         ("True", True),
         ("t", True),
         ("true", True),
-        ("True", True),
         ("On", True),
         ("on", True),
         ("1", True),
