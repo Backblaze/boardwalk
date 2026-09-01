@@ -33,7 +33,7 @@ dependencies = [
     "loguru >=0.7.3",
     "pydantic >=2.4.2",
     "slack-bolt >=1.21.3,<2",
-    "tornado >=6.4.2",
+    "tornado>=6.5.8",
     "rich >=15.0.0",
 ]
 
