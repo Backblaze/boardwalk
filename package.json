@@ -1,5 +1,5 @@
 {
-  "name": "boardwalk-js-tests",
+  "name": "@backblaze-labs/boardwalk-js-tests",
   "type": "module",
   "private": true,
   "engines": {
