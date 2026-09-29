@@ -39,7 +39,7 @@ jobs:
 
       - name: Run ansible-lint
         if: steps.linter-setup.conclusion == 'success' && !cancelled()
-        uses: ansible/ansible-lint@262624cd0ab22a4221293216856c59671ce7aa5e  # v26.6.0 - https://github.com/ansible/ansible-lint/releases/tag/v26.6.0
+        uses: ansible/ansible-lint@e7f397ad6dfa20d274afa17cd7bbedd84ed136f5  # v26.9.0 - https://github.com/ansible/ansible-lint/releases/tag/v26.9.0
         with:
           args: "--config-file ${{ github.workspace }}/test/ansible-lint.yaml"
           working_directory: ${{ github.workspace }}/test
